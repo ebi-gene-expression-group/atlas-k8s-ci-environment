@@ -1,13 +1,13 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: gradle-ro-dep-cache-rox
+  name: gradle-7.0-ro-dep-cache-rox
   namespace: jenkins-gene-expression
 spec:
   dataSource:
     apiGroup: snapshot.storage.k8s.io
     kind: VolumeSnapshot
-    name: gradle-ro-dep-cache-rwo-snapshot
+    name: gradle-7.0-ro-dep-cache-rwo-snapshot
   accessModes:
     - ReadOnlyMany
   storageClassName: premium-rwo

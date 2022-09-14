@@ -7,7 +7,7 @@ spec:
   volumes:
     - name: gradle-ro-dep-cache-rwo-vol
       persistentVolumeClaim:
-        claimName: gradle-ro-dep-cache-rwo
+        claimName: gradle-7.0-ro-dep-cache-rwo
   containers:
     - name: shell
       image: openjdk:11
