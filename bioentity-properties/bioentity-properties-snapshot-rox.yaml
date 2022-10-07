@@ -1,0 +1,16 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: bioentity-properties-rox
+  namespace: jenkins-gene-expression
+spec:
+  dataSource:
+    apiGroup: snapshot.storage.k8s.io
+    kind: VolumeSnapshot
+    name: bioentity-properties-rwo-snapshot
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: standard-rwo
+  resources:
+    requests:
+      storage: 10Gi

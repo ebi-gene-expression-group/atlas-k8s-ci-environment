@@ -1,0 +1,9 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: bioentity-properties-rwo-snapshot
+  namespace: jenkins-gene-expression
+spec:
+  volumeSnapshotClassName: snapshot-class
+  source:
+    persistentVolumeClaimName: bioentity-properties-rwo
