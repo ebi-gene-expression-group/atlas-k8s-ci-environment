@@ -7,4 +7,3 @@ spec:
   volumeSnapshotClassName: snapshot-class
   source:
     persistentVolumeClaimName: gradle-7.0-ro-dep-cache-rwo
-

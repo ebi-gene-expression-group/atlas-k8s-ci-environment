@@ -4,4 +4,3 @@ metadata:
   name: snapshot-class
 driver: pd.csi.storage.gke.io
 deletionPolicy: Delete
-

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: openjdk-shell-gradle
+  name: openjdk-gradle-shell
   namespace: jenkins-gene-expression
 spec:
   volumes:
@@ -11,6 +11,7 @@ spec:
   containers:
     - name: shell
       image: openjdk:11
+      workingDir: /root
       resources:
         requests:
           memory: 2Gi
@@ -25,4 +26,3 @@ spec:
       volumeMounts:
         - mountPath: /gradle-ro-dep-cache
           name: gradle-ro-dep-cache-rwo-vol
-
