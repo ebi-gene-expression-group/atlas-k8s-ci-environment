@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scxa-data-rwo
+  namespace: jenkins-gene-expression
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scxa-data-populator
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      volumes:
+        - name: scxa-data-vol
+          persistentVolumeClaim:
+            claimName: scxa-data-rwo
+      containers:
+      - name: scxa-data-ftp
+        image: takkatakka/lftp
+        env:
+        - name: EXP_IDS
+          value: "E-CURD-4 E-EHCA-2 E-GEOD-71585 E-GEOD-81547 E-GEOD-99058 E-MTAB-5061 E-ENAD-53"
+        command: ["sh", "-c"]
+        args:
+          - lftp -e "get /pub/databases/arrayexpress/data/atlas/atlas-ci/species-properties.json -o /scxa-data; exit" ftp.ebi.ac.uk;
+            lftp -e "get /pub/databases/arrayexpress/data/atlas/atlas-ci/release-metadata.json -o /scxa-data; exit" ftp.ebi.ac.uk;
+            lftp -e "get /pub/databases/arrayexpress/data/atlas/sc_experiments/cell_stats.json -o /scxa-data/magetab; exit" ftp.ebi.ac.uk;
+            for EXP_ID in ${EXP_IDS}; do lftp -e "mirror -vvv /pub/databases/arrayexpress/data/atlas/sc_experiments/${EXP_ID} /scxa-data/magetab/${EXP_ID}; exit" ftp.ebi.ac.uk; done;
+        volumeMounts:
+          - mountPath: "/scxa-data"
+            name: scxa-data-vol
+      restartPolicy: Never
+  backoffLimit: 4
+
