@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    jenkins: slave
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    ports:
+    - containerPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx2
+  labels:
+    jenkins: slave
+spec:
+  containers:
+  - name: nginx2
+    image: bitnami/kubectl
+    args: ["get","pods"]
+    ports:
+    - containerPort: 80
