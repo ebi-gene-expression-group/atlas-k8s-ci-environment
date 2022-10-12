@@ -9,7 +9,7 @@ spec:
       template: 
         spec:
           restartPolicy: OnFailure
-          serviceAccountName: admin-default
+          serviceAccountName: admin-jenkins-gene-expression
           nodeSelector:
             cloud.google.com/gke-spot: "true"
           containers:
