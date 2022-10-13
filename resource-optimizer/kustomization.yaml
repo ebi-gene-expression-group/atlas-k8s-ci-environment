@@ -1,0 +1,7 @@
+configMapGenerator:
+  - name: script-configmap
+    files:
+    - scripts/main.sh
+
+resources:
+- cronjob.yaml

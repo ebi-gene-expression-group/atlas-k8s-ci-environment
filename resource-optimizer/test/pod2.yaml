@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: resources-optimizer
+spec:
+  schedule: "* /30 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: admin-default
+          containers:
+          - name: resources-optimizer
+            image: bitnami/kubectl:latest
+            command: ["/bin/bash"]
+            args: ["/scripts-dir/main.sh"]
+            env:
+            - name: LABELS_FILTER
+              value: "jenkins in (slave)"
+            - name: STATEFULSET
+              value: "scxa-solrcloud-fast scxa-zk-fast"
+            volumeMounts:
+            - name: script-vol
+              mountPath: /scripts-dir
+          volumes:
+          - name: script-vol
+            configMap:
+              name: script-configmap

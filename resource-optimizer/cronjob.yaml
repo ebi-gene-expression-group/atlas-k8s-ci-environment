@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: resources-optimizer
+spec:
+  schedule: '@hourly'
+  jobTemplate:
+    spec:
+      template: 
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: admin-jenkins-gene-expression
+          nodeSelector:
+            cloud.google.com/gke-spot: "true"
+          containers:
+          - name: resources-optimizer
+            image: bitnami/kubectl:latest
+            resources:
+              requests:
+                memory: "100Mi"
+                cpu: "50m"
+                ephemeral-storage: "50Mi"
+              limits:
+                memory: "100Mi"
+                cpu: "50m"
+                ephemeral-storage: "50Mi"
+            command: ["/bin/bash"]
+            args: ["/scripts-dir/main.sh"]
+            env:
+            - name: LABELS_FILTER
+              value: "jenkins in (slave)"
+            - name: STATEFULSET
+              value: "scxa-solrcloud scxa-solrcloud-zookeeper"
+            volumeMounts:
+            - name: script-vol
+              mountPath: /scripts-dir
+          volumes:
+          - name: script-vol
+            configMap:
+              name: script-configmap
