@@ -1,0 +1,6 @@
+secretGenerator:
+  - name: scxa-solrcloud-package-store-keys
+    namespace: jenkins-gene-expression
+    files:
+      - scxa-solrcloud.pem
+      - scxa-solrcloud.der
