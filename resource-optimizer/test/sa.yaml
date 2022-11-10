@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: admin-default
-  namespace: default
+  name: admin-jenkins-gene-expression
+  namespace: jenkins-gene-expression
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: admin-default
-  namespace: default
+  name: admin-jenkins-gene-expression
+  namespace: jenkins-gene-expression
   annotations:
     kubernetes.io/service-account.name: "sa-name"
 type: kubernetes.io/service-account-token
@@ -18,13 +18,38 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: cluster-admin-cicd
-  namespace: default
+  namespace: jenkins-gene-expression
 subjects:
 - kind: ServiceAccount
-  name: admin-default
-  namespace: default
+  name: admin-jenkins-gene-expression
+  namespace: jenkins-gene-expression
   apiGroup: ""
 roleRef:
   kind: ClusterRole
   name: admin
   apiGroup: "rbac.authorization.k8s.io"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: jenkins-gene-expression
+  name: solrcloud-scaler
+rules:
+- apiGroups: ["solr.apache.org"]
+  resources: ["solrclouds", "solrclouds/scale"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solrcloud-scaler
+  namespace: jenkins-gene-expression
+subjects:
+- kind: ServiceAccount
+  name: admin-jenkins-gene-expression
+  namespace: jenkins-gene-expression
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: solrcloud-scaler
+  apiGroup: rbac.authorization.k8s.io
