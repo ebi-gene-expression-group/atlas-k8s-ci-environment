@@ -1,59 +1,58 @@
-apiVersion: apps/v1
-kind: StatefulSet
+# https://apache.github.io/solr-operator/example/test_solrcloud.yaml
+apiVersion: solr.apache.org/v1beta1
+kind: SolrCloud
 metadata:
-  name: scxa-zk-fast
+  name: scxa
+  namespace: default
 spec:
-  serviceName: "nginx"
+  dataStorage:
+    persistent:
+      reclaimPolicy: Retain
+      pvcTemplate:
+        spec:
+          storageClassName: hostpath
+          resources:
+            requests:
+              storage: 5Gi
   replicas: 2
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: nginx
-        ports:
-        - containerPort: 80
-          name: web
-  volumeClaimTemplates:
-  - metadata:
-      name: www
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
+  solrImage:
+    tag: 8.7.0
+  solrJavaMem: "-Xms2000m -Xmx2000m"
+# solrModules:
+#   - jaegertracer-configurator
+#   - ltr
+  customSolrKubeOptions:
+    podOptions:
       resources:
+        limits:
+          memory: 2.5Gi
         requests:
-          storage: 1Gi
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: scxa-solrcloud-fast
-spec:
-  serviceName: "nginx"
-  replicas: 2
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: nginx
-        ports:
-        - containerPort: 80
-          name: web
-  volumeClaimTemplates:
-  - metadata:
-      name: www
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 1Gi
+#         cpu: "65m"
+          memory: 2Gi
+      volumes:
+      - defaultContainerMount:
+          mountPath: /keys
+          name: foo
+        name: foobar
+        source:
+          secret:
+            secretName: scxa-solrcloud-package-store-keys-4f2tcm6dgc
+  zookeeperRef:
+    provided:
+#     chroot: "/this/will/be/auto/created"
+      persistence:
+        spec:
+          storageClassName: hostpath
+          resources:
+            requests:
+              storage: 500Mi
+      replicas: 3
+      zookeeperPodPolicy:
+        resources:
+          limits:
+            memory: 512Mi
+#         requests:
+#           cpu: "65m"
+#           memory: "156Mi"
+  solrOpts: "-Denable.packages=true -Dblob.max.size.mb=100" # "-Dsolr.autoSoftCommit.maxTime=10000"
+  solrGCTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"

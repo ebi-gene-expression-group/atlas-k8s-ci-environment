@@ -13,7 +13,7 @@ CACERT=${SERVICEACCOUNT}/ca.crt
 REPLICAS_DESIRED=0
 
 function get_stateful_replicas() {
-  echo $( kubectl get statefulset $1 -o=jsonpath="{.spec.replicas}" )
+  echo $( kubectl get solrcloud $1 -o=jsonpath="{.spec.replicas}" )
 }
 
 function decrease_replicas() {
@@ -26,9 +26,8 @@ function decrease_replicas() {
     then
       echo "No replicas running. Doing nothing..."
     else
-      echo "$replicaset running, and no jenkins nodes running. Scaling down...."
-      echo "Running: kubectl scale statefulset $replicaset --replicas=$REPLICAS_DESIRED"
-      scale_result=$( kubectl scale statefulset $replicaset --replicas=$REPLICAS_DESIRED )
+      echo "Running: kubectl scale SolrCloud  $replicaset --replicas=$REPLICAS_DESIRED"
+      scale_result=$( kubectl scale SolrCloud  $replicaset --replicas=$REPLICAS_DESIRED )
       echo $scale_result
     fi
   done

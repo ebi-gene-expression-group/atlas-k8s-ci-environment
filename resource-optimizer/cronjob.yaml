@@ -3,10 +3,11 @@ kind: CronJob
 metadata:
   name: resources-optimizer
 spec:
-  schedule: '@hourly'
+  schedule: "@hourly"
+  startingDeadlineSeconds: 40
   jobTemplate:
     spec:
-      template: 
+      template:
         spec:
           restartPolicy: OnFailure
           serviceAccountName: admin-jenkins-gene-expression
@@ -15,22 +16,13 @@ spec:
           containers:
           - name: resources-optimizer
             image: bitnami/kubectl:latest
-            resources:
-              requests:
-                memory: "100Mi"
-                cpu: "50m"
-                ephemeral-storage: "50Mi"
-              limits:
-                memory: "100Mi"
-                cpu: "50m"
-                ephemeral-storage: "50Mi"
             command: ["/bin/bash"]
             args: ["/scripts-dir/main.sh"]
             env:
             - name: LABELS_FILTER
               value: "jenkins in (slave)"
             - name: STATEFULSET
-              value: "scxa-solrcloud scxa-solrcloud-zookeeper"
+              value: "scxa"
             volumeMounts:
             - name: script-vol
               mountPath: /scripts-dir
