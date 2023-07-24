@@ -1,0 +1,58 @@
+# https://apache.github.io/solr-operator/example/test_solrcloud.yaml
+apiVersion: solr.apache.org/v1beta1
+kind: SolrCloud
+metadata:
+  name: gxa
+  namespace: jenkins-gene-expression
+spec:
+  dataStorage:
+    persistent:
+      reclaimPolicy: Retain
+      pvcTemplate:
+        spec:
+          storageClassName: premium-rwo
+          resources:
+            requests:
+              storage: 5Gi
+  replicas: 2
+  solrImage:
+    tag: 8.7.0
+  solrJavaMem: "-Xms2000m -Xmx2000m"
+# solrModules:
+#   - jaegertracer-configurator
+#   - ltr
+  customSolrKubeOptions:
+    podOptions:
+      resources:
+        limits:
+          memory: 2.5Gi
+        requests:
+#         cpu: "65m"
+          memory: 2Gi
+      volumes:
+      - defaultContainerMount:
+          mountPath: /keys
+          name: foo
+        name: foobar
+        source:
+          secret:
+            secretName: gxa-solrcloud-package-store-keys
+  zookeeperRef:
+    provided:
+#     chroot: "/this/will/be/auto/created"
+      persistence:
+        spec:
+          storageClassName: premium-rwo
+          resources:
+            requests:
+              storage: 500Mi
+      replicas: 3
+      zookeeperPodPolicy:
+        resources:
+          limits:
+            memory: 512Mi
+#         requests:
+#           cpu: "65m"
+#           memory: "156Mi"
+  solrOpts: "-Denable.packages=true -Dblob.max.size.mb=100" # "-Dsolr.autoSoftCommit.maxTime=10000"
+  solrGCTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
