@@ -1,0 +1,16 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: gxa-data-rox
+  namespace: jenkins-gene-expression
+spec:
+  dataSource:
+    apiGroup: snapshot.storage.k8s.io
+    kind: VolumeSnapshot
+    name: gxa-data-rwo-snapshot
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: premium-rwo
+  resources:
+    requests:
+      storage: 20Gi
