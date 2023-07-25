@@ -27,13 +27,13 @@ spec:
         image: takkatakka/lftp
         env:
         - name: EXP_IDS
-          value: "E-CURD-4 E-EHCA-2 E-GEOD-71585 E-GEOD-81547 E-GEOD-99058 E-MTAB-5061 E-ENAD-53"
+          value: "E-ERAD-475 E-GEOD-40611 E-GEOD-43049 E-GEOD-46858 E-MAXD-6 E-MEXP-1810 E-MEXP-1968 E-MTAB-1913 E-MTAB-2770 E-MTAB-2836 E-MTAB-2909 E-MTAB-3579 E-MTAB-3827 E-MTAB-3834 E-MTAB-4106 E-MTAB-4401 E-MTAB-451 E-MTAB-4559 E-MTAB-5128 E-MTAB-5200 E-MTAB-5214 E-MTAB-5422 E-MTAB-5633 E-MTAB-5941 E-PROT-1 E-PROT-15 E-PROT-39 E-TABM-713"
         command: ["sh", "-c"]
         args:
           - lftp -e "get /pub/databases/arrayexpress/data/atlas/atlas-ci/species-properties.json -o /gxa-data; exit" ftp.ebi.ac.uk;
             lftp -e "get /pub/databases/arrayexpress/data/atlas/atlas-ci/release-metadata.json -o /gxa-data; exit" ftp.ebi.ac.uk;
             lftp -e "get /pub/databases/arrayexpress/data/atlas/sc_experiments/cell_stats.json -o /gxa-data/magetab; exit" ftp.ebi.ac.uk;
-            for EXP_ID in ${EXP_IDS}; do lftp -e "mirror -vvv /pub/databases/arrayexpress/data/atlas/sc_experiments/${EXP_ID} /gxa-data/magetab/${EXP_ID}; exit" ftp.ebi.ac.uk; done;
+            for EXP_ID in ${EXP_IDS}; do lftp -e "mirror -vvv /pub/databases/arrayexpress/data/atlas/experiments/${EXP_ID} /gxa-data/magetab/${EXP_ID}; exit" ftp.ebi.ac.uk; done;
         volumeMounts:
           - mountPath: "/gxa-data"
             name: gxa-data-vol
