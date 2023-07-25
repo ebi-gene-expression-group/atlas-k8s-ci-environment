@@ -13,7 +13,7 @@ spec:
           storageClassName: premium-rwo
           resources:
             requests:
-              storage: 5Gi
+              storage: 20Gi
   replicas: 2
   solrImage:
     tag: 8.7.0
