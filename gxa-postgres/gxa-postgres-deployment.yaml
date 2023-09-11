@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: jenkins-gene-expression
+  name: gxa-postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          securityContext:
+            runAsUser: 0
+          image: postgres:11-alpine
+          ports:
+            - containerPort: 5432
+              name: postgresql
+          env:
+            - name: POSTGRES_USER
+              value: "atlasdev"
+            - name: POSTGRES_PASSWORD
+              value: "atlasdev"
+            - name: POSTGRES_DB
+              value: "gxpgxadev"
+          resources:
+            requests:
+              memory: "500Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: 2
