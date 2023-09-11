@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gxa-expdesign-rwo
+  namespace: jenkins-gene-expression
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gxa-postgres-populator
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      volumes:
+        - name: gxa-expdesign-vol
+          persistentVolumeClaim:
+            claimName: gxa-expdesign-rwo
+        - name: gxa-data-vol
+          persistentVolumeClaim:
+            claimName: gxa-data-rox
+      containers:
+        - name: gxa-flyway
+          image: quay.io/ebigxa/gxa-atlas-web-bulk-cli-postgres-populator
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8"
+            - name: POSTGRES_HOST
+              value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
+            - name: POSTGRES_USER
+              value: "atlasdev"
+            - name: POSTGRES_PASSWORD
+              value: "atlasdev"
+            - name: POSTGRES_DB
+              value: "gxpgxadev"
+            - name: EXP_IDS
+              value: "E-ERAD-475,E-GEOD-40611,E-GEOD-43049,E-GEOD-46858,E-MAXD-6,E-MEXP-1810,E-MEXP-1968,E-MTAB-1913,E-MTAB-2770,E-MTAB-2836,E-MTAB-2909,E-MTAB-3827,E-MTAB-3834,E-MTAB-4401,E-MTAB-451,E-MTAB-4559,E-MTAB-5128,E-MTAB-5200,E-MTAB-5422,E-MTAB-5633,E-MTAB-5941,E-TABM-713,E-MTAB-5214,E-PROT-1,E-MTAB-4106,E-PROT-28,E-PROT-39"
+          args:
+            - |
+              cd /root/atlas-web-bulk
+              
+              ./gradlew \
+              -PexperimentFilesLocation=/atlas-data/exp \
+              -PexperimentDesignLocation=/atlas-data/expdesign \
+              -PjdbcUrl=jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB} \
+              -PjdbcUsername=${POSTGRES_USER} \
+              -PjdbcPassword=${POSTGRES_PASSWORD} \
+              :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})"
+              
+              ./gradlew \
+              -PexperimentFilesLocation=/atlas-data/exp \
+              -PexperimentDesignLocation=/atlas-data/expdesign \
+              -PjdbcUrl=jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB} \
+              -PjdbcUsername=${POSTGRES_USER} \
+              -PjdbcPassword=${POSTGRES_PASSWORD} \
+              :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
+          volumeMounts:
+            - mountPath: "/atlas-data/expdesign"
+              name: gxa-expdesign-vol
+            - mountPath: "/atlas-data/exp"
+              name: gxa-data-vol
+      restartPolicy: Never
+  backoffLimit: 4
