@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gxa-bioentities-jsonl-rwo
+  namespace: jenkins-gene-expression
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gxa-solrcloud-bioentities-jsonl
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      volumes:
+        - name: gradle-ro-dep-cache-vol
+          persistentVolumeClaim:
+            claimName: gradle-7.0-ro-dep-cache-rox
+        - name: gxa-data-vol
+          persistentVolumeClaim:
+            claimName: gxa-data-rox
+        - name: bioentity-properties-vol
+          persistentVolumeClaim:
+            claimName: bioentity-properties-rox
+        - name: gxa-bioentities-jsonl-vol
+          persistentVolumeClaim:
+            claimName: gxa-bioentities-jsonl-rwo
+      containers:
+        - name: gxa-solrcloud-bioentities-jsonl
+          image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8"
+            - name: GRADLE_RO_DEP_CACHE
+              value: "/gradle-ro-dep-cache"
+            - name: POSTGRES_HOST
+              value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
+            - name: POSTGRES_USER
+              value: "atlasdev"
+            - name: POSTGRES_PASSWORD
+              value: "atlasdev"
+            - name: POSTGRES_DB
+              value: "gxpgxadev"
+            - name: SPECIES
+              value: "danio_rerio homo_sapiens equus_caballus drosophila_melanogaster caenorhabditis_elegans mus_musculus oryza_indica anas_platyrhynchos oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays saccharomyces_cerevisiae schizosaccharomyces_pombe"
+          resources:
+            requests:
+              memory: 6Gi
+              ephemeral-storage: 8Gi
+            limits:
+              memory: 8Gi
+          args:
+            - |
+              for _SPECIES in ${SPECIES}
+              do
+                rsync -av --include=${_SPECIES}* --include=*/ --exclude=* /atlas-data/bioentity_properties /root
+              done
+              
+              cd /root/atlas-web-bulk
+              ./gradlew --no-watch-fs \
+              -PdataFilesLocation=/root \
+              -PexperimentFilesLocation=/atlas-data/exp \
+              -PexperimentDesignLocation=/root \
+              -PjdbcUrl=jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB} \
+              -PjdbcUsername=${POSTGRES_USER} \
+              -PjdbcPassword=${POSTGRES_PASSWORD} \
+              :cli:bootRun --args="bioentities-json --output=/atlas-data/bioentities-jsonl"
+          volumeMounts:
+            - mountPath: "/gradle-ro-dep-cache"
+              name: gradle-ro-dep-cache-vol
+              readOnly: true
+            - mountPath: "/atlas-data/exp"
+              name: gxa-data-vol
+              readOnly: true
+            - mountPath: "/atlas-data/bioentity_properties"
+              name: bioentity-properties-vol
+              readOnly: true
+            - mountPath: "/atlas-data/bioentities-jsonl"
+              name: gxa-bioentities-jsonl-vol
+      restartPolicy: Never
