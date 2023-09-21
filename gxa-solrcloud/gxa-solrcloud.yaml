@@ -14,10 +14,10 @@ spec:
           resources:
             requests:
               storage: 20Gi
-  replicas: 2
+  replicas: 4
   solrImage:
     tag: 8.7.0
-  solrJavaMem: "-Xms2000m -Xmx2000m"
+  solrJavaMem: "-Xms3000m -Xmx4000m"
 # solrModules:
 #   - jaegertracer-configurator
 #   - ltr
@@ -25,15 +25,14 @@ spec:
     podOptions:
       resources:
         limits:
-          memory: 2.5Gi
+          memory: 4Gi
         requests:
-#         cpu: "65m"
           memory: 2Gi
       volumes:
       - defaultContainerMount:
           mountPath: /keys
-          name: foo
-        name: foobar
+          name: keys-secret
+        name: keys-secret
         source:
           secret:
             secretName: gxa-solrcloud-package-store-keys
@@ -51,8 +50,5 @@ spec:
         resources:
           limits:
             memory: 512Mi
-#         requests:
-#           cpu: "65m"
-#           memory: "156Mi"
   solrOpts: "-Denable.packages=true -Dblob.max.size.mb=100" # "-Dsolr.autoSoftCommit.maxTime=10000"
   solrGCTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
