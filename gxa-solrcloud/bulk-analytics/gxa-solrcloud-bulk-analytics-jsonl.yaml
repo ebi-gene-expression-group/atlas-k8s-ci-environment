@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gxa-bulk-analytics-jsonl-rwo
+  namespace: jenkins-gene-expression
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 150Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gxa-solrcloud-bulk-analytics-populator
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      volumes:
+        - name: gradle-ro-dep-cache-vol
+          persistentVolumeClaim:
+            claimName: gradle-7.0-ro-dep-cache-rox
+        - name: gxa-expdesign-vol
+          persistentVolumeClaim:
+            claimName: gxa-expdesign-rwo
+        - name: gxa-data-vol
+          persistentVolumeClaim:
+            claimName: gxa-data-rox
+        - name: gxa-bulk-analytics-jsonl-vol
+          persistentVolumeClaim:
+            claimName: gxa-bulk-analytics-jsonl-rwo
+      containers:
+        - name: gxa-solrcloud-bulk-analytics-jsonl
+          image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8"
+            - name: GRADLE_RO_DEP_CACHE
+              value: "/gradle-ro-dep-cache"
+            - name: POSTGRES_HOST
+              value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
+            - name: POSTGRES_USER
+              value: "atlasdev"
+            - name: POSTGRES_PASSWORD
+              value: "atlasdev"
+            - name: POSTGRES_DB
+              value: "gxpgxadev"
+            - name: ZK_HOSTS
+              # Set in gxa-solrcloud.yaml
+              value: "gxa-solrcloud-zookeeper-0.gxa-solrcloud-zookeeper-headless.jenkins-gene-expression.svc.cluster.local:2181,gxa-solrcloud-zookeeper-1.gxa-solrcloud-zookeeper-headless.jenkins-gene-expression.svc.cluster.local:2181,gxa-solrcloud-zookeeper-2.gxa-solrcloud-zookeeper-headless.jenkins-gene-expression.svc.cluster.local:2181"
+            - name: SOLR_HOSTS
+              value: "http://gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-1.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-2.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-3.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr"
+            - name: HUMAN_EXP_IDS
+              value: "E-GEOD-40611,E-GEOD-43049,E-MTAB-2770,E-MTAB-2836,E-MTAB-3827,E-MTAB-5200,E-MTAB-5423,E-TABM-713,E-MTAB-5214,E-PROT-1,E-PROT-28,E-PROT-39"
+            - name: MOUSE_EXP_IDS
+              value: "E-MEXP-1968,E-MTAB-5633"
+            - name: ZEBRAFISH_EXP_IDS
+              value: "E-ERAD-475"
+            - name: FLY_EXP_IDS
+              value: "E-MAXD-6"
+            - name: WORM_EXP_IDS
+              value: "E-MEXP-1810"
+            - name: HORSE_EXP_IDS
+              value: "E-GEOD-46858"
+            - name: YEAST_EXP_IDS
+              value: "E-MTAB-5128,E-MTAB-4106"
+            - name: WHEAT_EXP_IDS
+              value: "E-MTAB-4559,E-MTAB-5422"
+            - name: PLATYPUS_EXP_IDS
+              value: "E-MTAB-2909"
+            - name: RICE_EXP_IDS
+              value: "E-MTAB-1913,E-MTAB-3834,E-MTAB-5941"
+            - name: GRASS_EXP_IDS
+              value: "E-MTAB-4401"
+            - name: SCHISTOSOME_EXP_IDS
+              value: "E-MTAB-451"
+          resources:
+            requests:
+              memory: 6Gi
+              ephemeral-storage: 8Gi
+            limits:
+              memory: 8Gi
+          args:
+            - |
+              cd /root/atlas-web-bulk
+              
+              for EXP_IDS in HUMAN_EXP_IDS MOUSE_EXP_IDS ZEBRAFISH_EXP_IDS FLY_EXP_IDS WORM_EXP_IDS HORSE_EXP_IDS YEAST_EXP_IDS WHEAT_EXP_IDS PLATYPUS_EXP_IDS RICE_EXP_IDS GRASS_EXP_IDS SCHISTOSOME_EXP_IDS
+              do          
+                ./gradlew --no-watch-fs \
+                -PdataFilesLocation=/atlas-data \
+                -PexperimentFilesLocation=/atlas-data/exp \
+                -PexperimentDesignLocation=/atlas-data/expdesign \
+                -PjdbcUrl=jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB} \
+                -PjdbcUsername=${POSTGRES_USER} \
+                -PjdbcPassword=${POSTGRES_PASSWORD} \
+                -PzkHosts=${ZK_HOSTS} \
+                -PsolrHosts=${SOLR_HOSTS} \
+                :cli:bootRun --args="bulk-analytics-json --output=/atlas-data/bulk-analytics-jsonl -e ${!EXP_IDS}"
+              done
+          volumeMounts:
+            - mountPath: "/gradle-ro-dep-cache"
+              name: gradle-ro-dep-cache-vol
+              readOnly: true
+            - mountPath: "/atlas-data/expdesign"
+              name: gxa-expdesign-vol
+            - mountPath: "/atlas-data/exp"
+              name: gxa-data-vol
+            - mountPath: "/atlas-data/bulk-analytics-jsonl"
+              name: gxa-bulk-analytics-jsonl-vol
+      restartPolicy: Never
