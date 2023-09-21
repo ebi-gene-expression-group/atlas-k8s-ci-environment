@@ -21,7 +21,7 @@ RUN apt-get clean && \
 # Set working directory and clone necessary repositories
 WORKDIR /root
 RUN git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
-RUN git clone --recurse-submodules --depth 1 --single-branch Ihttps://github.com/ebi-gene-expression-group/index-bioentities.git
+RUN git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/index-bioentities.git
 RUN git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/solr-bulk.git
 
 ENTRYPOINT ["/bin/bash", "-c"]
