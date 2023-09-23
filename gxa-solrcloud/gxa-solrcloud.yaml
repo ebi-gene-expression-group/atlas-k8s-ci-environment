@@ -17,7 +17,7 @@ spec:
   replicas: 4
   solrImage:
     tag: 8.7.0
-  solrJavaMem: "-Xms3000m -Xmx4000m"
+  solrJavaMem: "-Xms2000m -Xmx3000m"
 # solrModules:
 #   - jaegertracer-configurator
 #   - ltr
@@ -25,9 +25,9 @@ spec:
     podOptions:
       resources:
         limits:
-          memory: 4Gi
+          memory: 3Gi
         requests:
-          memory: 4Gi
+          memory: 3Gi
       volumes:
       - defaultContainerMount:
           mountPath: /keys

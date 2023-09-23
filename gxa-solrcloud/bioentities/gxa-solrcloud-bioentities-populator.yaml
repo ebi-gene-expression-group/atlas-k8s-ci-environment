@@ -21,14 +21,16 @@ spec:
             - name: SOLR_NUM_SHARDS
               value: "4"
             - name: NUM_DOCS_PER_BATCH
-              value: "20000"
+              value: "10000"
             - name: SOLR_COLLECTION
               value: "bioentities"
             - name: SCHEMA_VERSION
               value: "1"
           resources:
             requests:
-              memory: 2Gi
+              memory: 256Mi
+            limits:
+              memory: 1Gi
           args:
             - |
               cd /root/index-bioentities/bin
