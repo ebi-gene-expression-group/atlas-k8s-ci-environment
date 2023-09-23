@@ -13,7 +13,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gxa-solrcloud-bulk-analytics-populator
+  name: gxa-solrcloud-bulk-analytics-jsonl
   namespace: jenkins-gene-expression
 spec:
   template:
