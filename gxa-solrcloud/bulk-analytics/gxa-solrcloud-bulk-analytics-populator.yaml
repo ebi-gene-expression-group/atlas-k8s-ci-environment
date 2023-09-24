@@ -47,13 +47,6 @@ spec:
                 INPUT_JSONL=${FILE} ./solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
               done
           volumeMounts:
-            - mountPath: "/gradle-ro-dep-cache"
-              name: gradle-ro-dep-cache-vol
-              readOnly: true
-            - mountPath: "/atlas-data/expdesign"
-              name: gxa-expdesign-vol
-            - mountPath: "/atlas-data/exp"
-              name: gxa-data-vol
             - mountPath: "/atlas-data/bulk-analytics-jsonl"
               name: gxa-bulk-analytics-jsonl-vol
       restartPolicy: Never
