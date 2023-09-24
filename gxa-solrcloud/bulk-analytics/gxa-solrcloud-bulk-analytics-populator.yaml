@@ -32,8 +32,9 @@ spec:
           resources:
             requests:
               memory: 256Mi
+              ephemeral-storage: 2Gi
             limits:
-              memory: 1Gi
+              memory: 2Gi
           args:
             - |
               cd /root/solr-bulk/bin
