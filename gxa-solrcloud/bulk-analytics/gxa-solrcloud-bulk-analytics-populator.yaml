@@ -10,6 +10,15 @@ spec:
         - name: gxa-bulk-analytics-jsonl-vol
           persistentVolumeClaim:
             claimName: gxa-bulk-analytics-jsonl-rwo
+        - name: scratch-bulk-analytics-vol
+          ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes: [ "ReadWriteOnce" ]
+                storageClassName: "premium-rwo"
+                resources:
+                  requests:
+                    storage: 100Gi
       containers:
         - name: gxa-solrcloud-populator
           image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
@@ -32,7 +41,6 @@ spec:
           resources:
             requests:
               memory: 256Mi
-              ephemeral-storage: 2Gi
             limits:
               memory: 2Gi
           args:
@@ -42,12 +50,14 @@ spec:
               ./create-bulk-analytics-schema.sh
 
               # We go back to index-bioentities/bin because the solr-jsonl-chunk-loader.sh script isn’t in the solr-bulk repository
-              cd /root/index-bioentities/bin
+              cd /atlas-data/scratch
               for FILE in `ls /atlas-data/bulk-analytics-jsonl/*.jsonl`
               do
-                INPUT_JSONL=${FILE} ./solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
+                INPUT_JSONL=${FILE} /root/index-bioentities/bin/solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
               done
           volumeMounts:
             - mountPath: "/atlas-data/bulk-analytics-jsonl"
               name: gxa-bulk-analytics-jsonl-vol
+            - mountPath: "/atlas-data/scratch"
+              name: scratch-bulk-analytics-vol
       restartPolicy: Never
