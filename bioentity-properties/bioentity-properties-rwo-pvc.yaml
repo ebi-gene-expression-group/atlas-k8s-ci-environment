@@ -25,7 +25,7 @@ spec:
       containers:
       - name: bioentity-properties-populator
         image: takkatakka/lftp
-        command: ['sh', '-c', 'lftp -e "mirror -vvv /pub/databases/microarray/data/atlas/bioentity_properties /bioentity-properties" ftp.ebi.ac.uk']
+        command: ['sh', '-c', 'lftp -e "mirror -vvv /pub/databases/microarray/data/atlas/bioentity_properties /bioentity-properties; exit" ftp.ebi.ac.uk']
         volumeMounts:
           - mountPath: "/bioentity-properties"
             name: bioentity-properties
