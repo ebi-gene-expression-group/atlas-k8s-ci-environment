@@ -32,8 +32,8 @@ spec:
         args:
           - lftp -e "get /pub/databases/arrayexpress/data/atlas/atlas-ci/species-properties.json -o /gxa-data; exit" ftp.ebi.ac.uk;
             lftp -e "get /pub/databases/arrayexpress/data/atlas/atlas-ci/release-metadata.json -o /gxa-data; exit" ftp.ebi.ac.uk;
-            lftp -e "get /pub/databases/arrayexpress/data/atlas/ontology -o /gxa-data; exit" ftp.ebi.ac.uk;
             lftp -e "get /pub/databases/arrayexpress/data/atlas/sc_experiments/cell_stats.json -o /gxa-data/magetab; exit" ftp.ebi.ac.uk;
+            lftp -e "mirror -vvv /pub/databases/arrayexpress/data/atlas/ontology -o /gxa-data/ontology; exit" ftp.ebi.ac.uk;
             for EXP_ID in ${EXP_IDS}; do lftp -e "mirror -vvv /pub/databases/arrayexpress/data/atlas/experiments/${EXP_ID} /gxa-data/magetab/${EXP_ID}; exit" ftp.ebi.ac.uk; done;
         volumeMounts:
           - mountPath: "/gxa-data"
