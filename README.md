@@ -2,7 +2,8 @@
 Collection of Kubernetes manifests for CI of Expression Atlas web applications
 
 
-## Before We Start: Populated Read-Only Volumes
+## Before We Start
+### Populating read-only volumes
 In order to run tests on multiple branches concurrently we need to set up read-only volumes. The pattern we follow to
 populate them with data is described in the following document:
 https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/readonlymany-disks
@@ -12,6 +13,29 @@ snapshot class with a **`driver` which is platform-specific**. In the remainder 
 will be used to create snapshots of read-write volumes.For GCP this is in the top-level directory of this repo:
 ```bash
 kubectl create -f snapshot-class.yaml
+```
+
+### Inspecting volumes
+You can browse the contents of the populated volumes at any point with a pod that mounts the volume. The file 
+`ubuntu-pod.yaml` is provided for convenience (the pod will be up for thirty minutes before shutting down). Just
+replace the value of the `claimName` with the one corresponding to the volume want to inspect.
+```bash
+kubectl create -f - <<EOF
+# Paste YAML contents or use `kubectl create -f ubuntu-pod.yaml`
+EOF
+```
+
+Next, open a shell in the pod:
+```bash
+kubectl -n jenkins-gene-expression wait --for=condition=ready --timeout=1h pod ubuntu && \
+kubectl -n jenkins-gene-expression exec -it ubuntu -- bash
+```
+
+If you used `ubuntu-pod.yaml`, the volume will be mounted in the `/foobar` directory.
+
+Remember to clean up or wait for half an hour for the pod to shut down: 
+```bash
+kubectl -n jenkins-gene-expression delete pod ubuntu
 ```
 
 

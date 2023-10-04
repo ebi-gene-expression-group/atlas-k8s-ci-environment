@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu
+  namespace: jenkins-gene-expression
+spec:
+  volumes:
+    - name: test-vol
+      persistentVolumeClaim:
+        claimName: my-claim-name
+  containers:
+    - name: ubuntu
+      image: ubuntu
+      command:
+        - "sleep"
+        - "1h"
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - mountPath: "/foobar"
+          name: test-vol
