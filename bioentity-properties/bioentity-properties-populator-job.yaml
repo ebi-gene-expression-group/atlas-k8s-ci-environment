@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bioentity-properties-populator
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      volumes:
+        - name: bioentity-properties
+          persistentVolumeClaim:
+            claimName: bioentity-properties-rwo
+      containers:
+        - name: bioentity-properties-populator
+          image: takkatakka/lftp
+          command: ['sh', '-c', 'lftp -e "mirror -vvv /pub/databases/microarray/data/atlas/bioentity_properties /bioentity-properties; exit" ftp.ebi.ac.uk']
+          volumeMounts:
+            - mountPath: "/bioentity-properties"
+              name: bioentity-properties
+      restartPolicy: Never
+  backoffLimit: 4
