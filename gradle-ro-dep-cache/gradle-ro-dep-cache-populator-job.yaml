@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gradle-ro-dep-cache-populator
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      volumes:
+        - name: gradle-ro-dep-cache-vol
+          persistentVolumeClaim:
+            claimName: gradle-7.0-ro-dep-cache-rwo
+      containers:
+        - name: gradle-ro-dep-cache-populator
+          image: ubuntu:jammy
+          resources:
+            requests:
+              memory: "3.5Gi"
+              ephemeral-storage: "6Gi"
+            limits:
+              memory: "5Gi"
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8"
+          command: [ "/bin/bash", "-c" ]
+          args:
+            - apt-get update; 
+              apt-get install -y --no-install-recommends git openjdk-11-jdk rsync;
+              git clone --recurse-submodules --depth 1 https://github.com/ebi-gene-expression-group/atlas-web-bulk.git /root/atlas-web-bulk;
+              git clone --recurse-submodules --depth 1 https://github.com/ebi-gene-expression-group/atlas-web-single-cell.git /root/atlas-web-single-cell;
+              cd /root/atlas-web-bulk;
+              ./gradlew :atlas-web-core:test;
+              ./gradlew :app:test;
+              ./gradlew :app:war;
+              ./gradlew :cli:bootRun;
+              cd /root/atlas-web-single-cell;
+              ./gradlew :atlas-web-core:test;
+              ./gradlew :app:test;
+              ./gradlew :app:war;
+              ./gradlew :cli:bootRun;
+              rsync -av --exclude=*.lock --exclude=gc.properties /root/.gradle/caches/modules-2 /gradle-ro-dep-cache/;
+          volumeMounts:
+            - mountPath: "/gradle-ro-dep-cache"
+              name: gradle-ro-dep-cache-vol
+      restartPolicy: Never
+  backoffLimit: 4

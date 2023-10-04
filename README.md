@@ -36,3 +36,21 @@ kubectl create -f bioentity-properties-rox-pvc.yaml
 
 Note that the timeouts for the `wait` command are only indicative. They may need to be adjusted depending on the speed 
 of the underlying storage and network connection.
+
+## Gradle Read-Only Dependency Cache Volume
+To speed up test builds [it is very convenient to have a Gradle Read Only Dependency Cache volume]
+(https://docs.gradle.org/current/userguide/dependency_resolution.html#sub:ephemeral-ci-cache). This can be created
+as follows:
+```bash
+cd gradle-ro-dep-cache
+kubectl create -f gradle-ro-dep-cache-rwo-pvc.yaml && \
+kubectl create -f gradle-ro-dep-cache-populator-job.yaml && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=1h job gradle-ro-dep-cache-populator && \
+kubectl create -f gradle-ro-dep-cache-rwo-snapshot.yaml && \
+kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=15m volumesnapshot gradle-7.0-ro-dep-cache-rwo-snapshot && \
+kubectl create -f gradle-ro-dep-cache-rox-pvc.yaml
+```
+
+Inside the populator job we don’t care about the success or failure of the tasks. We just want to make Gradle download
+all dependencies to copy them to the read-write volume. Similar to the previous section, we then create a snapshot of
+the read-write volume and finally create a read-only volume from the snapshot.
