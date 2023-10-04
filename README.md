@@ -78,3 +78,24 @@ kubectl create -f gradle-ro-dep-cache-rox-pvc.yaml
 Inside the populator job we don’t care about the success or failure of the tasks. We just want to make Gradle download
 all dependencies to copy them to the read-write volume. Similar to the previous section, we then create a snapshot of
 the read-write volume and finally create a read-only volume from the snapshot.
+
+
+## Gene Expression Atlas
+# Data volumes
+```bash
+cd gxa-data
+kubectl create -f gxa-data-rwo-pvc.yaml && \
+kubectl create -f gxa-data-populator-job.yaml && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=12h job gxa-data-populator && \
+kubectl create -f gxa-data-rwo-snapshot.yaml && \
+kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=15m volumesnapshot gxa-data-rwo-snapshot && \
+kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=15m volumesnapshot gxa-data-ontology-rwo-snapshot && \
+kubectl create -f gxa-data-rox-pvc.yaml
+```
+
+# PostgreSQL
+
+# Solr
+
+
+## Single Cell Expression Atlas

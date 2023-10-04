@@ -7,4 +7,13 @@ spec:
   volumeSnapshotClassName: snapshot-class
   source:
     persistentVolumeClaimName: gxa-data-rwo
-
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: gxa-data-ontology-rwo-snapshot
+  namespace: jenkins-gene-expression
+spec:
+  volumeSnapshotClassName: snapshot-class
+  source:
+    persistentVolumeClaimName: gxa-data-ontology-rwo

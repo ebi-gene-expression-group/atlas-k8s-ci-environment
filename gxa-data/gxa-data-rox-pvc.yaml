@@ -14,3 +14,21 @@ spec:
   resources:
     requests:
       storage: 70Gi
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: gxa-data-ontology-rox
+  namespace: jenkins-gene-expression
+spec:
+  dataSource:
+    apiGroup: snapshot.storage.k8s.io
+    kind: VolumeSnapshot
+    name: gxa-data-ontology-rwo-snapshot
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: premium-rwo
+  resources:
+    requests:
+      storage: 1Gi
+
