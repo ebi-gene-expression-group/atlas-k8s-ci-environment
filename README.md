@@ -82,16 +82,24 @@ the read-write volume and finally create a read-only volume from the snapshot.
 
 ## Gene Expression Atlas
 # Data volumes
+The first step specific to (bulk) Gene Expression Atlas is to create two read-only volumes of the test datasets and the
+ontology auxiliary files, respectively. As before, we create and populate read-write volumes, and we create a read-only
+volume from snapshots.
 ```bash
 cd gxa-data
 kubectl create -f gxa-data-rwo-pvc.yaml && \
 kubectl create -f gxa-data-populator-job.yaml && \
-kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=12h job gxa-data-populator && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=6h job gxa-data-populator && \
 kubectl create -f gxa-data-rwo-snapshot.yaml && \
-kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=15m volumesnapshot gxa-data-rwo-snapshot && \
+kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=1h volumesnapshot gxa-data-rwo-snapshot && \
 kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=15m volumesnapshot gxa-data-ontology-rwo-snapshot && \
 kubectl create -f gxa-data-rox-pvc.yaml
 ```
+
+Be careful if you are using the Google Cloud Shell, since it can lose the connection after some time of inactivity. If
+this happens, you can paste the above commands from one of the `wait` commands. Another alternative is to run them
+with [`nohup`](https://man7.org/linux/man-pages/man1/nohup.1.html).
+
 
 # PostgreSQL
 
