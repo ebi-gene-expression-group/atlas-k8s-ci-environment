@@ -102,11 +102,23 @@ with [`nohup`](https://man7.org/linux/man-pages/man1/nohup.1.html).
 
 
 # PostgreSQL
+In order to create the JSONL files to populate the `bulk-analytics` collection, experiments need to be loaded in 
+Postgres. The CLI module reuses a great deal of the logic from the web application for this purpose, so if an
+experiment isn’t loaded the CLI will throw an error reporting that the experiment doesn’t exist. This is why we need to
+load the experiments in Postgres; as a side benefit, the process will also create the experiment design files which are
+also needed for the integration tests.
+
+This step creates a Postgres deployment, a job that migrates the schema to the latest version with Flyway, a job that
+loads the experiments, and the creation of a read-only volume for the experiment design files:
 ```bash
 cd gxa-postgres
 kubectl create -f gxa-postgres-deployment.yaml && \
 kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=30m job gxa-postgres-migrator && \
-kubectl create -f gxa-postgres-populator.yaml
+kubectl create -f gxa-postgres-populator.yaml && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=1h job gxa-postgres-populator && \
+kubectl create -f gxa-expdesign/gxa-expdesign-rwo-snapshot.yaml && \
+kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=true --timeout=15m volumesnapshot gxa-expdesign-rwo-snapshot && \
+kubectl create -f gxa-expdesign/gxa-expdesign-rox-pvc.yaml
 ```
 
 # Solr
