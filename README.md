@@ -122,6 +122,45 @@ kubectl create -f gxa-expdesign/gxa-expdesign-rox-pvc.yaml
 ```
 
 # Solr
+Create a key pair for the SolrCloud package store:
+```bash
+openssl genrsa -out ./gxa-solrcloud.pem 512
+openssl rsa -in ./gxa-solrcloud.pem -pubout -outform DER -out ./gxa-solrcloud.der
+kubectl -n jenkins-gene-expression create secret generic gxa-solrcloud-package-store-keys \
+--from-file=./gxa-solrcloud.pem \
+--from-file=./gxa-solrcloud.der
+```
 
+Install the Solr Operator.
+
+Load image to Quay:
+```bash
+docker build -t gxa-atlas-web-bulk-postgres-solrcloud-populator .
+docker run gxa-atlas-web-bulk-postgres-solrcloud-populator
+docker commit <CONTAINER_ID> quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator
+docker push quay.io/ebi-gene-expression-group/gxa-solr-operator:latest
+```
+
+Create a SolrCloud cluster:
+```bash
+cd gxa-solrcloud
+kubectl create -f gxa-solrcloud.yaml
+```
+
+## Bioentities
+```bash
+cd bioentities
+kubectl create -f gxa-solrcloud-bioentities-jsonl.yaml && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=1h job gxa-solrcloud-bioentities-jsonl && \
+kubectl create -f gxa-solrcloud-bioentities-populator.yaml
+```
+
+## Bulk Analytics
+```bash
+cd bulk-analytics
+kubectl create -f gxa-solrcloud-bulk-analytics-jsonl.yaml && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=1h job gxa-solrcloud-bulk-analytics-jsonl && \
+kubectl create -f gxa-solrcloud-bulk-analytics-populator.yaml
+```
 
 ## Single Cell Expression Atlas

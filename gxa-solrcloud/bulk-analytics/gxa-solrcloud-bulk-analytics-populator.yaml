@@ -26,9 +26,9 @@ spec:
             - name: SOLR_HOST
               value: "gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
             - name: SOLR_HOSTS
-              value: "gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 gxa-solrcloud-1.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 gxa-solrcloud-2.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 gxa-solrcloud-3.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
+              value: "gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 gxa-solrcloud-1.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
             - name: SOLR_NUM_SHARDS
-              value: "4"
+              value: "2
             - name: NUM_DOCS_PER_BATCH
               value: "10000"
             - name: SOLR_COLLECTION
