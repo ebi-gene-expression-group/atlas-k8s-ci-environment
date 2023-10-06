@@ -102,6 +102,12 @@ with [`nohup`](https://man7.org/linux/man-pages/man1/nohup.1.html).
 
 
 # PostgreSQL
+```bash
+cd gxa-postgres
+kubectl create -f gxa-postgres-deployment.yaml && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=30m job gxa-postgres-migrator && \
+kubectl create -f gxa-postgres-populator.yaml
+```
 
 # Solr
 

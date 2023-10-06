@@ -34,3 +34,42 @@ spec:
             limits:
               memory: "2Gi"
               cpu: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: jenkins-gene-expression
+  name: gxa-postgres-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
+      protocol: TCP
+  selector:
+    app: postgres
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gxa-postgres-migrator
+  namespace: jenkins-gene-expression
+spec:
+  template:
+    spec:
+      containers:
+        - name: gxa-flyway
+          image: quay.io/ebigxa/gxa-flyway-migrator
+          env:
+            - name: FLYWAY_USER
+              value: "atlasdev"
+            - name: FLYWAY_PASSWORD
+              value: "atlasdev"
+            - name: FLYWAY_SCHEMAS
+              value: "atlasdev"
+            - name: FLYWAY_URL
+              value: "jdbc:postgresql://gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local:5432/gxpgxadev"
+      restartPolicy: Never
+  backoffLimit: 4
