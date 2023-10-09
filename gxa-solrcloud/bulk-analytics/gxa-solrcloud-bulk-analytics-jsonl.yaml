@@ -80,9 +80,11 @@ spec:
               value: "E-MTAB-451"
           resources:
             requests:
+              cpu: 0.25
               memory: 6Gi
               ephemeral-storage: 8Gi
             limits:
+              cpu: 0.5
               memory: 8Gi
           args:
             - |

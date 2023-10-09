@@ -42,9 +42,11 @@ spec:
               value: "dedupe"
           resources:
             requests:
-              memory: 256Mi
+              cpu: 0.1
+              memory: 32Mi
             limits:
-              memory: 2Gi
+              cpu: 0.25
+              memory: 64Mi
           args:
             - |
               cd /root/solr-bulk/bin

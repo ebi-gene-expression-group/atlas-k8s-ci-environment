@@ -53,9 +53,11 @@ spec:
               value: "danio_rerio homo_sapiens equus_caballus drosophila_melanogaster caenorhabditis_elegans mus_musculus oryza_indica anas_platyrhynchos oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays saccharomyces_cerevisiae schizosaccharomyces_pombe"
           resources:
             requests:
+              cpu: 0.25
               memory: 6Gi
-              ephemeral-storage: 8Gi
+              ephemeral-storage: 2Gi
             limits:
+              cpu: 0.5
               memory: 8Gi
           args:
             - |
