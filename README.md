@@ -2,7 +2,7 @@
 Collection of Kubernetes manifests for CI of Expression Atlas web applications
 
 
-## Before We Start
+## Prologue
 ### Populating read-only volumes
 In order to run tests on multiple branches concurrently we need to set up read-only volumes. The pattern we follow to
 populate them with data is described in the following document:
@@ -18,8 +18,8 @@ kubectl create -f snapshot-class.yaml
 ### Regions and zones
 It’s important to know that for a pod to be successfully scheduled in a cluster, all volumes must be in the same zone.
 A pod can’t mount multiple volumes across different zones. Since read-only volumes are created when a pod requests it
-for the first time, the zone of the volume will be the one where the pod is scheduled. Therefore, the zones of the jobs
-that request the read-only volumes for the first time is set with `nodeSelector` to `europe-west2-a`:
+for the first time, the zone of the volume will be the one where the pod is scheduled; these are set with
+`nodeSelector` to `europe-west2-a`:
 ```yaml
 spec:
   template:
@@ -150,9 +150,9 @@ kubectl -n jenkins-gene-expression create secret generic gxa-solrcloud-package-s
 --from-file=./gxa-solrcloud.der
 ```
 
-Install the Solr Operator.
+Install the [Solr Operator](https://solr.apache.org/operator/).
 
-Load image to Quay:
+[Load the image used by the jobs to Quay](https://docs.quay.io/solution/getting-started.html):
 ```bash
 docker build -t gxa-atlas-web-bulk-postgres-solrcloud-populator .
 docker run gxa-atlas-web-bulk-postgres-solrcloud-populator
@@ -168,15 +168,15 @@ kubectl create -f gxa-solrcloud.yaml
 
 ## Bioentities
 ```bash
-cd bioentities
+cd gxa-solrcloud/bioentities
 kubectl create -f gxa-solrcloud-bioentities-jsonl.yaml && \
-kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=1h job gxa-solrcloud-bioentities-jsonl && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=4h job gxa-solrcloud-bioentities-jsonl && \
 kubectl create -f gxa-solrcloud-bioentities-populator.yaml
 ```
 
 ## Bulk Analytics
 ```bash
-cd bulk-analytics
+cd gxa-solrcloud/bulk-analytics
 kubectl create -f gxa-solrcloud-bulk-analytics-jsonl.yaml && \
 kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=1h job gxa-solrcloud-bulk-analytics-jsonl && \
 kubectl create -f gxa-solrcloud-bulk-analytics-populator.yaml
