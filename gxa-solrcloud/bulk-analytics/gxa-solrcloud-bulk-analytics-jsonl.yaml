@@ -18,6 +18,8 @@ metadata:
 spec:
   template:
     spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: "europe-west2-a"
       volumes:
         - name: gradle-ro-dep-cache-vol
           persistentVolumeClaim:

@@ -15,6 +15,25 @@ will be used to create snapshots of read-write volumes.For GCP this is in the to
 kubectl create -f snapshot-class.yaml
 ```
 
+### Regions and zones
+It’s important to know that for a pod to be successfully scheduled in a cluster, all volumes must be in the same zone.
+A pod can’t mount multiple volumes across different zones. Since read-only volumes are created when a pod requests it
+for the first time, the zone of the volume will be the one where the pod is scheduled. Therefore, the zones of the jobs
+that request the read-only volumes for the first time is set with `nodeSelector` to `europe-west2-a`:
+```yaml
+spec:
+  template:
+    spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: "europe-west2-a"
+```
+
+This ensures all the read-only volumes will be created in the same zone and any pod that needs them can be scheduled.
+Additionally, it’s a good idea to set the region with the `gcloud` command when deploying the manifests as a safeguard:
+```bash
+gcloud config set compute/zone europe-west2-a
+```
+
 ### Inspecting volumes
 You can browse the contents of the populated volumes at any point with a pod that mounts the volume. The file 
 `ubuntu-pod.yaml` is provided for convenience (the pod will be up for thirty minutes before shutting down). Just
