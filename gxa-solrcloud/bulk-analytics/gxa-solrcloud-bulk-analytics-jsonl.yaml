@@ -26,7 +26,7 @@ spec:
             claimName: gradle-7.0-ro-dep-cache-rox
         - name: gxa-expdesign-vol
           persistentVolumeClaim:
-            claimName: gxa-expdesign-rwo
+            claimName: gxa-expdesign-rox
         - name: gxa-data-vol
           persistentVolumeClaim:
             claimName: gxa-data-rox
