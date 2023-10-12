@@ -113,7 +113,7 @@ the read-write volume and finally create a read-only volume from the snapshot.
 
 
 ## Gene Expression Atlas
-# Data volumes
+### Data volumes
 The first step specific to (bulk) Gene Expression Atlas is to create two read-only volumes of the test datasets and the
 ontology auxiliary files, respectively. As before, we create and populate read-write volumes, and we create a read-only
 volume from snapshots.
@@ -133,7 +133,7 @@ this happens, you can paste the above commands from one of the `wait` commands. 
 with [`nohup`](https://man7.org/linux/man-pages/man1/nohup.1.html).
 
 
-# PostgreSQL
+### PostgreSQL
 In order to create the JSONL files to populate the `bulk-analytics` collection, experiments need to be loaded in 
 Postgres. The CLI module reuses a great deal of the logic from the web application for this purpose, so if an
 experiment isn’t loaded the CLI will throw an error reporting that the experiment doesn’t exist. This is why we need to
@@ -153,7 +153,7 @@ kubectl -n jenkins-gene-expression wait --for=jsonpath='{status.readyToUse}'=tru
 kubectl create -f gxa-expdesign/gxa-expdesign-rox-pvc.yaml
 ```
 
-# Solr
+### Solr
 Create a key pair for the SolrCloud package store:
 ```bash
 openssl genrsa -out ./gxa-solrcloud.pem 512
@@ -179,7 +179,7 @@ cd gxa-solrcloud
 kubectl create -f gxa-solrcloud.yaml
 ```
 
-## Bioentities
+#### Bioentities
 ```bash
 cd gxa-solrcloud/bioentities
 kubectl create -f gxa-solrcloud-bioentities-jsonl.yaml && \
@@ -187,7 +187,7 @@ kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=30m j
 kubectl create -f gxa-solrcloud-bioentities-populator.yaml
 ```
 
-## Bulk Analytics
+#### Bulk Analytics
 ```bash
 cd gxa-solrcloud/bulk-analytics
 kubectl create -f gxa-solrcloud-bulk-analytics-jsonl.yaml && \
