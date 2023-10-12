@@ -170,7 +170,7 @@ Install the [Solr Operator](https://solr.apache.org/operator/).
 docker build -t gxa-atlas-web-bulk-postgres-solrcloud-populator .
 docker run gxa-atlas-web-bulk-postgres-solrcloud-populator
 docker commit <CONTAINER_ID> quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator
-docker push quay.io/ebi-gene-expression-group/gxa-solr-operator:latest
+docker push quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
 ```
 
 Create a SolrCloud cluster:
