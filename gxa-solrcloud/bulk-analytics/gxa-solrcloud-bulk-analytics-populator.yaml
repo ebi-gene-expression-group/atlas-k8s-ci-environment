@@ -43,10 +43,10 @@ spec:
           resources:
             requests:
               cpu: 0.1
-              memory: 32Mi
+              memory: 128Mi
             limits:
               cpu: 0.25
-              memory: 64Mi
+              memory: 1Gi
           args:
             - |
               cd /root/solr-bulk/bin
