@@ -57,6 +57,19 @@ Remember to clean up or wait for half an hour for the pod to shut down:
 kubectl -n jenkins-gene-expression delete pod ubuntu
 ```
 
+### Inspecting Solr in GKE
+The following command will forward port 8983 of the Solr pods that back the SolrCloud headless service (this service is
+created by the Solr Operator and is named `gxa-solrcloud-headless` in the case of bulk).
+```bash
+gcloud container clusters get-credentials dev-autopilot-cluster --region europe-west2 --project prj-int-dev-atlas-app-intg && \
+echo "# When the next line says 'Forwarding from...', go to: https://ssh.cloud.google.com/devshell/proxy?port=8080" && \
+kubectl port-forward --namespace jenkins-gene-expression $(kubectl get pod --namespace jenkins-gene-expression --selector="solr-cloud=gxa,technology=solr-cloud" --output jsonpath='{.items[0].metadata.name}') 8080:8983
+```
+
+As stated by the `echo` statement, this will allow you to access the Solr admin interface at
+`https://ssh.cloud.google.com/devshell/proxy?port=8080`. You can read more about how to access VMs securely at
+https://cloud.google.com/solutions/connecting-securely.
+
 
 ## Bioentity Properties
 Both bulk Expression Atlas and Single Cell Expression Atlas require a `bioentities` collection in their respective
