@@ -53,7 +53,7 @@ spec:
               # Set in gxa-solrcloud.yaml
               value: "gxa-solrcloud-zookeeper-0.gxa-solrcloud-zookeeper-headless.jenkins-gene-expression.svc.cluster.local:2181,gxa-solrcloud-zookeeper-1.gxa-solrcloud-zookeeper-headless.jenkins-gene-expression.svc.cluster.local:2181,gxa-solrcloud-zookeeper-2.gxa-solrcloud-zookeeper-headless.jenkins-gene-expression.svc.cluster.local:2181"
             - name: SOLR_HOSTS
-              value: "http://gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-1.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr"
+              value: "http://gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-1.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-2.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr,http://gxa-solrcloud-3.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983/solr"
             - name: HUMAN_EXP_IDS
               value: "E-GEOD-40611,E-GEOD-43049,E-MTAB-2770,E-MTAB-2836,E-MTAB-3827,E-MTAB-5200,E-MTAB-5423,E-TABM-713,E-MTAB-5214,E-PROT-1,E-PROT-28,E-PROT-39"
             - name: MOUSE_EXP_IDS
