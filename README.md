@@ -183,7 +183,7 @@ kubectl create -f gxa-solrcloud.yaml
 ```bash
 cd gxa-solrcloud/bioentities
 kubectl create -f gxa-solrcloud-bioentities-jsonl.yaml && \
-kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=4h job gxa-solrcloud-bioentities-jsonl && \
+kubectl -n jenkins-gene-expression wait --for=condition=complete --timeout=30m job gxa-solrcloud-bioentities-jsonl && \
 kubectl create -f gxa-solrcloud-bioentities-populator.yaml
 ```
 
