@@ -13,7 +13,7 @@ spec:
   storageClassName: premium-rwo
   resources:
     requests:
-      storage: 100Gi
+      storage: 70Gi
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
