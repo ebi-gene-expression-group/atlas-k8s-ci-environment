@@ -43,13 +43,23 @@ spec:
               value: "gxpgxadev"
             - name: EXP_IDS
               value: "E-ERAD-475,E-GEOD-40611,E-GEOD-43049,E-GEOD-46858,E-MAXD-6,E-MEXP-1810,E-MEXP-1968,E-MTAB-1913,E-MTAB-2836,E-MTAB-2909,E-MTAB-3827,E-MTAB-3834,E-MTAB-4401,E-MTAB-451,E-MTAB-4559,E-MTAB-5128,E-MTAB-5422,E-MTAB-5633,E-MTAB-5941,E-TABM-713,E-MTAB-5214,E-PROT-1,E-MTAB-4106,E-PROT-28,E-PROT-39"
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "2"
+              ephemeral-storage: "4Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          command: ["/bin/sh", "-c"]
           args:
             - |
-              cd /root
+              apt-get install -y --no-install-recommends git
+              
               git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
 
-              cd /root/atlas-web-bulk
-              
+              cd atlas-web-bulk
+
               ./gradlew \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
@@ -65,6 +75,7 @@ spec:
               -PjdbcUsername=${POSTGRES_USER} \
               -PjdbcPassword=${POSTGRES_PASSWORD} \
               :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
+
           volumeMounts:
             - mountPath: "/atlas-data/expdesign"
               name: gxa-expdesign-vol
@@ -72,3 +83,4 @@ spec:
               name: gxa-data-vol
       restartPolicy: Never
   backoffLimit: 4
+
