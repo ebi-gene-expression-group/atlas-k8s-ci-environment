@@ -18,10 +18,10 @@ spec:
                 storageClassName: "premium-rwo"
                 resources:
                   requests:
-                    storage: 150Gi
+                    storage: 200Gi
       containers:
         - name: gxa-solrcloud-populator
-          image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
+          image: openjdk:11
           env:
             - name: SOLR_HOST
               value: "gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
@@ -47,9 +47,19 @@ spec:
             limits:
               cpu: 0.25
               memory: 1Gi
+          command: ["/bin/bash", "-c"]
           args:
             - |
-              cd /root/solr-bulk/bin
+              apt-get install -y --no-install-recommends git
+              
+              mkdir /work
+              
+              cd /work
+              
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/index-bioentities.git
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/solr-bulk.git
+              
+              cd /work/solr-bulk/bin
               ./create-bulk-analytics-collection.sh
               ./create-bulk-analytics-schema.sh
 
@@ -57,7 +67,7 @@ spec:
               cd /atlas-data/scratch
               for FILE in `ls /atlas-data/bulk-analytics-jsonl/*.jsonl`
               do
-                INPUT_JSONL=${FILE} /root/index-bioentities/bin/solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
+                INPUT_JSONL=${FILE} /work/index-bioentities/bin/solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
               done
           volumeMounts:
             - mountPath: "/atlas-data/bulk-analytics-jsonl"

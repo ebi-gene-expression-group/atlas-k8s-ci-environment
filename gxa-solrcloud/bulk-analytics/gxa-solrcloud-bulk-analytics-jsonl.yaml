@@ -8,7 +8,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 150Gi
+      storage: 200Gi
 ---
 apiVersion: batch/v1
 kind: Job
@@ -35,7 +35,7 @@ spec:
             claimName: gxa-bulk-analytics-jsonl-rwo
       containers:
         - name: gxa-solrcloud-bulk-analytics-jsonl
-          image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
+          image: openjdk:11
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8"
@@ -86,9 +86,14 @@ spec:
             limits:
               cpu: 0.5
               memory: 8Gi
+          command: ["/bin/bash", "-c"]
           args:
             - |
-              cd /root/atlas-web-bulk
+              apt-get install -y --no-install-recommends git
+              
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
+
+              cd atlas-web-bulk
               
               for EXP_IDS in HUMAN_EXP_IDS MOUSE_EXP_IDS ZEBRAFISH_EXP_IDS FLY_EXP_IDS WORM_EXP_IDS HORSE_EXP_IDS YEAST_EXP_IDS WHEAT_EXP_IDS PLATYPUS_EXP_IDS RICE_EXP_IDS GRASS_EXP_IDS SCHISTOSOME_EXP_IDS
               do          
