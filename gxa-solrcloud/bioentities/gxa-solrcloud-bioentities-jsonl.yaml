@@ -59,6 +59,7 @@ spec:
             limits:
               cpu: 0.5
               memory: 8Gi
+          command: ["/bin/bash", "-c"]
           args:
             - |
               for _SPECIES in ${SPECIES}
