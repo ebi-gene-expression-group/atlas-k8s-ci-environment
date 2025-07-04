@@ -6,13 +6,15 @@ metadata:
 spec:
   template:
     spec:
+      nodeSelector:
+        topology.kubernetes.io/zone: "europe-west2-a"
       volumes:
         - name: gxa-bioentities-jsonl-vol
           persistentVolumeClaim:
             claimName: gxa-bioentities-jsonl-rwo
       containers:
         - name: gxa-solrcloud-populator
-          image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
+          image: openjdk:11
           env:
             - name: SOLR_HOST
               value: "gxa-solrcloud-0.gxa-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
@@ -33,9 +35,18 @@ spec:
             limits:
               cpu: 0.25
               memory: 64Mi
+          command: ["/bin/bash", "-c"]
           args:
             - |
-              cd /root/index-bioentities/bin
+              apt-get install -y --no-install-recommends git
+              
+              mkdir /work
+              
+              cd /work
+              
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/index-bioentities.git
+  
+              cd index-bioentities/bin
               ./create-bioentities-collection.sh
               ./create-bioentities-schema.sh
               ./create-bioentities-suggesters.sh
