@@ -1,0 +1,9 @@
+# Default values for gxa.
+replicaCount: 1
+image:
+  repository: gxa-image
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  port: 80 
