@@ -1,4 +1,3 @@
-# atlas-k8s-ci-environment
 # K8S Configuration for Atlas Apps
 
 This repo contains k8s files for Gene Expressions Atlas and Single Cell Expression Atlas on k8s.
