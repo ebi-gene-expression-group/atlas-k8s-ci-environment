@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gxa.fullname" . }}
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "gxa.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "gxa.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "gxa.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: gxa-codon-volume
+              mountPath: /srv/gxa/data/gxa_codon
+              readOnly: true
+            - name: magetab-symlink
+              mountPath: /srv/gxa/data/gxa/magetab
+              readOnly: true
+            - name: gxa-volume
+              mountPath: /srv/gxa/data/gxa/release-metadata.json
+              subPath: release-metadata.json
+              readOnly: true
+            - name: gxa-codon-volume
+              mountPath: /srv/gxa/data/gxa/species-properties.json
+              subPath: species-properties.json
+              readOnly: true
+            - name: tomcat-users
+              mountPath: /usr/local/tomcat/conf/tomcat-users.xml
+              subPath: tomcat-users.xml
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: gxa-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/ro/gxa
+        - name: gxa-codon-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/ro/gxa_codon
+        - name: tomcat-users
+          secret:
+            secretName: {{ include "gxa.fullname" . }}-tomcat-users
+        - name: magetab-symlink
+          emptyDir: {}
+      initContainers:
+        - name: gxa-init
+          image: busybox
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [ "sh", "-c", "ln -s /srv/gxa/data/gxa_codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments /magetab/magetab" ]
+          volumeMounts:
+            - name: gxa-codon-volume
+              mountPath: /srv/gxa/data/gxa_codon
+            - name: magetab-symlink
+              mountPath: /magetab                 

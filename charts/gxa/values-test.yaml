@@ -1,0 +1,5 @@
+# values for gxa test env
+# List of experiment IDs to populate from the ftp server.
+# This should be a space-separated string.
+expIds: >
+  E-ERAD-475

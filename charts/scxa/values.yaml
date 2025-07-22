@@ -1,9 +1,1 @@
 # Default values for scxa.
-replicaCount: 1
-image:
-  repository: scxa-image
-  tag: latest
-  pullPolicy: IfNotPresent
-service:
-  type: ClusterIP
-  port: 80 
