@@ -19,7 +19,6 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: gxa-data-ontology-rox
-  namespace: jenkins-gene-expression
 spec:
   dataSource:
     apiGroup: snapshot.storage.k8s.io
