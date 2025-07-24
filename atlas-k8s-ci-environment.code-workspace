@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"makefile.configurations": [
+			{
+				"buildTarget": "deploy-test",
+				"env": "test",
+				"name": "Unnamed configuration 1"
+			},
+			{
+				"buildTarget": "deploy-dev",
+				"env": "dev",
+				"name": "Unnamed configuration 2"
+			}
+		],
+		"makefile.configureOnOpen": false
+	}
+}

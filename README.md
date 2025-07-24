@@ -1,5 +1,7 @@
 # K8S Configuration for Atlas Apps
 
+*NOTE:* This is still work in progress.
+
 This repo contains k8s files for Gene Expressions Atlas and Single Cell Expression Atlas on k8s.
 
 ## Helm Chart Structure
@@ -8,11 +10,12 @@ This repository uses Helm to manage Kubernetes manifests for the GXA and SCXA ap
 
 ### Structure
 
-```
+```text
 charts/
   gxa/                  # Helm chart for GXA
-  scxa/                 # Helm chart for SCXA
-  bioentity-properties/ # Shared Helm chart for both apps
+  scxa/                 # TBA: Helm chart for SCXA
+  bioentity-properties/ # TBA: Shared Helm chart for both apps
+  solr-cloud            # TBA: solr cloud stuff
 ```
 
 Other directories are the legacy k8s files that would be reorganised into helm charts.
@@ -22,32 +25,33 @@ Other directories are the legacy k8s files that would be reorganised into helm c
 To install the GXA chart (which depends on bioentity-properties):
 
 ```sh
-cd charts/gxa
-helm dependency update
-helm install gxa .
-```
-
-To install the SCXA chart:
-
-```sh
-cd charts/scxa
-helm dependency update
-helm install scxa .
+makefile deploy-test
 ```
 
 You can customize deployments by editing the respective `values.yaml` files.
 
 TODO
-- [ ] move gxa items into the gxa chart
-- [ ] move bioentity items
-- [ ] move scxa items into the scxa chart
-- [ ] move solr items into their own chart
 
-# Legacy k8s resources
+- [x] create gxa chart based on tomcat image
+- [x] mount nfs files
+- [x] run tomcat pod with tc_fg02 user
+- [ ] put war into tomcat. two options are
+    1. copy the war to the pod using an initContainer or a sidecar container
+    2. bake war into docker image - requires a new build process for this dockerfile
+    3. deploy the war using tomcat manager - requires changeing the webapps into a pv (currently it is an ephemeral emptyDir)
+- [ ] enable k8s probes for tomcat (they are currently disabled in deployment.yaml)
+- [ ] create bioentity chart
+- [ ] create scxa chart
+- [ ] create solr chart
+
+## Legacy k8s resources
 
 Collection of Kubernetes manifests for CI of Expression Atlas web applications
-## Prologue
-### Populating read-only volumes
+
+### Prologue
+
+#### Populating read-only volumes
+
 In order to run tests on multiple branches concurrently we need to set up read-only volumes. The pattern we follow to
 populate them with data is described in the following document:
 https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/readonlymany-disks
@@ -55,11 +59,13 @@ https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/readon
 This can be generalised to vendors other than Google Cloud Platform. However, the first step requires creating a
 snapshot class with a **`driver` which is platform-specific**. In the remainder of this document this snapshot class 
 will be used to create snapshots of read-write volumes.For GCP this is in the top-level directory of this repo:
+
 ```bash
 kubectl create -f snapshot-class.yaml
 ```
 
 ### Compute and volume zones
+
 It’s important to know that for a pod to be successfully scheduled in a cluster, all volumes must be in the same zone.
 A pod can’t mount multiple volumes across different zones. Since read-only volumes are created when a pod requests it
 for the first time, the zone of the volume will be the one where the pod is scheduled; additionally, a read-only volume
@@ -78,6 +84,7 @@ spec:
 This ensures all the read-only volumes will be created in the same zone and any pod that needs them can be scheduled.
 
 ### Inspecting volumes
+
 You can browse the contents of the populated volumes at any point with a pod that mounts the volume. The file 
 `ubuntu-pod.yaml` is provided for convenience (the pod will be up for thirty minutes before shutting down). Just
 replace the value of the `claimName` with the one corresponding to the volume want to inspect.
@@ -88,6 +95,7 @@ EOF
 ```
 
 Next, open a shell in the pod:
+
 ```bash
 kubectl -n jenkins-gene-expression wait --for=condition=ready --timeout=1h pod ubuntu && \
 kubectl -n jenkins-gene-expression exec -it ubuntu -- bash
@@ -96,13 +104,16 @@ kubectl -n jenkins-gene-expression exec -it ubuntu -- bash
 If you used `ubuntu-pod.yaml`, the volume will be mounted in the `/foobar` directory.
 
 Remember to clean up or wait for half an hour for the pod to shut down: 
+
 ```bash
 kubectl -n jenkins-gene-expression delete pod ubuntu
 ```
 
 ### Inspecting Solr in GKE
+
 The following command will forward port 8983 of the Solr pods that back the SolrCloud headless service (this service is
 created by the Solr Operator and is named `gxa-solrcloud-headless` in the case of bulk).
+
 ```bash
 gcloud container clusters get-credentials dev-autopilot-cluster --region europe-west2 --project prj-int-dev-atlas-app-intg && \
 echo "# When the next line says 'Forwarding from...', go to: https://ssh.cloud.google.com/devshell/proxy?port=8080" && \
@@ -115,6 +126,7 @@ https://cloud.google.com/solutions/connecting-securely.
 
 
 ## Bioentity Properties
+
 Both bulk Expression Atlas and Single Cell Expression Atlas require a `bioentities` collection in their respective
 SolrCloud clusters for some integration tests. In the case of bulk, though, this collection needs to be populated
 before populating the `bulk-analytics` collection because the latter reads gene annotations from the former.
@@ -123,6 +135,7 @@ The first step for either project is to create a read-only volume of the `bioent
 start by creating an empty read-write volume, then we run a job that downloads the data via FTP, we wait until the job
 completes before we create a snapshot of the read-write volume, and finally we create a read-only volume from the
 snapshot.
+
 ```bash
 cd bioentity-properties
 kubectl create -f bioentity-properties-rwo-pvc.yaml && \
@@ -137,9 +150,11 @@ Note that the timeouts for the `wait` command are only indicative. They may need
 of the underlying storage and network connection.
 
 ## Gradle Read-Only Dependency Cache Volume
+
 To speed up test builds [it is very convenient to have a Gradle Read Only Dependency Cache volume]
 (https://docs.gradle.org/current/userguide/dependency_resolution.html#sub:ephemeral-ci-cache). This can be created
 as follows:
+
 ```bash
 cd gradle-ro-dep-cache
 kubectl create -f gradle-ro-dep-cache-rwo-pvc.yaml && \

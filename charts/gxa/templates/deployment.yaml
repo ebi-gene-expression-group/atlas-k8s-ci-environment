@@ -35,32 +35,33 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: {{ .Values.tomcat.httpPort }}
               protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 30
+          #   timeoutSeconds: 10
+          #   failureThreshold: 20
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 30
+          #   timeoutSeconds: 10
+          #   failureThreshold: 20
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
               readOnly: true
-            - name: magetab-symlink
+            - name: experiments-snapshot 
               mountPath: /srv/gxa/data/gxa/magetab
+              # subPath: magetab
               readOnly: true
             - name: gxa-volume
               mountPath: /srv/gxa/data/gxa/release-metadata.json
@@ -68,11 +69,19 @@ spec:
               readOnly: true
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa/species-properties.json
-              subPath: species-properties.json
-              readOnly: true
+              subPath: species-properties.json        
+            # - name: {{ include "gxa.fullname" . }}-config
+              # mountPath: /usr/local/tomcat/conf/server.xml
+              # subPath: server.xml
             - name: tomcat-users
               mountPath: /usr/local/tomcat/conf/tomcat-users.xml
               subPath: tomcat-users.xml
+            - name: tomcat-logs
+              mountPath: /usr/local/tomcat/logs
+            - name: tomcat-work
+              mountPath: /usr/local/tomcat/work
+            - name: tomcat-webapps
+              mountPath: /usr/local/tomcat/webapps
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -94,18 +103,43 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa_codon
-        - name: tomcat-users
-          secret:
-            secretName: {{ include "gxa.fullname" . }}-tomcat-users
         - name: magetab-symlink
           emptyDir: {}
+        - name: experiments-snapshot
+          emptyDir: {}
+        - name: tomcat-config
+          configMap:
+            name: {{ include "gxa.fullname" . }}-config
+            items:
+              - key: server.xml
+                path: server.xml
+        - name: tomcat-users
+          secret:
+            secretName: {{ include "gxa.fullname" . }}-secrets
+            items:
+              - key: tomcat-users.xml
+                path: tomcat-users.xml
+        - name: tomcat-logs
+          emptyDir: {}
+        - name: tomcat-work
+          emptyDir: {}
+        - name: tomcat-webapps
+          emptyDir: {}
       initContainers:
-        - name: gxa-init
+        - name: gxa-init-codon-snapshot
           image: busybox
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "sh", "-c", "ln -s /srv/gxa/data/gxa_codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments /magetab/magetab" ]
+          command: [ "sh", "-c", "set -vx; ln -v -s /srv/gxa/data/gxa_codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* /experiments_snapshot/" ]
           volumeMounts:
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
-            - name: magetab-symlink
-              mountPath: /magetab                 
+            - name: experiments-snapshot
+              mountPath: /experiments_snapshot                 
+
+        - name: gxa-init-tomcat-manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [ "sh", "-c", "cp -r /usr/local/tomcat/webapps.dist/manager /usr/local/tomcat/webapps/" ]
+          volumeMounts:
+            - name: tomcat-webapps
+              mountPath: /usr/local/tomcat/webapps                 

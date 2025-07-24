@@ -28,13 +28,14 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext: 
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
-  # runAsUser: 1000
+  runAsUser: 2921
+  runAsGroup: 1146
 
 service:
   type: ClusterIP
@@ -81,7 +82,8 @@ tolerations: []
 
 affinity: {}
 
-# tomcat:
+tomcat:
+  httpPort: 8080
   # deployerPassword: set-in-commandline
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk

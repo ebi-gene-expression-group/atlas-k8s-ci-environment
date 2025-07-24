@@ -3,7 +3,7 @@ RELEASE ?= gxa
 ENV ?= test
 SUPPORTED_ENVS = test dev prod
 
-
+TOMCAT_PASSWORD ?= $(shell openssl rand -base64 16)
 
 VALUES = charts/$(RELEASE)/values-$(ENV).yaml
 NAMESPACE = $(RELEASE)-$(ENV)
@@ -21,7 +21,8 @@ deploy:
 	  charts/$(RELEASE) \
 	  --namespace $(NAMESPACE) \
 	  --create-namespace \
-	  -f $(VALUES)
+	  -f $(VALUES) \
+	  --set tomcat.deployerPassword="$(TOMCAT_PASSWORD)"
 
 deploy-test:
 	$(MAKE) deploy ENV=test

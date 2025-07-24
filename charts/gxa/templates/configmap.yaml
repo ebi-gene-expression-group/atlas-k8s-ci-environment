@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gxa.fullname" . }}-config
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
+data:
+  server.xml: |
+    <!-- Example Tomcat server.xml -->
+    <Server port="8005" shutdown="SHUTDOWN">
+      <Service name="Catalina">
+        <Connector port="8080" protocol="HTTP/1.1"
+                   connectionTimeout="20000"
+                   redirectPort="8443" />
+        <Engine name="Catalina" defaultHost="localhost">
+          <Host name="localhost"  appBase="webapps"
+                unpackWARs="true" autoDeploy="true">
+          </Host>
+        </Engine>
+      </Service>
+    </Server> 
+
+  configuration.properties: |
+    data.files.location = /srv/gxa/data
+    experiment.files.location = /srv/gxa/data/gxa
+    experiment.design.location= /srv/gxa/data/gxa/expdesign/
+
+    #build.number = 1
+    #build.branch = main
+    #build.commitId = foobar
+    #build.tomcatHostname = foobar
+
+
