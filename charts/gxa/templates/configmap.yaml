@@ -21,13 +21,23 @@ data:
     </Server> 
 
   configuration.properties: |
-    data.files.location = /srv/gxa/data
-    experiment.files.location = /srv/gxa/data/gxa
-    experiment.design.location= /srv/gxa/data/gxa/expdesign/
+    data.files.location = {{ .Values.data.files.location }}
+    experiment.files.location = {{ .Values.experiment.files.location }}
+    experiment.design.location = {{ .Values.experiment.design.location }}
 
     #build.number = 1
     #build.branch = main
     #build.commitId = foobar
     #build.tomcatHostname = foobar
+  
+  jdbc.properties: |
+    jdbc.url = {{ .Values.jdbc.url }}
+    jdbc.username = ${JDBC_USERNAME}
+    jdbc.password = ${JDBC_PASSWORD}
+    jdbc.pool = gxa
 
-
+  solr.properties: |
+    zk.hosts = gxa-solrcloud-zookeeper-0:2181,gxa-solrcloud-zookeeper-1:2181,gxa-solrcloud-zookeeper-2:2181
+    solr.hosts = http://gxa-solrcloud-0:8983/solr,http://gxa-solrcloud-1:8983/solr
+    solr.user = ${JDBC_PASSWORD}
+    solr.pass = ${SOLR_PASSWORD}

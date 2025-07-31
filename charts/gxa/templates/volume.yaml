@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "{{ include "gxa.fullname" . }}-webapps-volume"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.tomcat.webapps.volume.size }}
+  storageClassName: {{ .Values.tomcat.webapps.volume.storageClassName }}

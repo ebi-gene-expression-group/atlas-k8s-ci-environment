@@ -57,19 +57,22 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: gxa-codon-volume
-              mountPath: /srv/gxa/data/gxa_codon
+              mountPath: "{{ .Values.data.files.location }}/gxa_codon"
               readOnly: true
             - name: experiments-snapshot 
-              mountPath: /srv/gxa/data/gxa/magetab
+              mountPath: "{{ .Values.experiment.files.location }}/magetab"
               # subPath: magetab
               readOnly: true
             - name: gxa-volume
-              mountPath: /srv/gxa/data/gxa/release-metadata.json
+              mountPath: "{{ .Values.experiment.files.location }}/release-metadata.json"
               subPath: release-metadata.json
               readOnly: true
             - name: gxa-codon-volume
-              mountPath: /srv/gxa/data/gxa/species-properties.json
-              subPath: species-properties.json        
+              mountPath: "{{ .Values.experiment.files.location }}/species-properties.json"
+              subPath: species-properties.json
+            - name: gxa-codon-volume
+              mountPath: "{{ .Values.data.files.location }}/bioentity_properties"
+              subPath: web_app_bioentity_properties
             # - name: {{ include "gxa.fullname" . }}-config
               # mountPath: /usr/local/tomcat/conf/server.xml
               # subPath: server.xml
@@ -82,6 +85,39 @@ spec:
               mountPath: /usr/local/tomcat/work
             - name: tomcat-webapps
               mountPath: /usr/local/tomcat/webapps
+              readOnly: false
+            - name: tomcat-config
+              mountPath: /webapp-properties/solr.properties
+              subPath: solr.properties
+            - name: tomcat-config
+              mountPath: /webapp-properties/configuration.properties
+              subPath: configuration.properties
+            - name: tomcat-config
+              mountPath: /webapp-properties/jdbc.properties
+              subPath: jdbc.properties
+          env:
+            - name: TOMCAT_PASSWORD
+              value: {{ .Values.tomcat.deployerPassword }}
+            - name: JDBC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gxa.fullname" . }}-jdbc-creds
+                  key: username
+            - name: JDBC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gxa.fullname" . }}-jdbc-creds
+                  key: password
+            - name: SOLR_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gxa.fullname" . }}-solr-creds
+                  key: username
+            - name: SOLR_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gxa.fullname" . }}-solr-creds
+                  key: password
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -113,6 +149,13 @@ spec:
             items:
               - key: server.xml
                 path: server.xml
+               ## Can we mount the whole configmap and use the subpath on the volumeMount? 
+              - key: jdbc.properties
+                path: jdbc.properties
+              - key: solr.properties
+                path: solr.properties
+              - key: configuration.properties
+                path: configuration.properties
         - name: tomcat-users
           secret:
             secretName: {{ include "gxa.fullname" . }}-secrets
@@ -124,7 +167,8 @@ spec:
         - name: tomcat-work
           emptyDir: {}
         - name: tomcat-webapps
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: "{{ include "gxa.fullname" . }}-webapps-volume"
       initContainers:
         - name: gxa-init-codon-snapshot
           image: busybox
@@ -134,7 +178,7 @@ spec:
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
             - name: experiments-snapshot
-              mountPath: /experiments_snapshot                 
+              mountPath: /experiments_snapshot 
 
         - name: gxa-init-tomcat-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -142,4 +186,4 @@ spec:
           command: [ "sh", "-c", "cp -r /usr/local/tomcat/webapps.dist/manager /usr/local/tomcat/webapps/" ]
           volumeMounts:
             - name: tomcat-webapps
-              mountPath: /usr/local/tomcat/webapps                 
+              mountPath: /usr/local/tomcat/webapps

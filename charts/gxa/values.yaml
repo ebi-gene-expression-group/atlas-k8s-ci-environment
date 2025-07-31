@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: tomcat
+  repository: dockerhub.ebi.ac.uk/davidg/atlas-web-bulk
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "8-jdk11"
+  tag: "c043a5c5" 
 
 imagePullSecrets: []
 nameOverride: ""
@@ -36,10 +36,12 @@ securityContext:
   # runAsNonRoot: true
   runAsUser: 2921
   runAsGroup: 1146
+  # fsGroup: 1146
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
+  nodePort: 32000
 
 ingress:
   enabled: false
@@ -71,8 +73,8 @@ resources: {}
 
 autoscaling:
   enabled: false
-  minReplicas: 1
-  maxReplicas: 100
+  minReplicas: 2
+  maxReplicas: 3
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
@@ -84,7 +86,31 @@ affinity: {}
 
 tomcat:
   httpPort: 8080
-  # deployerPassword: set-in-commandline
+  webapps:
+    volume:
+      size: 10Gi 
+      storageClassName: standard-nfs-production
+  deployerPassword:
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
   snapshotComponent: gxa_codon_2025-07-14_14:10
+
+secrets:
+  jdbc:
+    username:
+    password:
+  solr:
+    username:
+    password:
+
+data:
+  files:
+    location: /srv/gxa/data
+experiment:
+  files:
+    location: /srv/gxa/data/gxa
+  design:
+    location: /srv/gxa/data/gxa/expdesign/
+
+jdbc:
+  url: jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst
