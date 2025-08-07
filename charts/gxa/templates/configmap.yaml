@@ -6,7 +6,6 @@ metadata:
     {{- include "gxa.labels" . | nindent 4 }}
 data:
   server.xml: |
-    <!-- Example Tomcat server.xml -->
     <Server port="8005" shutdown="SHUTDOWN">
       <Service name="Catalina">
         <Connector port="8080" protocol="HTTP/1.1"

@@ -56,6 +56,7 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+          # app data mounts
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
               readOnly: true
@@ -69,11 +70,22 @@ spec:
               readOnly: true
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa/species-properties.json
-              subPath: species-properties.json        
-            # - name: {{ include "gxa.fullname" . }}-config
+              subPath: species-properties.json   
+            # webapp properties mounts
+            - name: configuration-properties
+              mountPath: /webapp-properties/configuration.properties
+              subPath: configuration.properties
+            - name: tomcat-secrets
+              mountPath: /webapp-properties/jdbc.properties
+              subPath: jdbc.properties
+            - name: tomcat-secrets
+              mountPath: /webapp-properties/solr.properties
+              subPath: solr.properties
+            # tomcat config mounts
+            # - name: tomcat-server-config
               # mountPath: /usr/local/tomcat/conf/server.xml
               # subPath: server.xml
-            - name: tomcat-users
+            - name: tomcat-secrets
               mountPath: /usr/local/tomcat/conf/tomcat-users.xml
               subPath: tomcat-users.xml
             - name: tomcat-logs
@@ -82,18 +94,8 @@ spec:
               mountPath: /usr/local/tomcat/work
             - name: tomcat-webapps
               mountPath: /usr/local/tomcat/webapps
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+            - name: tomcat-config
+              mountPath: /usr/local/tomcat/conf/Catalina
       volumes:
         - name: gxa-volume
           nfs:
@@ -107,23 +109,28 @@ spec:
           emptyDir: {}
         - name: experiments-snapshot
           emptyDir: {}
-        - name: tomcat-config
+        - name: configuration-properties
+          configMap:
+            name: {{ include "gxa.fullname" . }}-config
+            items:
+              - key: configuration.properties
+                path: configuration.properties
+        - name: tomcat-server-config
           configMap:
             name: {{ include "gxa.fullname" . }}-config
             items:
               - key: server.xml
                 path: server.xml
-        - name: tomcat-users
+        - name: tomcat-secrets
           secret:
             secretName: {{ include "gxa.fullname" . }}-secrets
-            items:
-              - key: tomcat-users.xml
-                path: tomcat-users.xml
         - name: tomcat-logs
           emptyDir: {}
         - name: tomcat-work
           emptyDir: {}
         - name: tomcat-webapps
+          emptyDir: {}
+        - name: tomcat-config
           emptyDir: {}
       initContainers:
         - name: gxa-init-codon-snapshot
@@ -143,3 +150,15 @@ spec:
           volumeMounts:
             - name: tomcat-webapps
               mountPath: /usr/local/tomcat/webapps                 
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
