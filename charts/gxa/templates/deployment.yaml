@@ -70,7 +70,12 @@ spec:
               readOnly: true
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa/species-properties.json
-              subPath: species-properties.json   
+              subPath: species-properties.json  
+              readOnly: true
+            - name: bioentity-properties-volume
+              mountPath: /srv/gxa/data/bioentity_properties
+              subPath: fg/atlas/bioentity_properties
+              readOnly: true
             # webapp properties mounts
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
@@ -105,6 +110,10 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa_codon
+        - name: bioentity-properties-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/services
         - name: magetab-symlink
           emptyDir: {}
         - name: experiments-snapshot
@@ -142,7 +151,6 @@ spec:
               mountPath: /srv/gxa/data/gxa_codon
             - name: experiments-snapshot
               mountPath: /experiments_snapshot                 
-
         - name: gxa-init-tomcat-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
