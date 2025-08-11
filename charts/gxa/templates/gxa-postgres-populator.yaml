@@ -30,6 +30,10 @@ spec:
         - name: gxa-secrets
           secret:
             secretName: {{ include "gxa.fullname" . }}-secrets
+        - name: gxa-codon-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/ro/gxa_codon
           # persistentVolumeClaim:
             # claimName: gxa-data-rox
         # TODO mount jdbc.proeprties secret as a file
@@ -140,5 +144,9 @@ spec:
             - name: gxa-secrets
               mountPath: /secrets/jdbc.properties
               subPath: jdbc.properties
+            - name: gxa-codon-volume
+              mountPath: /atlas-data/exp/species-properties.json
+              subPath: species-properties.json  
+              readOnly: true
       restartPolicy: Never
   backoffLimit: 4
