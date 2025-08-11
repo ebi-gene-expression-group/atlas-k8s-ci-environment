@@ -2,8 +2,10 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: gxa-expdesign-rwo
-  namespace: jenkins-gene-expression
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
 spec:
+  storageClassName: standard-nfs-production 
   accessModes:
     - ReadWriteOnce
   resources:
@@ -14,35 +16,65 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: gxa-postgres-populator
-  namespace: jenkins-gene-expression
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
 spec:
   template:
     spec:
-      nodeSelector:
-        topology.kubernetes.io/zone: "europe-west2-a"
       volumes:
         - name: gxa-expdesign-vol
           persistentVolumeClaim:
             claimName: gxa-expdesign-rwo
         - name: gxa-data-vol
-          persistentVolumeClaim:
-            claimName: gxa-data-rox
+          emptyDir: {}
+          # persistentVolumeClaim:
+            # claimName: gxa-data-rox
+        # TODO mount jdbc.proeprties secret as a file
       containers:
         - name: gxa-flyway
           image: openjdk:11
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8"
-            - name: POSTGRES_HOST
-              value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
-            - name: POSTGRES_USER
-              value: "atlasdev"
-            - name: POSTGRES_PASSWORD
-              value: "atlasdev"
-            - name: POSTGRES_DB
-              value: "gxpgxadev"
+            - name: HTTP_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTP_PROXY
+            - name: HTTPS_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTPS_PROXY
+            - name: http_proxy
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTP_PROXY
+            - name: https_proxy
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTPS_PROXY
+            - name: NO_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: NO_PROXY
+            # taken as a whole from the jdbc.properties secret
+            # - name: POSTGRES_HOST
+              # value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
+            # - name: POSTGRES_USER
+              # value: "atlasdev"
+            # - name: POSTGRES_PASSWORD
+              # value: "atlasdev"
+            # - name: POSTGRES_DB
+              # value: "gxpgxadev"
             - name: EXP_IDS
-              value: "E-ERAD-475,E-GEOD-40611,E-GEOD-43049,E-GEOD-46858,E-MAXD-6,E-MEXP-1810,E-MEXP-1968,E-MTAB-1913,E-MTAB-2836,E-MTAB-2909,E-MTAB-3827,E-MTAB-3834,E-MTAB-4401,E-MTAB-451,E-MTAB-4559,E-MTAB-5128,E-MTAB-5422,E-MTAB-5633,E-MTAB-5941,E-TABM-713,E-MTAB-5214,E-PROT-1,E-MTAB-4106,E-PROT-28,E-PROT-39"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "gxa.fullname" . }}-config
+                  key: experiment_ids
           resources:
             requests:
               memory: "2Gi"
@@ -54,6 +86,7 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              set -e
               apt-get install -y --no-install-recommends git
               
               git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
@@ -63,17 +96,11 @@ spec:
               ./gradlew \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
-              -PjdbcUrl=jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB} \
-              -PjdbcUsername=${POSTGRES_USER} \
-              -PjdbcPassword=${POSTGRES_PASSWORD} \
               :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})"
               
               ./gradlew \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
-              -PjdbcUrl=jdbc:postgresql://${POSTGRES_HOST}:5432/${POSTGRES_DB} \
-              -PjdbcUsername=${POSTGRES_USER} \
-              -PjdbcPassword=${POSTGRES_PASSWORD} \
               :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
 
           volumeMounts:
@@ -83,4 +110,3 @@ spec:
               name: gxa-data-vol
       restartPolicy: Never
   backoffLimit: 4
-
