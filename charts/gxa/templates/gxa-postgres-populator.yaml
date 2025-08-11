@@ -61,6 +61,16 @@ spec:
                 configMapKeyRef:
                   name: ebi-proxy
                   key: NO_PROXY
+            - name: PROXY_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: PROXY_HOST
+            - name: PROXY_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: PROXY_PORT
             # taken as a whole from the jdbc.properties secret
             # - name: POSTGRES_HOST
               # value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
@@ -94,11 +104,21 @@ spec:
               cd atlas-web-bulk
 
               ./gradlew \
+              -Dhttp.proxyHost=${PROXY_HOST} \
+              -Dhttp.proxyPort=${PROXY_PORT} \
+              -Dhttps.proxyHost=${PROXY_HOST} \
+              -Dhttps.proxyPort=${PROXY_PORT} \
+              -Dhttp.nonProxyHosts=${NO_PROXY} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
               :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})"
               
               ./gradlew \
+              -Dhttp.proxyHost=${PROXY_HOST} \
+              -Dhttp.proxyPort=${PROXY_PORT} \
+              -Dhttps.proxyHost=${PROXY_HOST} \
+              -Dhttps.proxyPort=${PROXY_PORT} \
+              -Dhttp.nonProxyHosts=${NO_PROXY} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
               :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
