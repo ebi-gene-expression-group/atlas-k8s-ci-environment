@@ -1,0 +1,49 @@
+apiVersion: solr.apache.org/v1beta1
+kind: SolrCloud
+metadata:
+  name: {{ .Values.nameOverride }}
+  namespace: {{ .Values.namespace }}
+spec:
+  dataStorage:
+    persistent:
+      reclaimPolicy: {{ .Values.solr.storage.reclaimPolicy }}
+      pvcTemplate:
+        spec:
+          storageClassName: {{ .Values.solr.storage.className }}
+          resources:
+            requests:
+              storage: {{ .Values.solr.storage.size }}
+  replicas: {{ .Values.solr.replicas }}
+  solrImage:
+    tag: {{ .Values.solr.image.tag }}
+  solrJavaMem: {{ .Values.solr.javaMem | quote }}
+  solrOpts: {{ .Values.solr.opts | quote }}
+  solrGCTune: {{ .Values.solr.gcTune | quote }}
+  customSolrKubeOptions:
+    podOptions:
+      resources:
+        limits:
+          memory: {{ .Values.solr.resources.limits.memory }}
+        requests:
+          memory: {{ .Values.solr.resources.requests.memory }}
+      volumes:
+        - name: keys-secret
+          source:
+            secret:
+              secretName: {{ .Values.solr.secret.name }}
+          defaultContainerMount:
+            name: keys-secret
+            mountPath: {{ .Values.solr.secret.mountPath }}
+  zookeeperRef:
+    provided:
+      persistence:
+        spec:
+          storageClassName: {{ .Values.zookeeper.storage.className }}
+          resources:
+            requests:
+              storage: {{ .Values.zookeeper.storage.size }}
+      replicas: {{ .Values.zookeeper.replicas }}
+      zookeeperPodPolicy:
+        resources:
+          limits:
+            memory: {{ .Values.zookeeper.resources.limits.memory }}
