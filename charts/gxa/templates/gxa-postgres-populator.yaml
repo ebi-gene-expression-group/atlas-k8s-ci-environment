@@ -27,6 +27,9 @@ spec:
             claimName: gxa-expdesign-rwo
         - name: gxa-data-vol
           emptyDir: {}
+        - name: gxa-secrets
+          secret:
+            secretName: {{ include "gxa.fullname" . }}-secrets
           # persistentVolumeClaim:
             # claimName: gxa-data-rox
         # TODO mount jdbc.proeprties secret as a file
@@ -102,6 +105,9 @@ spec:
               git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
 
               cd atlas-web-bulk
+              
+              # copies secret files to resources directory
+              cp /secrets/jdbc.properties cli/src/main/resources/
 
               ./gradlew \
               -Dhttp.proxyHost=${PROXY_HOST} \
@@ -111,6 +117,9 @@ spec:
               -Dhttp.nonProxyHosts=${NO_PROXY} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
+              -Dlogging.level.root=DEBUG \
+              -Dlogging.level.org.springframework.boot=DEBUG \
+              -Dlogging.level.org.springframework.context.annotation=DEBUG \
               :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})"
               
               ./gradlew \
@@ -128,5 +137,8 @@ spec:
               name: gxa-expdesign-vol
             - mountPath: "/atlas-data/exp"
               name: gxa-data-vol
+            - name: gxa-secrets
+              mountPath: /secrets/jdbc.properties
+              subPath: jdbc.properties
       restartPolicy: Never
   backoffLimit: 4
