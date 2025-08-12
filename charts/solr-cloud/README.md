@@ -23,7 +23,13 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
 
    a. Pre-requisites
 
-     - TODO 
+     # Create a key pair for the SolrCloud package store
+
+     openssl genrsa -out /tmp/gxa-solrcloud.pem 512
+     openssl rsa -in /tmp/gxa-solrcloud.pem -pubout -outform DER -out /tmp/gxa-solrcloud.der
+
+     # Create the secret from the files
+     kubectl -n solr create secret generic gxa-solrcloud-package-store-keys --from-file=/tmp/gxa-solrcloud.pem --from-file=/tmp/gxa-solrcloud.der 
 
 
    b. Install solrCloud with helm
