@@ -60,9 +60,8 @@ spec:
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
               readOnly: true
-            - name: experiments-snapshot 
+            - name: experiments-snapshot
               mountPath: /srv/gxa/data/gxa/magetab
-              # subPath: magetab
               readOnly: true
             - name: gxa-volume
               mountPath: /srv/gxa/data/gxa/release-metadata.json
@@ -87,9 +86,6 @@ spec:
               mountPath: /webapp-properties/solr.properties
               subPath: solr.properties
             # tomcat config mounts
-            # - name: tomcat-server-config
-              # mountPath: /usr/local/tomcat/conf/server.xml
-              # subPath: server.xml
             - name: gxa-secrets
               mountPath: /usr/local/tomcat/conf/tomcat-users.xml
               subPath: tomcat-users.xml
@@ -142,10 +138,18 @@ spec:
         - name: tomcat-config
           emptyDir: {}
       initContainers:
-        - name: gxa-init-codon-snapshot
+        - name: gxa-init-experiments-snapshot
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           image: busybox
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "sh", "-c", "set -vx; ln -v -s /srv/gxa/data/gxa_codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* /experiments_snapshot/" ]
+          command: ["sh"]
+          args:
+            - "-c"
+            - |
+              set -vx
+              ln -s -v /srv/gxa/data/gxa_codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* /experiments_snapshot
+              ls -l /experiments_snapshot
           volumeMounts:
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon

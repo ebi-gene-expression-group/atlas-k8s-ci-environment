@@ -27,6 +27,8 @@ spec:
             claimName: gxa-expdesign-rwo
         - name: gxa-data-vol
           emptyDir: {}
+        - name: atlas-web-bulk
+          emptyDir: {}
         - name: gxa-secrets
           secret:
             secretName: {{ include "gxa.fullname" . }}-secrets
@@ -38,8 +40,10 @@ spec:
             # claimName: gxa-data-rox
         # TODO mount jdbc.proeprties secret as a file
       containers:
-        - name: gxa-flyway
+        - name: {{ include "gxa.fullname" . }}-postgres-populator
           image: openjdk:11
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8"
@@ -78,15 +82,6 @@ spec:
                 configMapKeyRef:
                   name: ebi-proxy
                   key: PROXY_PORT
-            # taken as a whole from the jdbc.properties secret
-            # - name: POSTGRES_HOST
-              # value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
-            # - name: POSTGRES_USER
-              # value: "atlasdev"
-            # - name: POSTGRES_PASSWORD
-              # value: "atlasdev"
-            # - name: POSTGRES_DB
-              # value: "gxpgxadev"
             - name: EXP_IDS
               valueFrom:
                 configMapKeyRef:
@@ -104,49 +99,45 @@ spec:
           args:
             - |
               set -e
-              apt-get install -y --no-install-recommends git
-              
-              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
 
-              cd atlas-web-bulk
-              
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
+              cp /secrets/jdbc.properties /atlas-web-bulk/cli/src/main/resources/
+
+              cd /atlas-web-bulk
+
               # copies secret files to resources directory
-              cp /secrets/jdbc.properties cli/src/main/resources/
+              mkdir /atlas-data/exp/magetab
+              ln -s /atlas-data/exp/gxa-codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* /atlas-data/exp/magetab 
 
               ./gradlew \
-              -Dhttp.proxyHost=${PROXY_HOST} \
-              -Dhttp.proxyPort=${PROXY_PORT} \
-              -Dhttps.proxyHost=${PROXY_HOST} \
-              -Dhttps.proxyPort=${PROXY_PORT} \
-              -Dhttp.nonProxyHosts=${NO_PROXY} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
               -Dlogging.level.root=DEBUG \
               -Dlogging.level.org.springframework.boot=DEBUG \
-              -Dlogging.level.org.springframework.context.annotation=DEBUG \
-              :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})"
+              -Dlogging.level.org.springframework.context.annotation=DEBUG \  
+              :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})
               
               ./gradlew \
-              -Dhttp.proxyHost=${PROXY_HOST} \
-              -Dhttp.proxyPort=${PROXY_PORT} \
-              -Dhttps.proxyHost=${PROXY_HOST} \
-              -Dhttps.proxyPort=${PROXY_PORT} \
-              -Dhttp.nonProxyHosts=${NO_PROXY} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
-              :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
+              :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})
+
 
           volumeMounts:
-            - mountPath: "/atlas-data/expdesign"
-              name: gxa-expdesign-vol
-            - mountPath: "/atlas-data/exp"
-              name: gxa-data-vol
-            - name: gxa-secrets
-              mountPath: /secrets/jdbc.properties
-              subPath: jdbc.properties
+            - name: gxa-expdesign-vol
+              mountPath: "/atlas-data/expdesign"
+            - name: gxa-data-vol
+              mountPath: "/atlas-data/exp"
+            - name: gxa-codon-volume
+              mountPath: /atlas-data/exp/gxa-codon
             - name: gxa-codon-volume
               mountPath: /atlas-data/exp/species-properties.json
               subPath: species-properties.json  
               readOnly: true
+            - name: atlas-web-bulk
+              mountPath: /atlas-web-bulk
+            - name: gxa-secrets
+              mountPath: /secrets/jdbc.properties
+              subPath: jdbc.properties
       restartPolicy: Never
   backoffLimit: 4

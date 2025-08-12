@@ -60,3 +60,15 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "gxa.jvmProxyArgs" -}}
+{{- /* Convert comma-separated NO_PROXY to Java's pipe-separated format 
+When used in a container, needs env variables to be set up, e.g. from a configmap.
+Note that the last system property arg is not followed by a backslash
+*/ -}}
+-Dhttp.proxyHost=${PROXY_HOST} \
+-Dhttp.proxyPort=${PROXY_PORT} \
+-Dhttps.proxyHost=${PROXY_HOST} \
+-Dhttps.proxyPort=${PROXY_PORT} \
+-Dhttp.nonProxyHosts=${NO_PROXY//,/|}
+{{- end }}
