@@ -1,5 +1,5 @@
 nameOverride: gxa-solr
-namespace: solr-test
+namespace: solr
 
 solr:
   replicas: 4
