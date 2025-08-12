@@ -70,22 +70,27 @@ spec:
               readOnly: true
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa/species-properties.json
-              subPath: species-properties.json   
+              subPath: species-properties.json  
+              readOnly: true
+            - name: bioentity-properties-volume
+              mountPath: /srv/gxa/data/bioentity_properties
+              subPath: fg/atlas/bioentity_properties
+              readOnly: true
             # webapp properties mounts
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
               subPath: configuration.properties
-            - name: tomcat-secrets
+            - name: gxa-secrets
               mountPath: /webapp-properties/jdbc.properties
               subPath: jdbc.properties
-            - name: tomcat-secrets
+            - name: gxa-secrets
               mountPath: /webapp-properties/solr.properties
               subPath: solr.properties
             # tomcat config mounts
             # - name: tomcat-server-config
               # mountPath: /usr/local/tomcat/conf/server.xml
               # subPath: server.xml
-            - name: tomcat-secrets
+            - name: gxa-secrets
               mountPath: /usr/local/tomcat/conf/tomcat-users.xml
               subPath: tomcat-users.xml
             - name: tomcat-logs
@@ -105,6 +110,10 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa_codon
+        - name: bioentity-properties-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/services
         - name: magetab-symlink
           emptyDir: {}
         - name: experiments-snapshot
@@ -121,7 +130,7 @@ spec:
             items:
               - key: server.xml
                 path: server.xml
-        - name: tomcat-secrets
+        - name: gxa-secrets
           secret:
             secretName: {{ include "gxa.fullname" . }}-secrets
         - name: tomcat-logs
@@ -142,7 +151,6 @@ spec:
               mountPath: /srv/gxa/data/gxa_codon
             - name: experiments-snapshot
               mountPath: /experiments_snapshot                 
-
         - name: gxa-init-tomcat-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}

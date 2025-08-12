@@ -29,4 +29,6 @@ data:
     #build.commitId = foobar
     #build.tomcatHostname = foobar
 
+  experiment_ids: {{ .Values.experiment_ids}}
+
 

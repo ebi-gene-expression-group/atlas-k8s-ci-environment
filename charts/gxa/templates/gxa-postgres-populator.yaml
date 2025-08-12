@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gxa-expdesign-rwo
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
+spec:
+  storageClassName: standard-nfs-production 
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gxa-postgres-populator
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+      volumes:
+        - name: gxa-expdesign-vol
+          persistentVolumeClaim:
+            claimName: gxa-expdesign-rwo
+        - name: gxa-data-vol
+          emptyDir: {}
+        - name: gxa-secrets
+          secret:
+            secretName: {{ include "gxa.fullname" . }}-secrets
+        - name: gxa-codon-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/ro/gxa_codon
+          # persistentVolumeClaim:
+            # claimName: gxa-data-rox
+        # TODO mount jdbc.proeprties secret as a file
+      containers:
+        - name: gxa-flyway
+          image: openjdk:11
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8"
+            - name: HTTP_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTP_PROXY
+            - name: HTTPS_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTPS_PROXY
+            - name: http_proxy
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTP_PROXY
+            - name: https_proxy
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: HTTPS_PROXY
+            - name: NO_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: NO_PROXY
+            - name: PROXY_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: PROXY_HOST
+            - name: PROXY_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ebi-proxy
+                  key: PROXY_PORT
+            # taken as a whole from the jdbc.properties secret
+            # - name: POSTGRES_HOST
+              # value: "gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local"
+            # - name: POSTGRES_USER
+              # value: "atlasdev"
+            # - name: POSTGRES_PASSWORD
+              # value: "atlasdev"
+            # - name: POSTGRES_DB
+              # value: "gxpgxadev"
+            - name: EXP_IDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "gxa.fullname" . }}-config
+                  key: experiment_ids
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "2"
+              ephemeral-storage: "4Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              apt-get install -y --no-install-recommends git
+              
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
+
+              cd atlas-web-bulk
+              
+              # copies secret files to resources directory
+              cp /secrets/jdbc.properties cli/src/main/resources/
+
+              ./gradlew \
+              -Dhttp.proxyHost=${PROXY_HOST} \
+              -Dhttp.proxyPort=${PROXY_PORT} \
+              -Dhttps.proxyHost=${PROXY_HOST} \
+              -Dhttps.proxyPort=${PROXY_PORT} \
+              -Dhttp.nonProxyHosts=${NO_PROXY} \
+              -PexperimentFilesLocation=/atlas-data/exp \
+              -PexperimentDesignLocation=/atlas-data/expdesign \
+              -Dlogging.level.root=DEBUG \
+              -Dlogging.level.org.springframework.boot=DEBUG \
+              -Dlogging.level.org.springframework.context.annotation=DEBUG \
+              :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})"
+              
+              ./gradlew \
+              -Dhttp.proxyHost=${PROXY_HOST} \
+              -Dhttp.proxyPort=${PROXY_PORT} \
+              -Dhttps.proxyHost=${PROXY_HOST} \
+              -Dhttps.proxyPort=${PROXY_PORT} \
+              -Dhttp.nonProxyHosts=${NO_PROXY} \
+              -PexperimentFilesLocation=/atlas-data/exp \
+              -PexperimentDesignLocation=/atlas-data/expdesign \
+              :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
+
+          volumeMounts:
+            - mountPath: "/atlas-data/expdesign"
+              name: gxa-expdesign-vol
+            - mountPath: "/atlas-data/exp"
+              name: gxa-data-vol
+            - name: gxa-secrets
+              mountPath: /secrets/jdbc.properties
+              subPath: jdbc.properties
+            - name: gxa-codon-volume
+              mountPath: /atlas-data/exp/species-properties.json
+              subPath: species-properties.json  
+              readOnly: true
+      restartPolicy: Never
+  backoffLimit: 4
