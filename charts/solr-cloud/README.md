@@ -26,6 +26,7 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
      - TODO 
 
 
-   b. Create solrCloud with helm
+   b. Install solrCloud with helm
    
-      helm create solr-cloud
+      # Install the solrCloud resource in the namespace 'solr'
+      helm install gxa-solr charts/solr-cloud/Charts.yaml --namespace solr --create-namespace=false
