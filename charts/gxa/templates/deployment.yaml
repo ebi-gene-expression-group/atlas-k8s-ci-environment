@@ -75,6 +75,8 @@ spec:
               mountPath: /srv/gxa/data/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
+            - name: gxa-expdesign-vol
+              mountPath: /srv/gxa/data/gxa/expdesign
             # webapp properties mounts
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
@@ -110,8 +112,9 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/services
-        - name: magetab-symlink
-          emptyDir: {}
+        - name: gxa-expdesign-vol
+          persistentVolumeClaim:
+            claimName: gxa-expdesign-rwo
         - name: experiments-snapshot
           emptyDir: {}
         - name: configuration-properties

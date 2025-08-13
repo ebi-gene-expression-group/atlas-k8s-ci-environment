@@ -110,6 +110,7 @@ spec:
               ln -s /atlas-data/exp/gxa-codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* \
                     /atlas-data/exp/magetab 
 
+              set +e
               ./gradlew \
               {{ include "gxa.jvmProxyArgs" . | indent 14 }} \
               -PexperimentFilesLocation=/atlas-data/exp \
