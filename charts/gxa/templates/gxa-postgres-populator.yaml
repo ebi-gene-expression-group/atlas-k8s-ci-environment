@@ -95,32 +95,35 @@ spec:
             limits:
               cpu: "2"
               memory: "4Gi"
-          command: ["/bin/sh", "-c"]
+          command: ["/bin/bash", "-c"]
           args:
             - |
               set -e
 
-              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
+              git clone --recurse-submodules --depth 1 --single-branch \
+                "https://github.com/ebi-gene-expression-group/atlas-web-bulk.git"
               cp /secrets/jdbc.properties /atlas-web-bulk/cli/src/main/resources/
 
-              cd /atlas-web-bulk
+              cd /atlas-web-bulk/
 
-              # copies secret files to resources directory
               mkdir /atlas-data/exp/magetab
-              ln -s /atlas-data/exp/gxa-codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* /atlas-data/exp/magetab 
+              ln -s /atlas-data/exp/gxa-codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* \
+                    /atlas-data/exp/magetab 
 
               ./gradlew \
+              {{ include "gxa.jvmProxyArgs" . | indent 14 }} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
               -Dlogging.level.root=DEBUG \
               -Dlogging.level.org.springframework.boot=DEBUG \
-              -Dlogging.level.org.springframework.context.annotation=DEBUG \  
-              :cli:bootRun --args="create-update-experiment -e $(echo ${EXP_IDS})
-              
+              -Dlogging.level.org.springframework.context.annotation=DEBUG \
+              ":cli:bootRun" --args="create-update-experiment -e $(echo ${EXP_IDS})"
+                  
               ./gradlew \
+              {{ include "gxa.jvmProxyArgs" . | indent 14 }} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
-              :cli:bootRun --args="update-baseline-coexpression -e $(echo ${EXP_IDS})
+              ":cli:bootRun" --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
 
 
           volumeMounts:

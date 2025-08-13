@@ -64,11 +64,13 @@ Create the name of the service account to use
 {{- define "gxa.jvmProxyArgs" -}}
 {{- /* Convert comma-separated NO_PROXY to Java's pipe-separated format 
 When used in a container, needs env variables to be set up, e.g. from a configmap.
-Note that the last system property arg is not followed by a backslash
+Notes:
+1. the last system property arg is not followed by a backslash
+2. fpr the non proxy hosts, we use substitution
 */ -}}
 -Dhttp.proxyHost=${PROXY_HOST} \
 -Dhttp.proxyPort=${PROXY_PORT} \
 -Dhttps.proxyHost=${PROXY_HOST} \
 -Dhttps.proxyPort=${PROXY_PORT} \
--Dhttp.nonProxyHosts=${NO_PROXY//,/|}
+-Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
 {{- end }}
