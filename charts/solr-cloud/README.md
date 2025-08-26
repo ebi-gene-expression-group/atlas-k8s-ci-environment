@@ -23,9 +23,9 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
 
 4. Deploying a SolrCloud
 
+   ```bash
    a. Pre-requisites
 
-     ```bash
      # Create a key pair for the SolrCloud package store
      openssl genrsa -out /tmp/gxa-solrcloud.pem 512
      openssl rsa -in /tmp/gxa-solrcloud.pem -pubout -outform DER -out /tmp/gxa-solrcloud.der
@@ -36,7 +36,6 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
 
    b. Install solrCloud with helm
  
-     ```bash
       # Install the solrCloud resource in the namespace 'gxa-dev-solrcloud'
       helm install gxa-dev charts/solr-cloud \
            --namespace gxa-dev-solrcloud \
