@@ -1,0 +1,30 @@
+namespace: gxa-dev-solrcloud
+
+solr:
+  replicas: 4
+  image:
+    tag: 8.7.0
+  javaMem: "-Xms2000m -Xmx3000m"
+  opts: "-Denable.packages=true -Dblob.max.size.mb=100"
+  gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
+  resources:
+    limits:
+      memory: 3Gi
+    requests:
+      memory: 2Gi
+  storage:
+    className: standard-nfs-production
+    size: 20Gi
+    reclaimPolicy: Retain
+  secret:
+    name: gxa-solrcloud-package-store-keys
+    mountPath: /keys
+
+zookeeper:
+  replicas: 3
+  storage:
+    className: standard-nfs-production
+    size: 500Mi
+  resources:
+    limits:
+      memory: 512Mi

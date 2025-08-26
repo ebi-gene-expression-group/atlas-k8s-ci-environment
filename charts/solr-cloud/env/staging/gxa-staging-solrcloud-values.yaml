@@ -1,5 +1,4 @@
-nameOverride: gxa-solr
-namespace: solr
+namespace: gxa-staging-solrcloud
 
 solr:
   replicas: 4
