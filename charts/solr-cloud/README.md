@@ -3,7 +3,8 @@
 Step-by-Step Installation Guide for Solr Operator v0.8.1
 
 1. Install the CRDs (Custom Resource Definitions)
-
+   
+   ```bash
    kubectl create -f https://solr.apache.org/operator/downloads/crds/v0.8.1/all-with-dependencies.yaml
 
 2. Install the Solr Operator via Helm
