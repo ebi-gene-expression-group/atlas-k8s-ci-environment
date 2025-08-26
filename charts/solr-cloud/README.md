@@ -13,7 +13,6 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
    helm repo add apache-solr https://solr.apache.org/charts
    helm repo update
 
-   ```bash
    # Installing solr-operator in a namespace
    helm install solr-operator apache-solr/solr-operator --version 0.8.1 --namespace solr --create-namespace
 
@@ -31,7 +30,6 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
      openssl genrsa -out /tmp/gxa-solrcloud.pem 512
      openssl rsa -in /tmp/gxa-solrcloud.pem -pubout -outform DER -out /tmp/gxa-solrcloud.der
 
-     ```bash
      # Create the secret from the files
      kubectl -n solr create secret generic gxa-solrcloud-package-store-keys --from-file=/tmp/gxa-solrcloud.pem --from-file=/tmp/gxa-solrcloud.der 
 
@@ -45,7 +43,6 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
            --values charts/solr-cloud/env/dev/gxa-dev-solrcloud-values.yaml \
            --create-namespace=false
 
-     ```bash
       # Install the solrCloud resource in the namespace 'scxa-dev-solrcloud'
       helm install scxa-dev charts/solr-cloud \
            --namespace scxa-dev-solrcloud \
