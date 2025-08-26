@@ -2,7 +2,7 @@ apiVersion: solr.apache.org/v1beta1
 kind: SolrCloud
 metadata:
   name: {{ .Release.Name }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
 spec:
   solrSecurity:
     authenticationType: Basic

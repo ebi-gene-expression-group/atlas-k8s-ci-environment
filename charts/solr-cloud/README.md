@@ -47,4 +47,4 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
       helm install scxa-dev charts/solr-cloud \
            --namespace scxa-dev-solrcloud \
            --values charts/solr-cloud/env/dev/scxa-dev-solrcloud-values.yaml \
-           --create-namespace=false 
+           --create-namespace=false
