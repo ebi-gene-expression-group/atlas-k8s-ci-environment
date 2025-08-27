@@ -1,7 +1,7 @@
 apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshot
 metadata:
-  name: gxa-expdesign-rwo-snapshot
+  name: {{ .Release.Name }}-expdesign-rwo-snapshot
   namespace: jenkins-gene-expression
 spec:
   volumeSnapshotClassName: snapshot-class

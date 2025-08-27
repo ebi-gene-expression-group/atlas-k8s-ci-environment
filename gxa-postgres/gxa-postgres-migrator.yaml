@@ -1,13 +1,13 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gxa-postgres-migrator
+  name: {{ .Release.Name }}-postgres-migrator
   namespace: jenkins-gene-expression
 spec:
   template:
     spec:
       containers:
-        - name: gxa-flyway
+        - name: {{ .Release.Name }}-flyway
           image: quay.io/ebigxa/gxa-flyway-migrator
           env:
             - name: FLYWAY_USER

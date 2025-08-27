@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gxa-solrcloud-bioentities-populator
+  name: {{ .Release.Name }}-solrcloud-bioentities-populator
   namespace: jenkins-gene-expression
 spec:
   template:
@@ -9,11 +9,11 @@ spec:
       nodeSelector:
         topology.kubernetes.io/zone: "europe-west2-a"
       volumes:
-        - name: gxa-bioentities-jsonl-vol
+        - name: {{ .Release.Name }}-bioentities-jsonl-vol
           persistentVolumeClaim:
             claimName: gxa-bioentities-jsonl-rwo
       containers:
-        - name: gxa-solrcloud-populator
+        - name: {{ .Release.Name }}-solrcloud-populator
           image: openjdk:11
           env:
             - name: SOLR_HOST
@@ -58,5 +58,5 @@ spec:
               ./build-suggesters.sh
           volumeMounts:
             - mountPath: "/atlas-data/bioentities-jsonl"
-              name: gxa-bioentities-jsonl-vol
+              name: {{ .Release.Name }}-bioentities-jsonl-vol
       restartPolicy: Never

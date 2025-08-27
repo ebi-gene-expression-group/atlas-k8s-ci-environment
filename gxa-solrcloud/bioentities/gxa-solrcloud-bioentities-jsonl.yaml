@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: gxa-bioentities-jsonl-rwo
+  name: {{ .Release.Name }}-bioentities-jsonl-rwo
   namespace: jenkins-gene-expression
 spec:
   accessModes:
@@ -13,7 +13,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gxa-solrcloud-bioentities-jsonl
+  name: {{ .Release.Name }}-solrcloud-bioentities-jsonl
   namespace: jenkins-gene-expression
 spec:
   template:
@@ -24,17 +24,17 @@ spec:
         - name: gradle-ro-dep-cache-vol
           persistentVolumeClaim:
             claimName: gradle-7.0-ro-dep-cache-rox
-        - name: gxa-data-vol
+        - name: {{ .Release.Name }}-data-vol
           persistentVolumeClaim:
             claimName: gxa-data-rox
         - name: bioentity-properties-vol
           persistentVolumeClaim:
             claimName: bioentity-properties-rox
-        - name: gxa-bioentities-jsonl-vol
+        - name: {{ .Release.Name }}-bioentities-jsonl-vol
           persistentVolumeClaim:
             claimName: gxa-bioentities-jsonl-rwo
       containers:
-        - name: gxa-solrcloud-bioentities-jsonl
+        - name: {{ .Release.Name }}-solrcloud-bioentities-jsonl
           image: quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:latest
           env:
             - name: JAVA_TOOL_OPTIONS
@@ -81,11 +81,11 @@ spec:
               name: gradle-ro-dep-cache-vol
               readOnly: true
             - mountPath: "/atlas-data/exp"
-              name: gxa-data-vol
+              name: {{ .Release.Name }}-data-vol
               readOnly: true
             - mountPath: "/atlas-data/bioentity_properties"
               name: bioentity-properties-vol
               readOnly: true
             - mountPath: "/atlas-data/bioentities-jsonl"
-              name: gxa-bioentities-jsonl-vol
+              name: {{ .Release.Name }}-bioentities-jsonl-vol
       restartPolicy: Never

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   namespace: jenkins-gene-expression
-  name: gxa-postgres-headless
+  name: {{ .Release.Name }}-postgres-headless
 spec:
   type: ClusterIP
   clusterIP: None

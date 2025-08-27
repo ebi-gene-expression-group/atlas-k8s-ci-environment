@@ -2,7 +2,7 @@
 apiVersion: solr.apache.org/v1beta1
 kind: SolrCloud
 metadata:
-  name: gxa
+  name: {{ .Release.Name }}
   namespace: jenkins-gene-expression
 spec:
   dataStorage:

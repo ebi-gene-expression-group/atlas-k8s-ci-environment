@@ -1,13 +1,13 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gxa-solrcloud-bulk-analytics-populator
+  name: {{ .Release.Name }}-solrcloud-bulk-analytics-populator
   namespace: jenkins-gene-expression
 spec:
   template:
     spec:
       volumes:
-        - name: gxa-bulk-analytics-jsonl-vol
+        - name: {{ .Release.Name }}-bulk-analytics-jsonl-vol
           persistentVolumeClaim:
             claimName: gxa-bulk-analytics-jsonl-rwo
         - name: scratch-bulk-analytics-vol
@@ -20,7 +20,7 @@ spec:
                   requests:
                     storage: 200Gi
       containers:
-        - name: gxa-solrcloud-populator
+        - name: {{ .Release.Name }}-solrcloud-populator
           image: openjdk:11
           env:
             - name: SOLR_HOST
@@ -71,7 +71,7 @@ spec:
               done
           volumeMounts:
             - mountPath: "/atlas-data/bulk-analytics-jsonl"
-              name: gxa-bulk-analytics-jsonl-vol
+              name: {{ .Release.Name }}-bulk-analytics-jsonl-vol
             - mountPath: "/atlas-data/scratch"
               name: scratch-bulk-analytics-vol
       restartPolicy: Never

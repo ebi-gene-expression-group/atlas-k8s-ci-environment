@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: gxa-expdesign-rwo
+  name: {{ .Release.Name }}-expdesign-rwo
   labels:
     {{- include "gxa.labels" . | nindent 4 }}
 spec:

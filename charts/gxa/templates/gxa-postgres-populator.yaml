@@ -1,28 +1,28 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: gxa-postgres-populator
+  name: {{ .Release.Name }}-postgres-populator
   labels:
     {{- include "gxa.labels" . | nindent 4 }}
 spec:
   template:
     spec:
       volumes:
-        - name: gxa-expdesign-vol
+        - name: {{ .Release.Name }}-expdesign-vol
           persistentVolumeClaim:
             claimName: gxa-expdesign-rwo
         - name: services-volume
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/services
-        - name: gxa-data-vol
+        - name: {{ .Release.Name }}-data-vol
           emptyDir: {}
         - name: atlas-web-bulk
           emptyDir: {}
-        - name: gxa-secrets
+        - name: {{ .Release.Name }}-secrets
           secret:
             secretName: {{ include "gxa.fullname" . }}-secrets
-        - name: gxa-codon-volume
+        - name: {{ .Release.Name }}-codon-volume
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa_codon
@@ -128,21 +128,21 @@ spec:
 
               sleep 5000
           volumeMounts:
-            - name: gxa-expdesign-vol
+            - name: {{ .Release.Name }}-expdesign-vol
               mountPath: "/atlas-data/expdesign"
-            - name: gxa-data-vol
+            - name: {{ .Release.Name }}-data-vol
               mountPath: "/atlas-data/exp"
             - name: services-volume
               mountPath: /atlas-data/services
-            - name: gxa-codon-volume
+            - name: {{ .Release.Name }}-codon-volume
               mountPath: /atlas-data/exp/gxa-codon
-            - name: gxa-codon-volume
+            - name: {{ .Release.Name }}-codon-volume
               mountPath: /atlas-data/exp/species-properties.json
               subPath: species-properties.json  
               readOnly: true
             - name: atlas-web-bulk
               mountPath: /atlas-web-bulk
-            - name: gxa-secrets
+            - name: {{ .Release.Name }}-secrets
               mountPath: /secrets/jdbc.properties
               subPath: jdbc.properties
       restartPolicy: Never
