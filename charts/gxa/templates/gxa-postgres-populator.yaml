@@ -1,17 +1,3 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: gxa-expdesign-rwo
-  labels:
-    {{- include "gxa.labels" . | nindent 4 }}
-spec:
-  storageClassName: standard-nfs-production 
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 500Mi
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -25,6 +11,10 @@ spec:
         - name: gxa-expdesign-vol
           persistentVolumeClaim:
             claimName: gxa-expdesign-rwo
+        - name: services-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/services
         - name: gxa-data-vol
           emptyDir: {}
         - name: atlas-web-bulk
@@ -107,31 +97,43 @@ spec:
               cd /atlas-web-bulk/
 
               mkdir /atlas-data/exp/magetab
-              ln -s /atlas-data/exp/gxa-codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* \
+              ln -s /atlas-data/services/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* \
                     /atlas-data/exp/magetab 
+              ls -lt /atlas-data/exp/magetab 
 
-              set +e
               ./gradlew \
               {{ include "gxa.jvmProxyArgs" . | indent 14 }} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
               -Dlogging.level.root=DEBUG \
-              -Dlogging.level.org.springframework.boot=DEBUG \
-              -Dlogging.level.org.springframework.context.annotation=DEBUG \
+              -Dlogging.level.org.springframework=DEBUG \
               ":cli:bootRun" --args="create-update-experiment -e $(echo ${EXP_IDS})"
-                  
+              
               ./gradlew \
               {{ include "gxa.jvmProxyArgs" . | indent 14 }} \
               -PexperimentFilesLocation=/atlas-data/exp \
               -PexperimentDesignLocation=/atlas-data/expdesign \
+              -Dlogging.level.root=DEBUG \
+              -Dlogging.level.org.springframework=DEBUG \
+              ":cli:bootRun" --args="update-experiment-design -e $(echo ${EXP_IDS})"
+                            
+              ./gradlew \
+              {{ include "gxa.jvmProxyArgs" . | indent 14 }} \
+              -PexperimentFilesLocation=/atlas-data/exp \
+              -PexperimentDesignLocation=/atlas-data/expdesign \
+              -Dlogging.level.root=DEBUG \
+              -Dlogging.level.uk.ac.ebi.atlas=DEBUG \
+              -Dlogging.level.org.springframework=DEBUG \
               ":cli:bootRun" --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
 
-
+              sleep 5000
           volumeMounts:
             - name: gxa-expdesign-vol
               mountPath: "/atlas-data/expdesign"
             - name: gxa-data-vol
               mountPath: "/atlas-data/exp"
+            - name: services-volume
+              mountPath: /atlas-data/services
             - name: gxa-codon-volume
               mountPath: /atlas-data/exp/gxa-codon
             - name: gxa-codon-volume

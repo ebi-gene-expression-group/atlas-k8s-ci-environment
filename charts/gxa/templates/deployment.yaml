@@ -71,12 +71,14 @@ spec:
               mountPath: /srv/gxa/data/gxa/species-properties.json
               subPath: species-properties.json  
               readOnly: true
-            - name: bioentity-properties-volume
+            - name: services-volume
               mountPath: /srv/gxa/data/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
             - name: gxa-expdesign-vol
               mountPath: /srv/gxa/data/gxa/expdesign
+            - name: services-volume
+              mountPath: /srv/gxa/data/services
             # webapp properties mounts
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
@@ -108,7 +110,7 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa_codon
-        - name: bioentity-properties-volume
+        - name: services-volume
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/services
@@ -151,11 +153,13 @@ spec:
             - "-c"
             - |
               set -vx
-              ln -s -v /srv/gxa/data/gxa_codon/.snapshot/{{ .Values.nfs.snapshotComponent }}/experiments/* /experiments_snapshot
-              ls -l /experiments_snapshot
+              ln -s -v /srv/gxa/data/services/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* /experiments_snapshot
+              ls -lt /experiments_snapshot
           volumeMounts:
             - name: gxa-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
+            - name: services-volume
+              mountPath: /srv/gxa/data/services
             - name: experiments-snapshot
               mountPath: /experiments_snapshot                 
         - name: gxa-init-tomcat-manager

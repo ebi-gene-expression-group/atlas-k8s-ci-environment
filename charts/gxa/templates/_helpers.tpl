@@ -74,3 +74,9 @@ Notes:
 -Dhttps.proxyPort=${PROXY_PORT} \
 -Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
 {{- end }}
+
+{{- define "gxa.experimentsDirName" -}}
+{{- if eq .Values.environment "test" }}
+experiments_test{{- else }}
+experiments{{- end }}
+{{- end }}

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gxa-expdesign-rwo
+  labels:
+    {{- include "gxa.labels" . | nindent 4 }}
+spec:
+  storageClassName: standard-nfs-production 
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi

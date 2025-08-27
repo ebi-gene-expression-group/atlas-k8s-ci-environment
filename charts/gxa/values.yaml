@@ -93,4 +93,4 @@ postgres:
     
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
-  snapshotComponent: gxa_codon_2025-07-14_14:10
+  snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
