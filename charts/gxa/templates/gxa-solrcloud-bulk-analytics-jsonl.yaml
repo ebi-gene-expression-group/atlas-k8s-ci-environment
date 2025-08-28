@@ -14,16 +14,13 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ .Release.Name }}-solrcloud-bulk-analytics-jsonl
-  namespace: jenkins-gene-expression
 spec:
   template:
     spec:
-      nodeSelector:
-        topology.kubernetes.io/zone: "europe-west2-a"
       volumes:
-        - name: gradle-ro-dep-cache-vol
-          persistentVolumeClaim:
-            claimName: gradle-7.0-ro-dep-cache-rox
+        # - name: gradle-ro-dep-cache-vol
+        #   persistentVolumeClaim:
+        #     claimName: gradle-7.0-ro-dep-cache-rox
         - name: {{ .Release.Name }}-expdesign-vol
           persistentVolumeClaim:
             claimName: gxa-expdesign-rox
