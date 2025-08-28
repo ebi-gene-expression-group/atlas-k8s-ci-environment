@@ -28,7 +28,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ include "app.name" . }}-webapp
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -56,30 +56,30 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-          # app data mounts
+            {{- /* app data mounts */}}
             - name: {{ include "app.name" . }}-codon-volume
-              mountPath: /srv/gxa/data/gxa_codon
+              mountPath: {{ include "app.dataDir" . }}/gxa_codon
               readOnly: true
             - name: experiments-snapshot
-              mountPath: /srv/gxa/data/gxa/magetab
+              mountPath: {{ include "app.experimentsDir" . }}/magetab
               readOnly: true
-            - name: {{ include "app.name" . }}-volume
-              mountPath: /srv/gxa/data/gxa/release-metadata.json
+            - name: gxa-volume
+              mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
-            - name: {{ include "app.name" . }}-codon-volume
-              mountPath: /srv/gxa/data/gxa/species-properties.json
+            - name: gxa-codon-volume
+              mountPath: {{ include "app.experimentsDir" . }}/species-properties.json
               subPath: species-properties.json  
               readOnly: true
             - name: services-volume
-              mountPath: /srv/gxa/data/bioentity_properties
+              mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
             - name: {{ include "app.name" . }}-expdesign-vol
-              mountPath: /srv/gxa/data/gxa/expdesign
+              mountPath: {{ include "app.expdesignDir" . }}
             - name: services-volume
-              mountPath: /srv/gxa/data/services
-            # webapp properties mounts
+              mountPath: {{ include "app.servicesDir" . }}
+            {{- /* webapp properties mounts */}}
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
               subPath: configuration.properties
@@ -89,34 +89,23 @@ spec:
             - name: {{ include "app.name" . }}-secrets
               mountPath: /webapp-properties/solr.properties
               subPath: solr.properties
-            # tomcat config mounts
+            {{- /* tomcat config mounts */}}
             - name: {{ include "app.name" . }}-secrets
-              mountPath: /usr/local/tomcat/conf/tomcat-users.xml
+              mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
               subPath: tomcat-users.xml
             - name: tomcat-logs
-              mountPath: /usr/local/tomcat/logs
+              mountPath: {{ include "app.tomcatDir" . }}/logs
             - name: tomcat-work
-              mountPath: /usr/local/tomcat/work
+              mountPath: {{ include "app.tomcatDir" . }}/work
             - name: tomcat-webapps
-              mountPath: /usr/local/tomcat/webapps
+              mountPath: {{ include "app.tomcatDir" . }}/webapps
             - name: tomcat-config
-              mountPath: /usr/local/tomcat/conf/Catalina
+              mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
       volumes:
-        - name: {{ include "app.name" . }}-volume
-          nfs:
-            server: {{ .Values.nfs.server }}
-            path: /ifs/public/ro/gxa
-        - name: {{ include "app.name" . }}-codon-volume
-          nfs:
-            server: {{ .Values.nfs.server }}
-            path: /ifs/public/ro/gxa_codon
-        - name: services-volume
-          nfs:
-            server: {{ .Values.nfs.server }}
-            path: /ifs/public/services
-        - name: {{ include "app.name" . }}-expdesign-vol
-          persistentVolumeClaim:
-            claimName: {{ include "app.name" . }}-expdesign-rwo
+        {{- include "app.gxaVolume" . | nindent 8 }}
+        {{- include "app.gxaCodonVolume" . | nindent 8 }}
+        {{- include "app.servicesVolume" . | nindent 8 }}
+        {{- include "app.expdesignVolume" . | nindent 8 }}
         - name: experiments-snapshot
           emptyDir: {}
         - name: configuration-properties
@@ -131,9 +120,7 @@ spec:
             items:
               - key: server.xml
                 path: server.xml
-        - name: {{ include "app.name" . }}-secrets
-          secret:
-            secretName: {{ include "app.fullname" . }}-secrets
+        {{- include "app.secretsVolume" . | nindent 8 }}
         - name: tomcat-logs
           emptyDir: {}
         - name: tomcat-work
@@ -153,22 +140,23 @@ spec:
             - "-c"
             - |
               set -vx
-              ln -s -v /srv/gxa/data/services/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* /experiments_snapshot
+              ln -s -v {{ include "app.servicesDir" . }}/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* /experiments_snapshot
               ls -lt /experiments_snapshot
           volumeMounts:
-            - name: {{ include "app.name" . }}-codon-volume
-              mountPath: /srv/gxa/data/gxa_codon
+            - name: gxa-codon-volume
+              mountPath: {{ include "app.dataDir" . }}/gxa_codon
             - name: services-volume
-              mountPath: /srv/gxa/data/services
+              {{- /* Use a template for the mountPath */}}
+              mountPath: {{ include "app.servicesDir" . }}
             - name: experiments-snapshot
               mountPath: /experiments_snapshot                 
         - name: {{ include "app.name" . }}-init-tomcat-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "sh", "-c", "cp -r /usr/local/tomcat/webapps.dist/manager /usr/local/tomcat/webapps/" ]
+          command: [ "sh", "-c", "cp -r {{ include "app.tomcatDir" . }}/webapps.dist/manager {{ include "app.tomcatDir" . }}/webapps/" ]
           volumeMounts:
             - name: tomcat-webapps
-              mountPath: /usr/local/tomcat/webapps                 
+              mountPath: {{ include "app.tomcatDir" . }}/webapps                 
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

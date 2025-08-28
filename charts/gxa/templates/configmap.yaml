@@ -8,11 +8,12 @@ data:
   server.xml: |
     <Server port="8005" shutdown="SHUTDOWN">
       <Service name="Catalina">
-        <Connector port="8080" protocol="HTTP/1.1"
+        <Connector port="{{ .Values.tomcat.port }}" 
+                   protocol="HTTP/1.1"
                    connectionTimeout="20000"
                    redirectPort="8443" />
         <Engine name="Catalina" defaultHost="localhost">
-          <Host name="localhost"  appBase="webapps"
+          <Host name="localhost" appBase="webapps"
                 unpackWARs="true" autoDeploy="true">
           </Host>
         </Engine>
@@ -20,14 +21,9 @@ data:
     </Server> 
 
   configuration.properties: |
-    data.files.location = /srv/gxa/data
-    experiment.files.location = /srv/gxa/data/gxa
-    experiment.design.location= /srv/gxa/data/gxa/expdesign/
-
-    #build.number = 1
-    #build.branch = main
-    #build.commitId = foobar
-    #build.tomcatHostname = foobar
+    data.files.location = {{- include "app.dataDir" . }}
+    experiment.files.location = {{- include "app.experimentsDir" . }}
+    experiment.design.location= {{ include "app.expdesignDir" . }}
 
   experiment_ids: {{ .Values.experiment_ids}}
 

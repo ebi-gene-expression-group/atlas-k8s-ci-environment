@@ -80,3 +80,123 @@ Notes:
 experiments_test{{- else }}
 experiments{{- end }}
 {{- end }}
+
+
+{{- define "app.dataDir" -}}
+/atlas-data
+{{- end }}
+
+{{- define "app.experimentsDir" -}}
+{{ include "app.dataDir" . }}/exp
+{{- end }}
+
+{{- define "app.expdesignDir" -}}
+{{ include "app.dataDir" . }}/expdesign
+{{- end }}
+
+{{- define "app.servicesDir" -}}
+{{ include "app.dataDir" . }}/services
+{{- end }}
+
+{{- define "app.tomcatDir" -}}
+/usr/local/tomcat
+{{- end }}
+
+{{/*
+Gradle CLI arguments for running the CLI application
+*/}}
+{{- define "app.gradleCliArgs" -}} 
+{{ include "app.jvmProxyArgs" . }} \
+-PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+-PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
+{{ include "app.loggingArgs" . }}
+{{- end }} 
+
+{{- define "app.loggingArgs" -}}
+{{- if eq .Values.loggingLevel "DEBUG" }}
+-Dlogging.level.root=DEBUG \
+-Dlogging.level.org.springframework=DEBUG 
+{{- else if eq .Values.loggingLevel "INFO" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Proxy environment variables, used in containers
+*/}}
+{{- define "app.proxyEnv" -}}
+- name: HTTP_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTP_PROXY
+- name: HTTPS_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTPS_PROXY
+- name: http_proxy
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTP_PROXY
+- name: https_proxy
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTPS_PROXY
+- name: NO_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: NO_PROXY
+- name: PROXY_HOST
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: PROXY_HOST
+- name: PROXY_PORT
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: PROXY_PORT
+{{- end }}
+
+{{/*
+NFS volume mounts, used in deployments and jobs
+*/}}
+
+{{- define "app.expdesignVolume" -}}
+- name: {{ include "app.name" . }}-expdesign-vol
+  persistentVolumeClaim:
+    claimName: {{ include "app.name" . }}-expdesign-rwo
+{{- end }}
+
+{{- define "app.gxaCodonVolume" -}}
+- name: {{ include "app.name" . }}-codon-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/ro/gxa_codon
+{{- end }}
+
+{{- define "app.servicesVolume" -}}
+- name: services-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/services
+{{- end }}
+
+{{- define "app.gxaVolume" -}}
+- name: {{ include "app.name" . }}-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/ro/gxa
+{{- end }}
+
+{{/*
+Secrets volume mount
+*/}}
+{{- define "app.secretsVolume" -}}
+- name: {{ include "app.name" . }}-secrets
+  secret:
+    secretName: {{ include "app.fullname" . }}-secrets
+{{- end }}

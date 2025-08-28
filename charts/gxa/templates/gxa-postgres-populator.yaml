@@ -8,26 +8,15 @@ spec:
   template:
     spec:
       volumes:
-        - name: {{ include "app.name" . }}-expdesign-vol
-          persistentVolumeClaim:
-            claimName: {{ include "app.name" . }}-expdesign-rwo
-        - name: services-volume
-          nfs:
-            server: {{ .Values.nfs.server }}
-            path: /ifs/public/services
+        {{- include "app.expdesignVolume" . | nindent 8 }}
+        {{- include "app.servicesVolume" . | nindent 8 }}
         - name: {{ include "app.name" . }}-data-vol
           emptyDir: {}
-        - name: atlas-web-bulk
+        - name: webapp-volume
           emptyDir: {}
-        - name: {{ include "app.name" . }}-secrets
-          secret:
-            secretName: {{ include "app.fullname" . }}-secrets
-        - name: {{ include "app.name" . }}-codon-volume
-          nfs:
-            server: {{ .Values.nfs.server }}
-            path: /ifs/public/ro/gxa_codon
-          # persistentVolumeClaim:
-            # claimName: {{ include "app.name" . }}-data-rox
+        {{- include "app.secretsVolume" . | nindent 8 }}
+        {{- include "app.gxaCodonVolume" . | nindent 8 }}
+        {{- include "app.gxaVolume" . | nindent 8 }}
         # TODO mount jdbc.proeprties secret as a file
       containers:
         - name: {{ include "app.fullname" . }}-postgres-populator
@@ -37,41 +26,7 @@ spec:
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8"
-            - name: HTTP_PROXY
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: HTTP_PROXY
-            - name: HTTPS_PROXY
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: HTTPS_PROXY
-            - name: http_proxy
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: HTTP_PROXY
-            - name: https_proxy
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: HTTPS_PROXY
-            - name: NO_PROXY
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: NO_PROXY
-            - name: PROXY_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: PROXY_HOST
-            - name: PROXY_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: ebi-proxy
-                  key: PROXY_PORT
+            {{- include "app.proxyEnv" . | nindent 12 }}
             - name: EXP_IDS
               valueFrom:
                 configMapKeyRef:
@@ -96,51 +51,38 @@ spec:
 
               cd /atlas-web-bulk/
 
-              mkdir /atlas-data/exp/magetab
+              mkdir {{ include "app.experimentsDir" . }}/magetab
               ln -s /atlas-data/services/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* \
-                    /atlas-data/exp/magetab 
-              ls -lt /atlas-data/exp/magetab 
+                    {{ include "app.experimentsDir" . }}/magetab 
+              ls -lt {{ include "app.experimentsDir" . }}/magetab 
 
               ./gradlew \
-              {{ include "app.jvmProxyArgs" . | indent 14 }} \
-              -PexperimentFilesLocation=/atlas-data/exp \
-              -PexperimentDesignLocation=/atlas-data/expdesign \
-              -Dlogging.level.root=DEBUG \
-              -Dlogging.level.org.springframework=DEBUG \
+              {{ include "app.gradleCliArgs" . | indent 14 }} \
               ":cli:bootRun" --args="create-update-experiment -e $(echo ${EXP_IDS})"
               
               ./gradlew \
-              {{ include "app.jvmProxyArgs" . | indent 14 }} \
-              -PexperimentFilesLocation=/atlas-data/exp \
-              -PexperimentDesignLocation=/atlas-data/expdesign \
-              -Dlogging.level.root=DEBUG \
-              -Dlogging.level.org.springframework=DEBUG \
+              {{ include "app.gradleCliArgs" . | indent 14 }} \
               ":cli:bootRun" --args="update-experiment-design -e $(echo ${EXP_IDS})"
                             
               ./gradlew \
-              {{ include "app.jvmProxyArgs" . | indent 14 }} \
-              -PexperimentFilesLocation=/atlas-data/exp \
-              -PexperimentDesignLocation=/atlas-data/expdesign \
-              -Dlogging.level.root=DEBUG \
-              -Dlogging.level.uk.ac.ebi.atlas=DEBUG \
-              -Dlogging.level.org.springframework=DEBUG \
+              {{ include "app.gradleCliArgs" . | indent 14 }} \
               ":cli:bootRun" --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
 
               sleep 5000
           volumeMounts:
             - name: {{ include "app.name" . }}-expdesign-vol
-              mountPath: "/atlas-data/expdesign"
+              mountPath: "{{ include "app.expdesignDir" . }}"
             - name: {{ include "app.name" . }}-data-vol
-              mountPath: "/atlas-data/exp"
+              mountPath: "{{ include "app.experimentsDir" . }}"
             - name: services-volume
-              mountPath: /atlas-data/services
+              mountPath: "{{ include "app.servicesDir" . }}"
             - name: {{ include "app.name" . }}-codon-volume
-              mountPath: /atlas-data/exp/{{ include "app.name" . }}-codon
+              mountPath: "{{ include "app.experimentsDir" . }}/gxa-codon"
             - name: {{ include "app.name" . }}-codon-volume
-              mountPath: /atlas-data/exp/species-properties.json
+              mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
               subPath: species-properties.json  
               readOnly: true
-            - name: atlas-web-bulk
+            - name: webapp-volume
               mountPath: /atlas-web-bulk
             - name: {{ include "app.name" . }}-secrets
               mountPath: /secrets/jdbc.properties
