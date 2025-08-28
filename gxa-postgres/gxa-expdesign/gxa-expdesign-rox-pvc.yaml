@@ -1,13 +1,13 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: {{ .Release.Name }}-expdesign-rox
+  name: {{ include "app.name" . }}-expdesign-rox
   namespace: jenkins-gene-expression
 spec:
   dataSource:
     apiGroup: snapshot.storage.k8s.io
     kind: VolumeSnapshot
-    name: {{ .Release.Name }}-expdesign-rwo-snapshot
+    name: {{ include "app.name" . }}-expdesign-rwo-snapshot
   accessModes:
     - ReadOnlyMany
   storageClassName: premium-rwo

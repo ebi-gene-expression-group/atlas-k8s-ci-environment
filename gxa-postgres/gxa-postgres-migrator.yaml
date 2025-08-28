@@ -1,14 +1,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-postgres-migrator
+  name: {{ include "app.name" . }}-postgres-migrator
   namespace: jenkins-gene-expression
 spec:
   template:
     spec:
       containers:
-        - name: {{ .Release.Name }}-flyway
-          image: quay.io/ebigxa/gxa-flyway-migrator
+        - name: {{ include "app.name" . }}-flyway
+          image: quay.io/ebigxa/{{ include "app.name" . }}-flyway-migrator
           env:
             - name: FLYWAY_USER
               value: "atlasdev"
@@ -17,6 +17,6 @@ spec:
             - name: FLYWAY_SCHEMAS
               value: "atlasdev"
             - name: FLYWAY_URL
-              value: "jdbc:postgresql://gxa-postgres-headless.jenkins-gene-expression.svc.cluster.local:5432/gxpgxadev"
+              value: "jdbc:postgresql://{{ include "app.name" . }}-postgres-headless.jenkins-gene-expression.svc.cluster.local:5432/gxpgxadev"
       restartPolicy: Never
   backoffLimit: 4

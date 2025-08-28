@@ -1,8 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Release.Name }}-bulk-analytics-jsonl-rwo
-  namespace: jenkins-gene-expression
+  name: {{ include "app.name" . }}-bulk-analytics-jsonl-rwo
 spec:
   accessModes:
     - ReadWriteOnce
@@ -13,7 +12,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ .Release.Name }}-solrcloud-bulk-analytics-jsonl
+  name: {{ include "app.name" . }}-solrcloud-bulk-analytics-jsonl
 spec:
   template:
     spec:
@@ -21,17 +20,17 @@ spec:
         # - name: gradle-ro-dep-cache-vol
         #   persistentVolumeClaim:
         #     claimName: gradle-7.0-ro-dep-cache-rox
-        - name: {{ .Release.Name }}-expdesign-vol
+        - name: {{ include "app.name" . }}-expdesign-vol
           persistentVolumeClaim:
             claimName: gxa-expdesign-rox
-        - name: {{ .Release.Name }}-data-vol
+        - name: {{ include "app.name" . }}-data-vol
           persistentVolumeClaim:
-            claimName: gxa-data-rox
-        - name: {{ .Release.Name }}-bulk-analytics-jsonl-vol
+            claimName: {{ include "app.name" . }}-data-rox
+        - name: {{ include "app.name" . }}-bulk-analytics-jsonl-vol
           persistentVolumeClaim:
             claimName: gxa-bulk-analytics-jsonl-rwo
       containers:
-        - name: {{ .Release.Name }}-solrcloud-bulk-analytics-jsonl
+        - name: {{ include "app.name" . }}-solrcloud-bulk-analytics-jsonl
           image: openjdk:11
           env:
             - name: JAVA_TOOL_OPTIONS
@@ -110,9 +109,9 @@ spec:
               name: gradle-ro-dep-cache-vol
               readOnly: true
             - mountPath: "/atlas-data/expdesign"
-              name: {{ .Release.Name }}-expdesign-vol
+              name: {{ include "app.name" . }}-expdesign-vol
             - mountPath: "/atlas-data/exp"
-              name: {{ .Release.Name }}-data-vol
+              name: {{ include "app.name" . }}-data-vol
             - mountPath: "/atlas-data/bulk-analytics-jsonl"
-              name: {{ .Release.Name }}-bulk-analytics-jsonl-vol
+              name: {{ include "app.name" . }}-bulk-analytics-jsonl-vol
       restartPolicy: Never

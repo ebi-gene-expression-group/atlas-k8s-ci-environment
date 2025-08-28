@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ .Release.Name }}-expdesign-rwo
+  name: {{ include "app.name" . }}-expdesign-rwo
   labels:
-    {{- include "gxa.labels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
 spec:
   storageClassName: standard-nfs-production 
   accessModes:

@@ -2,7 +2,7 @@
 apiVersion: solr.apache.org/v1beta1
 kind: SolrCloud
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "app.name" . }}
   namespace: jenkins-gene-expression
 spec:
   dataStorage:
@@ -35,7 +35,7 @@ spec:
         name: keys-secret
         source:
           secret:
-            secretName: gxa-solrcloud-package-store-keys
+            secretName: {{ include "app.name" . }}-solrcloud-package-store-keys
   zookeeperRef:
     provided:
 #     chroot: "/this/will/be/auto/created"

@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "gxa.name" -}}
+{{- define "app.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "gxa.fullname" -}}
+{{- define "app.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "gxa.chart" -}}
+{{- define "app.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "gxa.labels" -}}
-helm.sh/chart: {{ include "gxa.chart" . }}
-{{ include "gxa.selectorLabels" . }}
+{{- define "app.labels" -}}
+helm.sh/chart: {{ include "app.chart" . }}
+{{ include "app.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,23 +45,23 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "gxa.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "gxa.name" . }}
+{{- define "app.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "app.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "gxa.serviceAccountName" -}}
+{{- define "app.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "gxa.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "app.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 
-{{- define "gxa.jvmProxyArgs" -}}
+{{- define "app.jvmProxyArgs" -}}
 {{- /* Convert comma-separated NO_PROXY to Java's pipe-separated format 
 When used in a container, needs env variables to be set up, e.g. from a configmap.
 Notes:
@@ -75,7 +75,7 @@ Notes:
 -Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
 {{- end }}
 
-{{- define "gxa.experimentsDirName" -}}
+{{- define "app.experimentsDirName" -}}
 {{- if eq .Values.environment "test" }}
 experiments_test{{- else }}
 experiments{{- end }}

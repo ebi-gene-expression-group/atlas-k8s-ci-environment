@@ -47,16 +47,16 @@ uninstall:
 # Delete Kubernetes job
 delete-job: validate-env
 	@echo "Deleting Kubernetes job... from $(NAMESPACE)"
-	kubectl delete job gxa-postgres-populator --namespace $(NAMESPACE) || true
+	kubectl delete job $(RELEASE)-postgres-populator --namespace $(NAMESPACE) || true
 
 # Workflow: delete job then deploy to test
 workflow: validate-env delete-job deploy-test
 	@echo "Workflow completed: job deleted and deployed to test environment" 
 
-# Get tomcat-users.xml from gxa-secrets secret
+# Get tomcat-users.xml from $(RELEASE)-secrets secret
 get-tomcat-deployer-password: validate-env
-	@echo "Extracting deployer password from tomcat-users.xml from gxa-secrets secret
-	@kubectl get secret gxa-secrets --namespace $(NAMESPACE) \
+	@echo "Extracting deployer password from tomcat-users.xml from $(RELEASE)-secrets secret
+	@kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
 		| base64 -d \
 		| yq -oy -p=xml \
@@ -65,7 +65,7 @@ get-tomcat-deployer-password: validate-env
 # Deploy WAR file using curl commands
 deploy-war: validate-env
 	@echo "Deploying WAR file using curl commands..."
-	@DEPLOYER_PASSWORD=$$(kubectl get secret gxa-secrets --namespace $(NAMESPACE) \
+	@DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
 		| base64 -d \
 		| yq -oy -p=xml \

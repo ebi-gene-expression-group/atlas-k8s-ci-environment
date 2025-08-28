@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "gxa.fullname" . }}
+  name: {{ include "app.fullname" . }}
   labels:
-    {{- include "gxa.labels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "gxa.selectorLabels" . | nindent 6 }}
+      {{- include "app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,13 +18,13 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "gxa.selectorLabels" . | nindent 8 }}
+        {{- include "app.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "gxa.serviceAccountName" . }}
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -57,17 +57,17 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
           # app data mounts
-            - name: {{ .Release.Name }}-codon-volume
+            - name: {{ include "app.name" . }}-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
               readOnly: true
             - name: experiments-snapshot
               mountPath: /srv/gxa/data/gxa/magetab
               readOnly: true
-            - name: {{ .Release.Name }}-volume
+            - name: {{ include "app.name" . }}-volume
               mountPath: /srv/gxa/data/gxa/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
-            - name: {{ .Release.Name }}-codon-volume
+            - name: {{ include "app.name" . }}-codon-volume
               mountPath: /srv/gxa/data/gxa/species-properties.json
               subPath: species-properties.json  
               readOnly: true
@@ -75,7 +75,7 @@ spec:
               mountPath: /srv/gxa/data/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
-            - name: {{ .Release.Name }}-expdesign-vol
+            - name: {{ include "app.name" . }}-expdesign-vol
               mountPath: /srv/gxa/data/gxa/expdesign
             - name: services-volume
               mountPath: /srv/gxa/data/services
@@ -83,14 +83,14 @@ spec:
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
               subPath: configuration.properties
-            - name: {{ .Release.Name }}-secrets
+            - name: {{ include "app.name" . }}-secrets
               mountPath: /webapp-properties/jdbc.properties
               subPath: jdbc.properties
-            - name: {{ .Release.Name }}-secrets
+            - name: {{ include "app.name" . }}-secrets
               mountPath: /webapp-properties/solr.properties
               subPath: solr.properties
             # tomcat config mounts
-            - name: {{ .Release.Name }}-secrets
+            - name: {{ include "app.name" . }}-secrets
               mountPath: /usr/local/tomcat/conf/tomcat-users.xml
               subPath: tomcat-users.xml
             - name: tomcat-logs
@@ -102,11 +102,11 @@ spec:
             - name: tomcat-config
               mountPath: /usr/local/tomcat/conf/Catalina
       volumes:
-        - name: {{ .Release.Name }}-volume
+        - name: {{ include "app.name" . }}-volume
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa
-        - name: {{ .Release.Name }}-codon-volume
+        - name: {{ include "app.name" . }}-codon-volume
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/ro/gxa_codon
@@ -114,26 +114,26 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: /ifs/public/services
-        - name: {{ .Release.Name }}-expdesign-vol
+        - name: {{ include "app.name" . }}-expdesign-vol
           persistentVolumeClaim:
-            claimName: gxa-expdesign-rwo
+            claimName: {{ include "app.name" . }}-expdesign-rwo
         - name: experiments-snapshot
           emptyDir: {}
         - name: configuration-properties
           configMap:
-            name: {{ include "gxa.fullname" . }}-config
+            name: {{ include "app.fullname" . }}-config
             items:
               - key: configuration.properties
                 path: configuration.properties
         - name: tomcat-server-config
           configMap:
-            name: {{ include "gxa.fullname" . }}-config
+            name: {{ include "app.fullname" . }}-config
             items:
               - key: server.xml
                 path: server.xml
-        - name: {{ .Release.Name }}-secrets
+        - name: {{ include "app.name" . }}-secrets
           secret:
-            secretName: {{ include "gxa.fullname" . }}-secrets
+            secretName: {{ include "app.fullname" . }}-secrets
         - name: tomcat-logs
           emptyDir: {}
         - name: tomcat-work
@@ -143,7 +143,7 @@ spec:
         - name: tomcat-config
           emptyDir: {}
       initContainers:
-        - name: {{ .Release.Name }}-init-experiments-snapshot
+        - name: {{ include "app.name" . }}-init-experiments-snapshot
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: busybox
@@ -156,13 +156,13 @@ spec:
               ln -s -v /srv/gxa/data/services/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* /experiments_snapshot
               ls -lt /experiments_snapshot
           volumeMounts:
-            - name: {{ .Release.Name }}-codon-volume
+            - name: {{ include "app.name" . }}-codon-volume
               mountPath: /srv/gxa/data/gxa_codon
             - name: services-volume
               mountPath: /srv/gxa/data/services
             - name: experiments-snapshot
               mountPath: /experiments_snapshot                 
-        - name: {{ .Release.Name }}-init-tomcat-manager
+        - name: {{ include "app.name" . }}-init-tomcat-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [ "sh", "-c", "cp -r /usr/local/tomcat/webapps.dist/manager /usr/local/tomcat/webapps/" ]

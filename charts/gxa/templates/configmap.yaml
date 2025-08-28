@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "gxa.fullname" . }}-config
+  name: {{ include "app.fullname" . }}-config
   labels:
-    {{- include "gxa.labels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
 data:
   server.xml: |
     <Server port="8005" shutdown="SHUTDOWN">
