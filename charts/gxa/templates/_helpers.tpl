@@ -102,6 +102,10 @@ experiments{{- end }}
 /usr/local/tomcat
 {{- end }}
 
+{{- define "app.bulkAnalyticsJsonlDir" -}}
+{{ include "app.dataDir" . }}/bulk-analytics-jsonl
+{{- end }}
+
 {{/*
 Gradle CLI arguments for running the CLI application
 */}}
@@ -186,12 +190,17 @@ NFS volume mounts, used in deployments and jobs
 {{- end }}
 
 {{- define "app.gxaVolume" -}}
-- name: {{ include "app.name" . }}-volume
+- name: gxa-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/ro/gxa
 {{- end }}
 
+{{- define "app.bulkAnalyticsJsonlVolume" -}}
+- name: bulk-analytics-jsonl-vol
+  persistentVolumeClaim:
+    claimName: bulk-analytics-jsonl-rwo
+{{- end }}
 {{/*
 Secrets volume mount
 */}}

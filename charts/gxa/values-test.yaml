@@ -13,6 +13,9 @@ experiment_ids: "E-CURD-23,E-CURD-30,E-ERAD-475,E-GEOD-16879,E-GEOD-18068,E-GEOD
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
 
+solr:
+  bulkAnalyticsJsonl:
+    enabled: true
 
 nfs:
   snapshotComponent: experiments_test

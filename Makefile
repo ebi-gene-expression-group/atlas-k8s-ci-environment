@@ -21,7 +21,6 @@ validate-env:
 	@echo "Environment validation passed: $(ENV)"
 
 deploy: validate-env
-
 	@echo deploying to env $(ENV)
 	@echo using env specific values file $(ENV_VALUES)
 	helm upgrade --install \
@@ -45,12 +44,15 @@ uninstall:
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE) 
 
 # Delete Kubernetes job
-delete-job: validate-env
-	@echo "Deleting Kubernetes job... from $(NAMESPACE)"
-	kubectl delete job $(RELEASE)-postgres-populator --namespace $(NAMESPACE) || true
+delete-jobs: validate-env
+	@echo "Deleting Kubernetes jobs... from $(NAMESPACE)"
+	# kubectl delete job $(RELEASE)-postgres-populator --namespace $(NAMESPACE) || true
+	# kubectl delete job $(RELEASE)-solrcloud-bioentities-jsonl --namespace $(NAMESPACE) || true
+	kubectl delete job $(RELEASE)-solrcloud-bulk-analytics-jsonl --namespace $(NAMESPACE) || true
+	# kubectl delete job $(RELEASE)-solrcloud-bulk-analytics-populator --namespace $(NAMESPACE) || true
 
 # Workflow: delete job then deploy to test
-workflow: validate-env delete-job deploy-test
+workflow: validate-env delete-jobs deploy-test
 	@echo "Workflow completed: job deleted and deployed to test environment" 
 
 # Get tomcat-users.xml from $(RELEASE)-secrets secret

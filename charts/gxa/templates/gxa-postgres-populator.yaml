@@ -1,3 +1,4 @@
+{{- if .Values.jdbc.populator.enabled | default false -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -17,7 +18,6 @@ spec:
         {{- include "app.secretsVolume" . | nindent 8 }}
         {{- include "app.gxaCodonVolume" . | nindent 8 }}
         {{- include "app.gxaVolume" . | nindent 8 }}
-        # TODO mount jdbc.proeprties secret as a file
       containers:
         - name: {{ include "app.fullname" . }}-postgres-populator
           image: openjdk:11
@@ -47,12 +47,13 @@ spec:
 
               git clone --recurse-submodules --depth 1 --single-branch \
                 "https://github.com/ebi-gene-expression-group/atlas-web-bulk.git"
-              cp /secrets/jdbc.properties /atlas-web-bulk/cli/src/main/resources/
+              cp /secrets/jdbc.properties \
+                 /atlas-web-bulk/cli/src/main/resources/
 
               cd /atlas-web-bulk/
 
               mkdir {{ include "app.experimentsDir" . }}/magetab
-              ln -s /atlas-data/services/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* \
+              ln -s {{ include "app.servicesDir" . }}/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* \
                     {{ include "app.experimentsDir" . }}/magetab 
               ls -lt {{ include "app.experimentsDir" . }}/magetab 
 
@@ -89,3 +90,4 @@ spec:
               subPath: jdbc.properties
       restartPolicy: Never
   backoffLimit: 4
+{{- end }}

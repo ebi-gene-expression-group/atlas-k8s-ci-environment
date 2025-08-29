@@ -9,7 +9,7 @@ spec:
       volumes:
         - name: {{ include "app.name" . }}-bulk-analytics-jsonl-vol
           persistentVolumeClaim:
-            claimName: {{ include "app.name" . }}-bulk-analytics-jsonl-rwo
+            claimName: bulk-analytics-jsonl-rwo
         - name: scratch-bulk-analytics-vol
           ephemeral:
             volumeClaimTemplate:

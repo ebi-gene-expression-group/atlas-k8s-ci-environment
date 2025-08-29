@@ -85,12 +85,17 @@ affinity: {}
 tomcat:
   httpPort: 8080
   # deployerPassword: set-in-commandline
+  # createSecret: false
 
 
-postgres:
+jdbc:
   populator:
     run: false
-    
+
+solr:
+  bulkAnalyticsJsonl:
+    enabled: false
+
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
   snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
