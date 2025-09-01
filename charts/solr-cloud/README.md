@@ -40,14 +40,19 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
 
    b. Install solrCloud with helm
  
-      # Install the solrCloud resource in the namespace 'gxa-dev-solrcloud'
-      helm install gxa-dev charts/solr-cloud \
-           --namespace gxa-dev-solrcloud \
-           --values charts/solr-cloud/env/dev/gxa-dev-solrcloud-values.yaml \
-           --create-namespace=false
+     # Install the solrCloud resource in the namespace 'gxa-dev-solrcloud'
+     helm install gxa-dev charts/solr-cloud \
+          --namespace gxa-dev-solrcloud \
+          --values charts/solr-cloud/env/dev/gxa-dev-solrcloud-values.yaml \
+          --create-namespace=false
 
-      # Install the solrCloud resource in the namespace 'scxa-dev-solrcloud'
-      helm install scxa-dev charts/solr-cloud \
-           --namespace scxa-dev-solrcloud \
-           --values charts/solr-cloud/env/dev/scxa-dev-solrcloud-values.yaml \
-           --create-namespace=false
+     # Install the solrCloud resource in the namespace 'scxa-dev-solrcloud'
+     helm install scxa-dev charts/solr-cloud \
+          --namespace scxa-dev-solrcloud \
+          --values charts/solr-cloud/env/dev/scxa-dev-solrcloud-values.yaml \
+          --create-namespace=false
+
+   c. Solrcloud password
+
+     # Get the password
+     kubectl get secret gxa-dev-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n gxa-dev-solrcloud | base64 --decode
