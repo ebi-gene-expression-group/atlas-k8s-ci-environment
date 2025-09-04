@@ -1,0 +1,116 @@
+{{- if and .Values.solr .Values.solr.bioentitiesJsonl (.Values.solr.bioentitiesJsonl.enabled | default false) -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bioentities-jsonl-rwo
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  storageClassName: standard-nfs-production 
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "app.name" . }}-solrcloud-bioentities-jsonl
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+
+spec:
+  template:
+    spec:
+      volumes:
+        {{- include "app.servicesVolume" . | nindent 8 }}
+        {{- include "app.secretsVolume" . | nindent 8 }}
+        {{- include "app.gxaCodonVolume" . | nindent 8 }}
+        - name: bioentities-jsonl-vol
+          persistentVolumeClaim:
+            claimName: bioentities-jsonl-rwo
+        - name: bioentitues-subset-vol
+          emptyDir: {}
+        - name: webapp-volume
+          emptyDir: {}
+      containers:
+        - name: {{ include "app.name" . }}-solrcloud-bioentities-jsonl
+          image: openjdk:11
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8"
+            {{- include "app.proxyEnv" . | nindent 12 }}
+            - name: SPECIES
+              value: |
+                danio_rerio homo_sapiens equus_caballus drosophila_melanogaster
+                caenorhabditis_elegans mus_musculus oryza_indica anas_platyrhynchos
+                oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays
+                saccharomyces_cerevisiae schizosaccharomyces_pombe
+          resources:
+            requests:
+              cpu: 1
+              memory: 6Gi
+              ephemeral-storage: 2Gi
+            limits:
+              cpu: 1
+              memory: 8Gi
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              # set -e
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
+              cp /secrets/jdbc.properties \
+                 /atlas-web-bulk/cli/src/main/resources/
+
+              # link required files to app.bioentityPropertiesSubsetDir directory
+              for BIOENTITY_SUBDIR in annotations array_designs reactome
+              do
+                for _SPECIES in ${SPECIES}
+                do
+                  echo "processing: ${BIOENTITY_SUBDIR} for species: ${_SPECIES}"
+                  cd {{ include "app.bioentityPropertiesDir" . }}
+                  mkdir -pv {{ include "app.bioentityPropertiesSubsetDir" . }}/${BIOENTITY_SUBDIR}
+                  find . -type f | grep ${_SPECIES} | grep ${BIOENTITY_SUBDIR} \
+                    | xargs -I{} \
+                        ln -s {{ include "app.bioentityPropertiesDir" . }}/{} \
+                              {{ include "app.bioentityPropertiesSubsetDir" . }}/{}
+                done
+              done
+
+              cd /atlas-web-bulk
+              ./gradlew --no-watch-fs \
+              {{ include "app.gradleCliArgs" . | indent 14 }} \
+              -PdataFilesLocation={{ include "app.bioentityPropertiesSubsetDir" . }} \
+              -PexperimentDesignLocation={{ include "app.bioentityPropertiesSubsetDir" . }} \
+              :cli:bootRun --args="bioentities-json --output=/atlas-data/bioentities-jsonl"
+              
+              # sleep for 5000 seconds to allow the job to be debugged if needed
+              sleep 5000
+          volumeMounts:
+            # - mountPath: "{{ include "app.experimentsDir" . }}"
+              # name: {{ include "app.name" . }}-data-vol
+              # readOnly: true
+            # this is the volume where the bioentity_properties files are stored
+            # a subset of files are linked to the root directory
+            - mountPath: "/atlas-data/bioentity_properties"
+              name: services-volume
+              subPath: "fg/atlas/bioentity_properties"
+              readOnly: true
+            # this is the output directory where the jsonl files are written to
+            - mountPath: "/atlas-data/bioentities-jsonl"
+              name: bioentities-jsonl-vol
+            # this is the secrets volume where the jdbc.properties file is stored
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: /secrets/jdbc.properties
+              subPath: jdbc.properties
+            - mountPath: "{{ include "app.bioentityPropertiesSubsetDir" . }}"
+              name: bioentitues-subset-vol
+            - name: {{ include "app.name" . }}-codon-volume
+              mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
+              subPath: species-properties.json  
+              readOnly: true
+            - name: webapp-volume
+              mountPath: /atlas-web-bulk
+      restartPolicy: Never
+{{- end }}

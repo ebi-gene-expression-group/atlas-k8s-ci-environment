@@ -59,14 +59,20 @@ spec:
 
               ./gradlew \
               {{ include "app.gradleCliArgs" . | indent 14 }} \
+              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+              -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
               ":cli:bootRun" --args="create-update-experiment -e $(echo ${EXP_IDS})"
               
               ./gradlew \
               {{ include "app.gradleCliArgs" . | indent 14 }} \
+              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+              -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
               ":cli:bootRun" --args="update-experiment-design -e $(echo ${EXP_IDS})"
                             
               ./gradlew \
               {{ include "app.gradleCliArgs" . | indent 14 }} \
+              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+              -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
               ":cli:bootRun" --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
 
               sleep 5000

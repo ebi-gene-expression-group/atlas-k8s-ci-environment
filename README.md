@@ -66,6 +66,7 @@ created from a snapshot can’t be created in a different zone other than the or
 the snapshot.
 
 To enforce a single zone for all the necessary volumes `nodeSelector` is set to `europe-west2-a`:
+
 ```yaml
 spec:
   template:
@@ -164,10 +165,13 @@ the read-write volume and finally create a read-only volume from the snapshot.
 
 
 ## Gene Expression Atlas
+
 ### Data volumes
+
 The first step specific to (bulk) Gene Expression Atlas is to create two read-only volumes of the test datasets and the
 ontology auxiliary files, respectively. As before, we create and populate read-write volumes, and we create a read-only
 volume from snapshots.
+
 ```bash
 cd gxa-data
 kubectl create -f gxa-data-rwo-pvc.yaml && \
@@ -185,6 +189,7 @@ with [`nohup`](https://man7.org/linux/man-pages/man1/nohup.1.html).
 
 
 ### PostgreSQL
+
 In order to create the JSONL files to populate the `bulk-analytics` collection, experiments need to be loaded in 
 Postgres. The CLI module reuses a great deal of the logic from the web application for this purpose, so if an
 experiment isn’t loaded the CLI will throw an error reporting that the experiment doesn’t exist. This is why we need to
@@ -193,6 +198,7 @@ also needed for the integration tests.
 
 This step creates a Postgres deployment, a job that migrates the schema to the latest version with Flyway, a job that
 loads the experiments, and the creation of a read-only volume for the experiment design files:
+
 ```bash
 cd gxa-postgres
 kubectl create -f gxa-postgres-deployment.yaml && \
@@ -205,7 +211,9 @@ kubectl create -f gxa-expdesign/gxa-expdesign-rox-pvc.yaml
 ```
 
 ### Solr
+
 Create a key pair for the SolrCloud package store:
+
 ```bash
 openssl genrsa -out ./gxa-solrcloud.pem 512
 openssl rsa -in ./gxa-solrcloud.pem -pubout -outform DER -out ./gxa-solrcloud.der
@@ -217,6 +225,7 @@ kubectl -n jenkins-gene-expression create secret generic gxa-solrcloud-package-s
 Install the [Solr Operator](https://solr.apache.org/operator/).
 
 [Load the image used by the jobs to Quay](https://docs.quay.io/solution/getting-started.html):
+
 ```bash
 docker build -t gxa-atlas-web-bulk-postgres-solrcloud-populator .
 docker run gxa-atlas-web-bulk-postgres-solrcloud-populator
@@ -225,12 +234,14 @@ docker push quay.io/ebigxa/gxa-atlas-web-bulk-postgres-solrcloud-populator:lates
 ```
 
 Create a SolrCloud cluster:
+
 ```bash
 cd gxa-solrcloud
 kubectl create -f gxa-solrcloud.yaml
 ```
 
 #### Bioentities
+
 ```bash
 cd gxa-solrcloud/bioentities
 kubectl create -f gxa-solrcloud-bioentities-jsonl.yaml && \

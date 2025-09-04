@@ -1,8 +1,23 @@
+# Load environment variables from .env file if it exists
+ifneq (,$(wildcard .env))
+    $(info Loading environment variables from .env file)
+    include .env
+    export
+else
+    $(info No .env file found, using system environment variables)
+endif
+
 RELEASE ?= gxa
 
 ENV ?= test
 # SUPPORTED_ENVS = test dev prod
 SUPPORTED_ENVS = test
+
+# Validate environment variable
+ifeq ($(filter $(ENV),$(SUPPORTED_ENVS)),)
+$(error Error: unknown ENV $(ENV). must be one of: $(SUPPORTED_ENVS))
+endif
+$(info Using environment: $(ENV))
 
 ENV_VALUES = charts/$(RELEASE)/values-$(ENV).yaml
 NAMESPACE = $(RELEASE)-$(ENV)
@@ -10,18 +25,26 @@ APP_VERSION = 37.0.5
 TOMCAT_SERVER_URL ?= http://localhost:8080
 WAR_FILE_DIR ?= /Users/amnon/Downloads
 
-.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall validate-env delete-job workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war
+.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war
 
-# Validate environment variable
-validate-env:
-	@if ! echo "$(SUPPORTED_ENVS)" | grep -wq "$(ENV)"; then \
-	  echo "Error: unknown ENV $(ENV). must be one of: $(SUPPORTED_ENVS)"; \
-	  exit 1; \
-	fi
-	@echo "Environment validation passed: $(ENV)"
 
-deploy: validate-env
-	@echo deploying to env $(ENV)
+
+# Set helm --set arguments based on environment variables
+HELM_SET_ARGS = --set appVersion=$(APP_VERSION)
+ifdef JDBC_PASSWORD
+$(info Setting jdbc.password from JDBC_PASSWORD environment variable)
+HELM_SET_ARGS += --set jdbc.password="$(JDBC_PASSWORD)"
+endif
+ifdef SOLR_PASSWORD
+$(info Setting solr.password from SOLR_PASSWORD environment variable)
+HELM_SET_ARGS += --set solr.password="$(SOLR_PASSWORD)"
+endif
+ifdef TOMCAT_DEPLOYER_PASSWORD
+$(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
+HELM_SET_ARGS += --set tomcat.deployerPassword="$(TOMCAT_DEPLOYER_PASSWORD)"
+endif
+
+deploy:
 	@echo using env specific values file $(ENV_VALUES)
 	helm upgrade --install \
 	  $(RELEASE) \
@@ -29,7 +52,7 @@ deploy: validate-env
 	  --namespace $(NAMESPACE) \
 	  --create-namespace \
 	  -f $(ENV_VALUES) \
-	  --set appVersion=$(APP_VERSION)
+	  $(HELM_SET_ARGS)
 
 deploy-test:
 	$(MAKE) deploy ENV=test
@@ -44,19 +67,20 @@ uninstall:
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE) 
 
 # Delete Kubernetes job
-delete-jobs: validate-env
+delete-jobs:
 	@echo "Deleting Kubernetes jobs... from $(NAMESPACE)"
 	# kubectl delete job $(RELEASE)-postgres-populator --namespace $(NAMESPACE) || true
-	# kubectl delete job $(RELEASE)-solrcloud-bioentities-jsonl --namespace $(NAMESPACE) || true
+	kubectl delete job $(RELEASE)-solrcloud-bioentities-jsonl --namespace $(NAMESPACE) || true
+	kubectl delete job bioentities-populator --namespace $(NAMESPACE) || true
 	kubectl delete job $(RELEASE)-solrcloud-bulk-analytics-jsonl --namespace $(NAMESPACE) || true
 	# kubectl delete job $(RELEASE)-solrcloud-bulk-analytics-populator --namespace $(NAMESPACE) || true
 
 # Workflow: delete job then deploy to test
-workflow: validate-env delete-jobs deploy-test
+workflow: delete-jobs deploy-test
 	@echo "Workflow completed: job deleted and deployed to test environment" 
 
 # Get tomcat-users.xml from $(RELEASE)-secrets secret
-get-tomcat-deployer-password: validate-env
+get-tomcat-deployer-password:
 	@echo "Extracting deployer password from tomcat-users.xml from $(RELEASE)-secrets secret
 	@kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
@@ -65,7 +89,7 @@ get-tomcat-deployer-password: validate-env
 			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'
 
 # Deploy WAR file using curl commands
-deploy-war: validate-env
+deploy-war:
 	@echo "Deploying WAR file using curl commands..."
 	@DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \

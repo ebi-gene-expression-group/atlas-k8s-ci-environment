@@ -1,13 +1,11 @@
+{{- if and .Values.solr .Values.solr.bioentitiesPopulator .Values.solr.bioentitiesPopulator.enabled | default false -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "app.name" . }}-solrcloud-bioentities-populator
-  namespace: jenkins-gene-expression
+  name: bioentities-populator
 spec:
   template:
     spec:
-      nodeSelector:
-        topology.kubernetes.io/zone: "europe-west2-a"
       volumes:
         - name: {{ include "app.name" . }}-bioentities-jsonl-vol
           persistentVolumeClaim:
@@ -60,3 +58,4 @@ spec:
             - mountPath: "/atlas-data/bioentities-jsonl"
               name: {{ include "app.name" . }}-bioentities-jsonl-vol
       restartPolicy: Never
+{{- end }}

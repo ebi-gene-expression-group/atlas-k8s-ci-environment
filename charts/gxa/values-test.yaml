@@ -10,12 +10,23 @@ experiment_ids: "E-CURD-23,E-CURD-30,E-ERAD-475,E-GEOD-16879,E-GEOD-18068,E-GEOD
 # list of accessions not in the test db
 # experiment_ids: "E-MTAB-7663"
 
+tomcat:
+  createSecret: true
+
+
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
+  createSecret: true
 
 solr:
+  namespace: gxa-dev-solrcloud
+  user: k8s-oper
+  createSecret: true
   bulkAnalyticsJsonl:
+    enabled: false
+  bioentitiesJsonl:
     enabled: true
-
+  bioentitiesPopulator:
+    enabled: true
 nfs:
   snapshotComponent: experiments_test

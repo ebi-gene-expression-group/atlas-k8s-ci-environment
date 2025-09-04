@@ -81,7 +81,9 @@ experiments_test{{- else }}
 experiments{{- end }}
 {{- end }}
 
-
+{{/*
+Root directory for data mounts
+*/}}
 {{- define "app.dataDir" -}}
 /atlas-data
 {{- end }}
@@ -102,6 +104,14 @@ experiments{{- end }}
 /usr/local/tomcat
 {{- end }}
 
+{{- define "app.bioentityPropertiesDir" -}}
+{{ include "app.dataDir" . }}/bioentity_properties
+{{- end }}
+
+{{- define "app.bioentityPropertiesSubsetDir" -}}
+{{ include "app.dataDir" . }}/bioentities_properties_subset
+{{- end }}
+
 {{- define "app.bulkAnalyticsJsonlDir" -}}
 {{ include "app.dataDir" . }}/bulk-analytics-jsonl
 {{- end }}
@@ -111,8 +121,6 @@ Gradle CLI arguments for running the CLI application
 */}}
 {{- define "app.gradleCliArgs" -}} 
 {{ include "app.jvmProxyArgs" . }} \
--PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
--PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
 {{ include "app.loggingArgs" . }}
 {{- end }} 
 

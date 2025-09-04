@@ -1,4 +1,4 @@
-{{- if .Values.solr.bulkAnalyticsJsonl.enabled | default false -}}
+{{- if and .Values.solr .Values.solr.bulkAnalyticsJsonl .Values.solr.bulkAnalyticsJsonl.enabled | default false -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -17,6 +17,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "app.name" . }}-solrcloud-bulk-analytics-jsonl
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
 spec:
   template:
     spec:
@@ -91,6 +93,8 @@ spec:
                 ./gradlew --no-watch-fs \
                 -PdataFilesLocation=/atlas-data \
                 {{ include "app.gradleCliArgs" . | indent 14 }} \
+                -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+                -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
                 :cli:bootRun --args="bulk-analytics-json --output={{ include "app.bulkAnalyticsJsonlDir" . }} -e ${!EXP_IDS}"
               done
           volumeMounts:
