@@ -7,6 +7,8 @@ spec:
   template:
     spec:
       volumes:
+        {{- include "app.secretsVolume" . | nindent 8 }}
+
         - name: {{ include "app.name" . }}-bioentities-jsonl-vol
           persistentVolumeClaim:
             claimName: {{ include "app.name" . }}-bioentities-jsonl-rwo

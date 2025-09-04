@@ -108,8 +108,8 @@ Root directory for data mounts
 {{ include "app.dataDir" . }}/bioentity_properties
 {{- end }}
 
-{{- define "app.bioentityPropertiesSubsetDir" -}}
-{{ include "app.dataDir" . }}/bioentities_properties_subset
+{{- define "app.bioentityPropertiesSourceDir" -}}
+{{ include "app.dataDir" . }}/bioentity_properties_source
 {{- end }}
 
 {{- define "app.bulkAnalyticsJsonlDir" -}}

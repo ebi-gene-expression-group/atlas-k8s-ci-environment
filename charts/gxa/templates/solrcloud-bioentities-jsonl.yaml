@@ -30,7 +30,7 @@ spec:
         - name: bioentities-jsonl-vol
           persistentVolumeClaim:
             claimName: bioentities-jsonl-rwo
-        - name: bioentitues-subset-vol
+        - name: bioentity-properties-volume
           emptyDir: {}
         - name: webapp-volume
           emptyDir: {}
@@ -62,37 +62,35 @@ spec:
               cp /secrets/jdbc.properties \
                  /atlas-web-bulk/cli/src/main/resources/
 
-              # link required files to app.bioentityPropertiesSubsetDir directory
+              # link required files to app.bioentityPropertiesSourceDir directory
               for BIOENTITY_SUBDIR in annotations array_designs reactome
               do
                 for _SPECIES in ${SPECIES}
                 do
                   echo "processing: ${BIOENTITY_SUBDIR} for species: ${_SPECIES}"
-                  cd {{ include "app.bioentityPropertiesDir" . }}
-                  mkdir -pv {{ include "app.bioentityPropertiesSubsetDir" . }}/${BIOENTITY_SUBDIR}
+                  cd {{ include "app.bioentityPropertiesSourceDir" . }}
+                  mkdir -pv {{ include "app.bioentityPropertiesDir" . }}/${BIOENTITY_SUBDIR}
                   find . -type f | grep ${_SPECIES} | grep ${BIOENTITY_SUBDIR} \
                     | xargs -I{} \
-                        ln -s {{ include "app.bioentityPropertiesDir" . }}/{} \
-                              {{ include "app.bioentityPropertiesSubsetDir" . }}/{}
+                        ln -s {{ include "app.bioentityPropertiesSourceDir" . }}/{} \
+                              {{ include "app.bioentityPropertiesDir" . }}/{}
                 done
               done
 
               cd /atlas-web-bulk
               ./gradlew --no-watch-fs \
               {{ include "app.gradleCliArgs" . | indent 14 }} \
-              -PdataFilesLocation={{ include "app.bioentityPropertiesSubsetDir" . }} \
-              -PexperimentDesignLocation={{ include "app.bioentityPropertiesSubsetDir" . }} \
+              -PdataFilesLocation={{ include "app.dataDir" . }} \
+              -PexperimentDesignLocation={{ include "app.bioentityPropertiesDir" . }} \
+              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
               :cli:bootRun --args="bioentities-json --output=/atlas-data/bioentities-jsonl"
               
               # sleep for 5000 seconds to allow the job to be debugged if needed
               sleep 5000
           volumeMounts:
-            # - mountPath: "{{ include "app.experimentsDir" . }}"
-              # name: {{ include "app.name" . }}-data-vol
-              # readOnly: true
             # this is the volume where the bioentity_properties files are stored
             # a subset of files are linked to the root directory
-            - mountPath: "/atlas-data/bioentity_properties"
+            - mountPath: "{{ include "app.bioentityPropertiesSourceDir" . }}"
               name: services-volume
               subPath: "fg/atlas/bioentity_properties"
               readOnly: true
@@ -103,8 +101,8 @@ spec:
             - name: {{ include "app.name" . }}-secrets
               mountPath: /secrets/jdbc.properties
               subPath: jdbc.properties
-            - mountPath: "{{ include "app.bioentityPropertiesSubsetDir" . }}"
-              name: bioentitues-subset-vol
+            - mountPath: "{{ include "app.bioentityPropertiesDir" . }}"
+              name: bioentity-properties-volume
             - name: {{ include "app.name" . }}-codon-volume
               mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
               subPath: species-properties.json  
