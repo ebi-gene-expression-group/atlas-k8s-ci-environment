@@ -27,4 +27,10 @@ data:
 
   experiment_ids: {{ .Values.experiment_ids}}
 
+  species: |
+    danio_rerio homo_sapiens equus_caballus drosophila_melanogaster
+    caenorhabditis_elegans mus_musculus oryza_indica anas_platyrhynchos
+    oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays
+    saccharomyces_cerevisiae schizosaccharomyces_pombe
+
 

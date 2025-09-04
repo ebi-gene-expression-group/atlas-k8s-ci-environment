@@ -42,11 +42,10 @@ spec:
               value: "-Dfile.encoding=UTF8"
             {{- include "app.proxyEnv" . | nindent 12 }}
             - name: SPECIES
-              value: |
-                danio_rerio homo_sapiens equus_caballus drosophila_melanogaster
-                caenorhabditis_elegans mus_musculus oryza_indica anas_platyrhynchos
-                oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays
-                saccharomyces_cerevisiae schizosaccharomyces_pombe
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: species
           resources:
             requests:
               cpu: 1
