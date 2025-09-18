@@ -8,38 +8,73 @@ spec:
     spec:
       volumes:
         {{- include "app.secretsVolume" . | nindent 8 }}
-
-        - name: {{ include "app.name" . }}-bioentities-jsonl-vol
-          persistentVolumeClaim:
-            claimName: {{ include "app.name" . }}-bioentities-jsonl-rwo
+        {{- include "app.bioentitiesJsonlVolume" . | nindent 8 }}
+        - name: solr-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
       containers:
         - name: {{ include "app.name" . }}-solrcloud-populator
           image: openjdk:11
           env:
+            {{- include "app.proxyEnv" . | nindent 12 }}
+            # From Secret (sensitive credentials)
+            - name: SOLR_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_USER
+            - name: SOLR_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_PASS
+            # From ConfigMap (non-sensitive configuration)
             - name: SOLR_HOST
-              value: "{{ include "app.name" . }}-solrcloud-0.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_HOST
             - name: SOLR_HOSTS
-              value: "{{ include "app.name" . }}-solrcloud-0.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 {{ include "app.name" . }}-solrcloud-1.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 {{ include "app.name" . }}-solrcloud-2.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 {{ include "app.name" . }}-solrcloud-3.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_HOST
+            - name: SOLR_ZK_HOSTS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_ZK_HOSTS
+            - name: SOLR_COLLECTION
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_COLLECTION
             - name: SOLR_NUM_SHARDS
-              value: "4"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_NUM_SHARDS
+            - name: SOLR_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_TIMEOUT
+            # Job-specific environment variables
             - name: NUM_DOCS_PER_BATCH
               value: "20000"
-            - name: SOLR_COLLECTION
-              value: "bioentities"
             - name: SCHEMA_VERSION
               value: "1"
           resources:
             requests:
-              cpu: 0.1
-              memory: 32Mi
+              cpu: 1
+              memory: 500Mi
             limits:
-              cpu: 0.25
-              memory: 64Mi
+              cpu: 1
+              memory: 1Gi
           command: ["/bin/bash", "-c"]
           args:
-            - |
-              apt-get install -y --no-install-recommends git
-              
+            - |  
+              set -ev            
               mkdir /work
               
               cd /work
@@ -48,16 +83,20 @@ spec:
   
               cd index-bioentities/bin
               ./create-bioentities-collection.sh
-              ./create-bioentities-schema.sh
-              ./create-bioentities-suggesters.sh
+              # ./create-bioentities-schema.sh
+              # ./create-bioentities-suggesters.sh
 
-              for FILE in `ls /atlas-data/bioentities-jsonl/*.jsonl`
-              do
-                INPUT_JSONL=${FILE} ./solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
-              done
-              ./build-suggesters.sh
+              # for FILE in `ls {{ include "app.bioentitiesJsonlDir" . }}/*.jsonl`
+              # do
+                # INPUT_JSONL=${FILE} ./solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
+              # done
+              # ./build-suggesters.sh
+              sleep 5000
           volumeMounts:
-            - mountPath: "/atlas-data/bioentities-jsonl"
-              name: {{ include "app.name" . }}-bioentities-jsonl-vol
+            - mountPath: "{{ include "app.bioentitiesJsonlDir" . }}"
+              name: bioentities-jsonl-vol
+            - mountPath: /etc/solr
+              name: solr-config
+              readOnly: true
       restartPolicy: Never
 {{- end }}

@@ -27,9 +27,7 @@ spec:
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.secretsVolume" . | nindent 8 }}
         {{- include "app.gxaCodonVolume" . | nindent 8 }}
-        - name: bioentities-jsonl-vol
-          persistentVolumeClaim:
-            claimName: bioentities-jsonl-rwo
+        {{- include "app.bioentitiesJsonlVolume" . | nindent 8 }}
         - name: bioentity-properties-volume
           emptyDir: {}
         - name: webapp-volume
@@ -83,7 +81,7 @@ spec:
               -PdataFilesLocation={{ include "app.dataDir" . }} \
               -PexperimentDesignLocation={{ include "app.bioentityPropertiesDir" . }} \
               -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
-              :cli:bootRun --args="bioentities-json --output=/atlas-data/bioentities-jsonl"
+              :cli:bootRun --args="bioentities-json --output={{ include "app.bioentitiesJsonlDir" . }}"
               
               # sleep for 5000 seconds to allow the job to be debugged if needed
               sleep 5000
@@ -95,7 +93,7 @@ spec:
               subPath: "fg/atlas/bioentity_properties"
               readOnly: true
             # this is the output directory where the jsonl files are written to
-            - mountPath: "/atlas-data/bioentities-jsonl"
+            - mountPath: "{{ include "app.bioentitiesJsonlDir" . }}"
               name: bioentities-jsonl-vol
             # this is the secrets volume where the jdbc.properties file is stored
             - name: {{ include "app.name" . }}-secrets

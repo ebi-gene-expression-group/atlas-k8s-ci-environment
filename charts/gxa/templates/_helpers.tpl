@@ -116,6 +116,10 @@ Root directory for data mounts
 {{ include "app.dataDir" . }}/bulk-analytics-jsonl
 {{- end }}
 
+{{- define "app.bioentitiesJsonlDir" -}}
+{{ include "app.dataDir" . }}/bioentities-jsonl
+{{- end }}
+
 {{/*
 Gradle CLI arguments for running the CLI application
 */}}
@@ -209,6 +213,12 @@ NFS volume mounts, used in deployments and jobs
   persistentVolumeClaim:
     claimName: bulk-analytics-jsonl-rwo
 {{- end }}
+
+{{- define "app.bioentitiesJsonlVolume" -}}
+- name: bioentities-jsonl-vol
+  persistentVolumeClaim:
+    claimName: bioentities-jsonl-rwo
+{{- end }}
 {{/*
 Secrets volume mount
 */}}
@@ -216,4 +226,18 @@ Secrets volume mount
 - name: {{ include "app.name" . }}-secrets
   secret:
     secretName: {{ include "app.fullname" . }}-secrets
+{{- end }}
+
+{{/*
+Solr Zookeeper hosts URL
+*/}}
+{{- define "app.solrZkHosts" -}}
+{{ .Values.solr.namespace }}-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
+{{- end }}
+
+{{/*
+Solr hosts URL
+*/}}
+{{- define "app.solrHost" -}}
+{{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
 {{- end }}

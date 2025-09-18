@@ -33,4 +33,12 @@ data:
     oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays
     saccharomyces_cerevisiae schizosaccharomyces_pombe
 
+  {{- if and (not (empty .Values.solr)) .Values.solr.createSecret }}
+  # Solr configuration
+  SOLR_HOST: "{{ include "app.solrHost" . }}"
+  SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
+  SOLR_COLLECTION: "{{ .Values.solr.collection  }}"
+  SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
+  SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
+  {{- end }}
 
