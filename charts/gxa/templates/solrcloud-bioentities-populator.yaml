@@ -91,7 +91,7 @@ spec:
                 # INPUT_JSONL=${FILE} ./solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
               # done
               # ./build-suggesters.sh
-              sleep 5000
+              sleep 50000
           volumeMounts:
             - mountPath: "{{ include "app.bioentitiesJsonlDir" . }}"
               name: bioentities-jsonl-vol
