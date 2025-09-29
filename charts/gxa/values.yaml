@@ -102,6 +102,9 @@ solr:
   createSecret: true
   bulkAnalyticsJsonl:
     enabled: false
+  # bioentitiesPopulator:
+    # enabled: false
+    # gitBranch: "main"
 
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk

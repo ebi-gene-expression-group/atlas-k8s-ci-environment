@@ -37,7 +37,8 @@ data:
   # Solr configuration
   SOLR_HOST: "{{ include "app.solrHost" . }}"
   SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
-  SOLR_COLLECTION: "{{ .Values.solr.collection  }}"
+  SOLR_BIOENTITIES_COLLECTION: "{{ .Values.solr.bioentities.collection  }}"
+  SOLR_BULK_ANALYTICS_NUM_SHARDS: "{{ .Values.solr.bulkAnalytics.numShards | default "4" }}"
   SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
   SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
   {{- end }}

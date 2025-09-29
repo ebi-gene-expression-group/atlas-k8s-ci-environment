@@ -20,13 +20,19 @@ jdbc:
 
 solr:
   namespace: gxa-dev-solrcloud
-  user: k8s-oper
+  user: admin
   createSecret: true
-  bulkAnalyticsJsonl:
-    enabled: false
-  bioentitiesJsonl:
-    enabled: true
-  bioentitiesPopulator:
-    enabled: true
+  bulkAnalytics:
+    jsonl:
+      enabled: false
+    collection: "bulk-analytics"
+  bioentities:
+    jsonl:
+      enabled: true
+    populator:
+      enabled: true
+      gitBranch: "develop"
+    collection: "bioentities"
+
 nfs:
   snapshotComponent: experiments_test

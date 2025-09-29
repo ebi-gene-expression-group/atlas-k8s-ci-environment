@@ -1,6 +1,7 @@
 # Load environment variables from .env file if it exists
 ifneq (,$(wildcard .env))
     $(info Loading environment variables from .env file)
+    # Generate a processed env file (strip surrounding double quotes, trim, ignore comments) and include it
     include .env
     export
 else
@@ -33,15 +34,15 @@ WAR_FILE_DIR ?= /Users/amnon/Downloads
 HELM_SET_ARGS = --set appVersion=$(APP_VERSION)
 ifdef JDBC_PASSWORD
 $(info Setting jdbc.password from JDBC_PASSWORD environment variable)
-HELM_SET_ARGS += --set jdbc.password="$(JDBC_PASSWORD)"
+HELM_SET_ARGS += --set jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
 endif
 ifdef SOLR_PASSWORD
 $(info Setting solr.password from SOLR_PASSWORD environment variable)
-HELM_SET_ARGS += --set solr.password="$(SOLR_PASSWORD)"
+HELM_SET_ARGS += --set solr.password="$(subst ",,$(SOLR_PASSWORD))"
 endif
 ifdef TOMCAT_DEPLOYER_PASSWORD
 $(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
-HELM_SET_ARGS += --set tomcat.deployerPassword="$(TOMCAT_DEPLOYER_PASSWORD)"
+HELM_SET_ARGS += --set tomcat.deployerPassword="$(subst ",,$(TOMCAT_DEPLOYER_PASSWORD))"
 endif
 
 deploy:

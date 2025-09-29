@@ -1,4 +1,4 @@
-{{- if and .Values.solr .Values.solr.bioentitiesJsonl (.Values.solr.bioentitiesJsonl.enabled | default false) -}}
+{{- if and .Values.solr .Values.solr.bioentities.jsonl (.Values.solr.bioentities.jsonl.enabled | default false) -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

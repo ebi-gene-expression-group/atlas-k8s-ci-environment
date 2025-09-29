@@ -1,10 +1,14 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": ".",
 		},
 		{
 			"path": "../index-gxa"
+		},
+		{
+			"name": "index-bioentities",
+			"path": "../index-bioentities"
 		}
 	],
 	"settings": {
