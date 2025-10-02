@@ -1,6 +1,6 @@
-#README
+# README
 
-Step-by-Step Installation Guide for Solr Operator v0.8.1
+Step-by-Step Installation Guide for Solr Operator v0.9.1
 
 1. Install the CRDs (Custom Resource Definitions)
    
@@ -54,5 +54,5 @@ Step-by-Step Installation Guide for Solr Operator v0.8.1
 
    c. Solrcloud password
 
-     # Get the password
-     kubectl get secret gxa-dev-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n gxa-dev-solrcloud | base64 --decode
+     # Get the 'admin' password
+     kubectl get secret gxa-dev-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n gxa-dev-solrcloud | base64 --decode;echo
