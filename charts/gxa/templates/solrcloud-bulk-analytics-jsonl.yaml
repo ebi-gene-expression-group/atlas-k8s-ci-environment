@@ -1,4 +1,4 @@
-{{- if and .Values.solr .Values.solr.bulkAnalyticsJsonl .Values.solr.bulkAnalyticsJsonl.enabled | default false -}}
+{{- if and .Values.solr .Values.solr.bulkAnalytics.jsonl .Values.solr.bulkAnalytics.jsonl.enabled | default false -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -16,17 +16,20 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "app.name" . }}-solrcloud-bulk-analytics-jsonl
+  name: bulk-analytics-jsonl
   labels:
     {{- include "app.labels" . | nindent 4 }}
 spec:
   template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
       volumes:
         {{- include "app.expdesignVolume" . | nindent 8 }}
         {{- include "app.secretsVolume" . | nindent 8 }}
         {{- include "app.gxaCodonVolume" . | nindent 8 }}
-
         - name: {{ include "app.name" . }}-data-vol
           emptyDir: {}
         - name: webapp-volume
@@ -89,9 +92,10 @@ spec:
               ls -lt {{ include "app.experimentsDir" . }}/magetab               
               
               for EXP_IDS in HUMAN_EXP_IDS MOUSE_EXP_IDS ZEBRAFISH_EXP_IDS FLY_EXP_IDS WORM_EXP_IDS HORSE_EXP_IDS YEAST_EXP_IDS WHEAT_EXP_IDS PLATYPUS_EXP_IDS RICE_EXP_IDS GRASS_EXP_IDS SCHISTOSOME_EXP_IDS
-              do          
+              do  
+                echo "Processing experiment IDs: ${EXP_IDS}"
                 ./gradlew --no-watch-fs \
-                -PdataFilesLocation=/atlas-data \
+                -PdataFilesLocation={{ include "app.dataDir" . }} \
                 {{ include "app.gradleCliArgs" . | indent 14 }} \
                 -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
                 -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \

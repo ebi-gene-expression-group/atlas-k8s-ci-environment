@@ -16,13 +16,16 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "app.name" . }}-solrcloud-bioentities-jsonl
+  name: bioentities-jsonl
   labels:
     {{- include "app.labels" . | nindent 4 }}
-
 spec:
   template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
       volumes:
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.secretsVolume" . | nindent 8 }}

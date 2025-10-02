@@ -24,7 +24,9 @@ solr:
   createSecret: true
   bulkAnalytics:
     jsonl:
-      enabled: false
+      enabled: true
+    populator:
+      enabled: true
     collection: "bulk-analytics"
   bioentities:
     jsonl:

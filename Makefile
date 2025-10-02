@@ -1,3 +1,14 @@
+# Color definitions
+RED := \033[0;31m
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+BLUE := \033[0;34m
+MAGENTA := \033[0;35m
+CYAN := \033[0;36m
+WHITE := \033[0;37m
+RESET := \033[0m
+BOLD := \033[1m
+
 # Load environment variables from .env file if it exists
 ifneq (,$(wildcard .env))
     $(info Loading environment variables from .env file)
@@ -23,11 +34,14 @@ $(info Using environment: $(ENV))
 ENV_VALUES = charts/$(RELEASE)/values-$(ENV).yaml
 NAMESPACE = $(RELEASE)-$(ENV)
 APP_VERSION = 37.0.5
-TOMCAT_SERVER_URL ?= http://localhost:8080
+
+# Simple variables for node hostname and port
+NODE_HOSTNAME ?= $(shell kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
+TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
+
 WAR_FILE_DIR ?= /Users/amnon/Downloads
-
-.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war
-
+.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
 
 
 # Set helm --set arguments based on environment variables
@@ -44,9 +58,14 @@ ifdef TOMCAT_DEPLOYER_PASSWORD
 $(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
 HELM_SET_ARGS += --set tomcat.deployerPassword="$(subst ",,$(TOMCAT_DEPLOYER_PASSWORD))"
 endif
+ifdef DOCKER_CONFIG_JSON
+$(info Setting registrySecret.dockerconfigjson from DOCKER_CONFIG_JSON environment variable)
+HELM_SET_ARGS += --set-file registrySecret.dockerconfigjson="$(subst ",,$(DOCKER_CONFIG_JSON))"
+endif
 
 deploy:
-	@echo using env specific values file $(ENV_VALUES)
+	@echo "$(BOLD)$(GREEN)Deploying to environment: $(ENV)$(RESET)"
+	@echo "$(CYAN)Using values file: $(ENV_VALUES)$(RESET)"
 	helm upgrade --install \
 	  $(RELEASE) \
 	  charts/$(RELEASE) \
@@ -69,47 +88,101 @@ uninstall:
 
 # Delete Kubernetes job
 delete-jobs:
-	@echo "Deleting Kubernetes jobs... from $(NAMESPACE)"
-	# kubectl delete job $(RELEASE)-postgres-populator --namespace $(NAMESPACE) || true
-	kubectl delete job $(RELEASE)-solrcloud-bioentities-jsonl --namespace $(NAMESPACE) || true
-	kubectl delete job bioentities-populator --namespace $(NAMESPACE) || true
-	kubectl delete job $(RELEASE)-solrcloud-bulk-analytics-jsonl --namespace $(NAMESPACE) || true
-	# kubectl delete job $(RELEASE)-solrcloud-bulk-analytics-populator --namespace $(NAMESPACE) || true
+	@echo "$(BOLD)$(MAGENTA)Deleting Kubernetes jobs... from $(NAMESPACE)$(RESET)"
+
+	kubectl delete job --selector app.kubernetes.io/name=gxa --namespace $(NAMESPACE) || true
 
 # Workflow: delete job then deploy to test
 workflow: delete-jobs deploy-test
-	@echo "Workflow completed: job deleted and deployed to test environment" 
+	@echo "$(BOLD)$(GREEN)Workflow completed: job deleted and deployed to test environment$(RESET)" 
 
 # Get tomcat-users.xml from $(RELEASE)-secrets secret
 get-tomcat-deployer-password:
-	@echo "Extracting deployer password from tomcat-users.xml from $(RELEASE)-secrets secret
+	@echo "$(BOLD)$(BLUE)Extracting deployer password from tomcat-users.xml from $(RELEASE)-secrets secret$(RESET)"
 	@kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
 		| base64 -d \
 		| yq -oy -p=xml \
 			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'
 
-# Deploy WAR file using curl commands
-deploy-war:
-	@echo "Deploying WAR file using curl commands..."
-	@DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
+# Check tomcat-users.xml directly from the pod
+check-tomcat-users:
+	@echo "$(BOLD)$(CYAN)Checking tomcat-users.xml from the running pod...$(RESET)"
+	@POD_NAME=$$(kubectl get pods --namespace $(NAMESPACE) -l app.kubernetes.io/name=$(RELEASE) -o jsonpath='{.items[0].metadata.name}'); \
+	echo "Pod name: $$POD_NAME"; \
+	echo "=== tomcat-users.xml content ==="; \
+	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- cat /usr/local/tomcat/conf/tomcat-users.xml; \
+	echo ""; \
+	echo "=== Checking if manager app is deployed ==="; \
+	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- ls -la /usr/local/tomcat/webapps/ | grep manager; \
+	echo ""; \
+	echo "=== Checking tomcat logs for authentication errors ==="; \
+	kubectl logs $$POD_NAME --namespace $(NAMESPACE) --tail=20 | grep -i "auth\|403\|manager" || echo "No recent auth/403/manager errors found"; \
+	echo ""; \
+	echo "=== Checking tomcat-users.xml from secret ==="; \
+	kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) -o jsonpath='{.data.tomcat-users\.xml}' | base64 -d
+
+# Test Tomcat Manager REST API access
+test-tomcat-manager:
+	@echo "$(BOLD)$(MAGENTA)Testing Tomcat Manager REST API access...$(RESET)"
+	@set -e; \
+	DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
 		| base64 -d \
 		| yq -oy -p=xml \
 			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'); \
-	echo "Deploying WAR file..."; \
+	echo "Testing authentication with password: $$DEPLOYER_PASSWORD"; \
+	echo "=== Testing manager/text/list ==="; \
+	curl -u "deployer:$$DEPLOYER_PASSWORD" \
+		--fail \
+		--verbose \
+		"$(TOMCAT_SERVER_URL)/manager/text/list" || echo "Manager REST API failed";
+
+# Inspect Tomcat Manager context restrictions (RemoteAddrValve, roles)
+inspect-manager-context:
+	@echo "$(BOLD)$(CYAN)Inspecting Tomcat Manager context and server configuration...$(RESET)"
+	@POD_NAME=$$(kubectl get pods --namespace $(NAMESPACE) -l app.kubernetes.io/name=$(RELEASE) -o jsonpath='{.items[0].metadata.name}'); \
+	echo "Pod name: $$POD_NAME"; \
+	echo "=== Context.xml for manager app (if present) ==="; \
+	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'if [ -f /usr/local/tomcat/webapps/manager/META-INF/context.xml ]; then cat /usr/local/tomcat/webapps/manager/META-INF/context.xml; else echo "No manager/META-INF/context.xml found"; fi'; \
+	echo ""; \
+	echo "=== Global context.xml (conf/context.xml) ==="; \
+	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'if [ -f /usr/local/tomcat/conf/context.xml ]; then cat /usr/local/tomcat/conf/context.xml; else echo "No conf/context.xml found"; fi' | grep -E "RemoteAddrValve|allow=|deny=" || true; \
+	echo ""; \
+	echo "=== Server.xml valves (conf/server.xml) ==="; \
+	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'if [ -f /usr/local/tomcat/conf/server.xml ]; then cat /usr/local/tomcat/conf/server.xml; else echo "No conf/server.xml found"; fi' | grep -E "RemoteAddrValve|RemoteIpValve|Valve|manager|realm" || true; \
+	echo ""; \
+	echo "=== Confirm roles for user deployer from tomcat-users.xml ==="; \
+	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'cat /usr/local/tomcat/conf/tomcat-users.xml' | yq -oy -p=xml '.tomcat-users.user | select(.["+@username"] == "deployer") | .+@roles' || true
+	
+# Deploy WAR file using curl commands
+deploy-war:
+	@echo "$(BOLD)$(GREEN)Deploying WAR file using curl commands...$(RESET)"
+	@set -e; \
+	DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
+		-o jsonpath='{.data.tomcat-users\.xml}' \
+		| base64 -d \
+		| yq -oy -p=xml \
+			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'); \
+	if [ -z "$$DEPLOYER_PASSWORD" ]; then \
+		echo "ERROR: Failed to get deployer password"; \
+		exit 1; \
+	fi; \
+	echo "Deploying WAR file... to $(TOMCAT_SERVER_URL)"; \
 	curl -u deployer:$$DEPLOYER_PASSWORD \
 		--fail \
 		--include \
 		--verbose \
-		-X PUT \
 		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=/gxa&update=true" \
 		--upload-file $(WAR_FILE_DIR)/gxa.war; \
 	echo "Listing deployed applications..."; \
 	curl -u deployer:$$DEPLOYER_PASSWORD \
+		--fail \
 		--verbose \
 		"$(TOMCAT_SERVER_URL)/manager/text/list"; \
-	echo "Checking application location..."; \
-	curl "$(TOMCAT_SERVER_URL)/gxa" \
-		--location
+	echo "Checking application homepage..."; \
+	curl --fail \
+		"$(TOMCAT_SERVER_URL)/gxa" \
+		--location \
+		-O
 

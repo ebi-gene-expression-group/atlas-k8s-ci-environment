@@ -22,6 +22,23 @@ serviceAccount:
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
+  # Optional: registry credentials applied to all Pods using this SA
+  imagePullSecrets: []
+
+# Optional docker registry secret managed by this chart
+registrySecret:
+  create: false
+  # If empty and create=true, defaults to "{{ include \"app.fullname\" . }}-registry"
+  # name: ""
+  # Provide the full Docker config JSON content for the key ".dockerconfigjson".
+  # TIP: Populate this via CI secrets; do not commit real credentials to Git.
+  # Example content (abbreviated):
+  # {
+  #   "auths": {
+  #     "ghcr.io": {"auth": "<base64(user:token)>"}
+  #   }
+  # }
+  # dockerconfigjson: ""
 
 podAnnotations: {}
 
@@ -38,7 +55,7 @@ securityContext:
   runAsGroup: 1146
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
 
 ingress:
@@ -99,12 +116,19 @@ solr:
   # collection: "bioentities"
   # numShards: "4"
   # timeout: "30000"
-  createSecret: true
-  bulkAnalyticsJsonl:
-    enabled: false
-  # bioentitiesPopulator:
-    # enabled: false
-    # gitBranch: "main"
+  # createSecret: true
+  # bioentities:
+  #   jsonl:
+  #     enabled: false
+  #   populator:
+  #     enabled: false
+  #     gitBranch: "develop"
+  # bulkAnalytics:
+  #   jsonl:
+  #     enabled: false
+  #   populator:
+  #     enabled: false
+  #     gitBranch: "develop"
 
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk

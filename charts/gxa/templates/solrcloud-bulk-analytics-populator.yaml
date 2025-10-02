@@ -1,21 +1,25 @@
+{{- if and .Values.solr .Values.solr.bulkAnalytics.populator .Values.solr.bulkAnalytics.populator.enabled | default false -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "app.name" . }}-solrcloud-bulk-analytics-populator
-  namespace: jenkins-gene-expression
+  name: bulk-analytics-populator
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
 spec:
   template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
       volumes:
-        - name: {{ include "app.name" . }}-bulk-analytics-jsonl-vol
-          persistentVolumeClaim:
-            claimName: bulk-analytics-jsonl-rwo
+        {{ include "app.bulkAnalyticsJsonlVolume" . | nindent 8 }}
         - name: scratch-bulk-analytics-vol
           ephemeral:
             volumeClaimTemplate:
               spec:
                 accessModes: [ "ReadWriteOnce" ]
-                storageClassName: "premium-rwo"
+                storageClassName: "standard-nfs-production"
                 resources:
                   requests:
                     storage: 200Gi
@@ -24,17 +28,29 @@ spec:
           image: openjdk:11
           env:
             - name: SOLR_HOST
-              value: "{{ include "app.name" . }}-solrcloud-0.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_HOST
             - name: SOLR_HOSTS
-              value: "{{ include "app.name" . }}-solrcloud-0.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 {{ include "app.name" . }}-solrcloud-1.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 {{ include "app.name" . }}-solrcloud-2.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983 {{ include "app.name" . }}-solrcloud-3.{{ include "app.name" . }}-solrcloud-headless.jenkins-gene-expression.svc.cluster.local:8983"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_HOST
             - name: SOLR_NUM_SHARDS
-              value: "4"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_NUM_SHARDS
             - name: NUM_DOCS_PER_BATCH
               value: "10000"
             - name: SOLR_COMMIT_DOCS
               value: "500000"
             - name: SOLR_COLLECTION
-              value: "bulk-analytics"
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_ANALYTICS_COLLECTION
             - name: SCHEMA_VERSION
               value: "1"
             # Consider moving this to an export line in the script (?)
@@ -42,16 +58,15 @@ spec:
               value: "dedupe"
           resources:
             requests:
-              cpu: 0.1
-              memory: 128Mi
+              cpu: 0.5
+              memory: 256Mi
             limits:
-              cpu: 0.25
+              cpu: 0.55
               memory: 1Gi
           command: ["/bin/bash", "-c"]
           args:
-            - |
-              apt-get install -y --no-install-recommends git
-              
+            - |  
+              set -ev            
               mkdir /work
               
               cd /work
@@ -64,14 +79,24 @@ spec:
               ./create-bulk-analytics-schema.sh
 
               # We go back to index-bioentities/bin because the solr-jsonl-chunk-loader.sh script isn’t in the solr-bulk repository
-              cd /atlas-data/scratch
-              for FILE in `ls /atlas-data/bulk-analytics-jsonl/*.jsonl`
+              cd {{ include "app.dataDir" . }}/scratch
+              for FILE in `ls {{include "app.bulkAnalyticsJsonlDir" . }}/*.jsonl`
               do
                 INPUT_JSONL=${FILE} /work/index-bioentities/bin/solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
               done
           volumeMounts:
-            - mountPath: "/atlas-data/bulk-analytics-jsonl"
-              name: {{ include "app.name" . }}-bulk-analytics-jsonl-vol
-            - mountPath: "/atlas-data/scratch"
+            - mountPath: "{{ include "app.bulkAnalyticsJsonlDir" . }}"
+              name: bulk-analytics-jsonl-vol
+            - mountPath: "{{ include "app.dataDir" . }}/scratch"
               name: scratch-bulk-analytics-vol
+      initContainers:
+        - name: wait-for-previous-job
+          image: dtzar/helm-kubectl:3.16.2
+          command: ["kubectl"]
+          args:
+          - "wait"
+          - "--for=condition=complete"
+          - "--timeout=1h"
+          - "job/bulk-analytics-jsonl"
       restartPolicy: Never
+{{- end }}

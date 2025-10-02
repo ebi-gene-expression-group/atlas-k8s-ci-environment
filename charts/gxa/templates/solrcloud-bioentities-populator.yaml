@@ -3,9 +3,15 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: bioentities-populator
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
 spec:
   template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
       volumes:
         {{- include "app.secretsVolume" . | nindent 8 }}
         {{- include "app.bioentitiesJsonlVolume" . | nindent 8 }}
@@ -101,5 +107,14 @@ spec:
             - mountPath: /etc/solr
               name: solr-config
               readOnly: true
+      initContainers:
+        - name: wait-for-previous-job
+          image: dtzar/helm-kubectl:3.16.2
+          command: ["kubectl"]
+          args:
+          - "wait"
+          - "--for=condition=complete"
+          - "--timeout=1h"
+          - "job/bioentities-jsonl"
       restartPolicy: Never
 {{- end }}

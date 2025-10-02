@@ -1,2 +1,3 @@
 *.curlrc
 .env
+.dockerconfig.json
