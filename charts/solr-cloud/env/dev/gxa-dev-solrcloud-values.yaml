@@ -26,3 +26,6 @@ zookeeper:
   resources:
     limits:
       memory: 512Mi
+
+service:
+   nodePort: null   # Assign a port (30000–32767)

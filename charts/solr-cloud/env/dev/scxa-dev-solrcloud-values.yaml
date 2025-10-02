@@ -29,4 +29,4 @@ zookeeper:
       memory: 512Mi
 
 service:
-   nodePort: 30984   # optional, leave blank for auto-assign
+   nodePort: null   # Assign a port (30000–32767)
