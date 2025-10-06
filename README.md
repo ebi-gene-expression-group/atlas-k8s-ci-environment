@@ -14,7 +14,6 @@ This repository uses Helm to manage Kubernetes manifests for the GXA and SCXA ap
 charts/
   gxa/                  # Helm chart for GXA
   scxa/                 # TBA: Helm chart for SCXA
-  bioentity-properties/ # TBA: Shared Helm chart for both apps
   solr-cloud            # TBA: solr cloud stuff
 ```
 
@@ -22,22 +21,25 @@ Other directories are the legacy k8s files that would be reorganised into helm c
 
 ### Usage
 
-To install the GXA chart (which depends on bioentity-properties):
+To install the GXA chart:
 
 ```sh
-makefile deploy-test
+ENV=test make deploy
 ```
 
-You can customize deployments by editing the respective `values.yaml` files.
+### Configuration
+
+- customize deployments by editing the respective `values-<env>.yaml` files
+- passowrds (jdbc, tomcat deployer, etc.) can be configured in .env which ignored by git
 
 TODO
 
 - [x] create gxa chart based on tomcat image
-- [ ] create bioentity chart
+- [x] create bioentity chart
 - [ ] create scxa chart - after gxa one works
 - [x] create solr chart - by Anmol
 
-## Legacy k8s resources
+## Legacy k8s resources - Should be deleted
 
 Collection of Kubernetes manifests for CI of Expression Atlas web applications
 
