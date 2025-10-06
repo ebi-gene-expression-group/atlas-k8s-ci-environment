@@ -104,6 +104,7 @@ tomcat:
   # deployerPassword: set-in-commandline
   # createSecret: false
 
+loggingLevel: DEBUG
 
 jdbc:
   populator:

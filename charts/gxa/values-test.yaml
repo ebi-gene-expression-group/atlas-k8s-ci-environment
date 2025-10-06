@@ -13,6 +13,7 @@ experiment_ids: "E-CURD-23,E-CURD-30,E-ERAD-475,E-GEOD-16879,E-GEOD-18068,E-GEOD
 tomcat:
   createSecret: true
 
+loggingLevel: DEBUG
 
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
@@ -27,14 +28,16 @@ solr:
       enabled: true
     populator:
       enabled: true
-    collection: "bulk-analytics"
+    collection: bulk-analytics
+    loggingLevel: DEBUG
   bioentities:
     jsonl:
       enabled: true
     populator:
       enabled: true
-      gitBranch: "develop"
-    collection: "bioentities"
+      gitBranch: develop
+    collection: bioentities
+
 
 nfs:
   snapshotComponent: experiments_test

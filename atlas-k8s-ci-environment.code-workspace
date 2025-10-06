@@ -24,6 +24,7 @@
 				"name": "Unnamed configuration 2"
 			}
 		],
-		"makefile.configureOnOpen": false
+		"makefile.configureOnOpen": false,
+		"nextflow.telemetry.enabled": true
 	}
 }

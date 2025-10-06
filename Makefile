@@ -77,12 +77,6 @@ deploy:
 deploy-test:
 	$(MAKE) deploy ENV=test
 
-deploy-dev:
-	$(MAKE) deploy ENV=dev
-
-deploy-prod:
-	$(MAKE) deploy ENV=prod	
-
 uninstall:
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE) 
 
@@ -90,71 +84,12 @@ uninstall:
 delete-jobs:
 	@echo "$(BOLD)$(MAGENTA)Deleting Kubernetes jobs... from $(NAMESPACE)$(RESET)"
 
-	kubectl delete job --selector app.kubernetes.io/name=gxa --namespace $(NAMESPACE) || true
+	kubectl delete job --selector app.kubernetes.io/name=$(RELEASE) --namespace $(NAMESPACE) || true
 
 # Workflow: delete job then deploy to test
 workflow: delete-jobs deploy-test
 	@echo "$(BOLD)$(GREEN)Workflow completed: job deleted and deployed to test environment$(RESET)" 
 
-# Get tomcat-users.xml from $(RELEASE)-secrets secret
-get-tomcat-deployer-password:
-	@echo "$(BOLD)$(BLUE)Extracting deployer password from tomcat-users.xml from $(RELEASE)-secrets secret$(RESET)"
-	@kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
-		-o jsonpath='{.data.tomcat-users\.xml}' \
-		| base64 -d \
-		| yq -oy -p=xml \
-			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'
-
-# Check tomcat-users.xml directly from the pod
-check-tomcat-users:
-	@echo "$(BOLD)$(CYAN)Checking tomcat-users.xml from the running pod...$(RESET)"
-	@POD_NAME=$$(kubectl get pods --namespace $(NAMESPACE) -l app.kubernetes.io/name=$(RELEASE) -o jsonpath='{.items[0].metadata.name}'); \
-	echo "Pod name: $$POD_NAME"; \
-	echo "=== tomcat-users.xml content ==="; \
-	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- cat /usr/local/tomcat/conf/tomcat-users.xml; \
-	echo ""; \
-	echo "=== Checking if manager app is deployed ==="; \
-	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- ls -la /usr/local/tomcat/webapps/ | grep manager; \
-	echo ""; \
-	echo "=== Checking tomcat logs for authentication errors ==="; \
-	kubectl logs $$POD_NAME --namespace $(NAMESPACE) --tail=20 | grep -i "auth\|403\|manager" || echo "No recent auth/403/manager errors found"; \
-	echo ""; \
-	echo "=== Checking tomcat-users.xml from secret ==="; \
-	kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) -o jsonpath='{.data.tomcat-users\.xml}' | base64 -d
-
-# Test Tomcat Manager REST API access
-test-tomcat-manager:
-	@echo "$(BOLD)$(MAGENTA)Testing Tomcat Manager REST API access...$(RESET)"
-	@set -e; \
-	DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
-		-o jsonpath='{.data.tomcat-users\.xml}' \
-		| base64 -d \
-		| yq -oy -p=xml \
-			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'); \
-	echo "Testing authentication with password: $$DEPLOYER_PASSWORD"; \
-	echo "=== Testing manager/text/list ==="; \
-	curl -u "deployer:$$DEPLOYER_PASSWORD" \
-		--fail \
-		--verbose \
-		"$(TOMCAT_SERVER_URL)/manager/text/list" || echo "Manager REST API failed";
-
-# Inspect Tomcat Manager context restrictions (RemoteAddrValve, roles)
-inspect-manager-context:
-	@echo "$(BOLD)$(CYAN)Inspecting Tomcat Manager context and server configuration...$(RESET)"
-	@POD_NAME=$$(kubectl get pods --namespace $(NAMESPACE) -l app.kubernetes.io/name=$(RELEASE) -o jsonpath='{.items[0].metadata.name}'); \
-	echo "Pod name: $$POD_NAME"; \
-	echo "=== Context.xml for manager app (if present) ==="; \
-	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'if [ -f /usr/local/tomcat/webapps/manager/META-INF/context.xml ]; then cat /usr/local/tomcat/webapps/manager/META-INF/context.xml; else echo "No manager/META-INF/context.xml found"; fi'; \
-	echo ""; \
-	echo "=== Global context.xml (conf/context.xml) ==="; \
-	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'if [ -f /usr/local/tomcat/conf/context.xml ]; then cat /usr/local/tomcat/conf/context.xml; else echo "No conf/context.xml found"; fi' | grep -E "RemoteAddrValve|allow=|deny=" || true; \
-	echo ""; \
-	echo "=== Server.xml valves (conf/server.xml) ==="; \
-	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'if [ -f /usr/local/tomcat/conf/server.xml ]; then cat /usr/local/tomcat/conf/server.xml; else echo "No conf/server.xml found"; fi' | grep -E "RemoteAddrValve|RemoteIpValve|Valve|manager|realm" || true; \
-	echo ""; \
-	echo "=== Confirm roles for user deployer from tomcat-users.xml ==="; \
-	kubectl exec $$POD_NAME --namespace $(NAMESPACE) -- sh -c 'cat /usr/local/tomcat/conf/tomcat-users.xml' | yq -oy -p=xml '.tomcat-users.user | select(.["+@username"] == "deployer") | .+@roles' || true
-	
 # Deploy WAR file using curl commands
 deploy-war:
 	@echo "$(BOLD)$(GREEN)Deploying WAR file using curl commands...$(RESET)"

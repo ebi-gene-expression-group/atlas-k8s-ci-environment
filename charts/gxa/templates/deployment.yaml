@@ -141,6 +141,7 @@ spec:
               - key: logback.xml
                 path: logback.xml
         {{- include "app.secretsVolume" . | nindent 8 }}
+        # TODO: do we need to make logs a persistent volume? If we use the cluster's monitoring, there is no need.
         - name: tomcat-logs
           emptyDir: {}
         - name: tomcat-work

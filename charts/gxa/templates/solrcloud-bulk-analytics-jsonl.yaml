@@ -68,12 +68,12 @@ spec:
               value: "E-MTAB-451"
           resources:
             requests:
-              cpu: "2"
-              memory: "6Gi"
+              cpu: "1.5"
+              memory: "4.5Gi"
               ephemeral-storage: "8Gi"
             limits:
               cpu: "2"
-              memory: "8Gi"
+              memory: "6Gi"
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -94,7 +94,7 @@ spec:
               for EXP_IDS in HUMAN_EXP_IDS MOUSE_EXP_IDS ZEBRAFISH_EXP_IDS FLY_EXP_IDS WORM_EXP_IDS HORSE_EXP_IDS YEAST_EXP_IDS WHEAT_EXP_IDS PLATYPUS_EXP_IDS RICE_EXP_IDS GRASS_EXP_IDS SCHISTOSOME_EXP_IDS
               do  
                 echo "Processing experiment IDs: ${EXP_IDS}"
-                ./gradlew --no-watch-fs \
+                ./gradlew --no-watch-fs --info \
                 -PdataFilesLocation={{ include "app.dataDir" . }} \
                 {{ include "app.gradleCliArgs" . | indent 14 }} \
                 -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
@@ -121,5 +121,14 @@ spec:
               mountPath: /secrets/jdbc.properties
               subPath: jdbc.properties
 
+      initContainers:
+      - name: wait-for-previous-job
+        image: dtzar/helm-kubectl:3.16.2
+        command: ["kubectl"]
+        args:
+        - "wait"
+        - "--for=condition=complete"
+        - "--timeout=1h"
+        - "job/bioentities-populator"
       restartPolicy: Never
 {{- end }}
