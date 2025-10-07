@@ -1,3 +1,5 @@
 *.curlrc
 .env
 .dockerconfig.json
+
+/tmp/**

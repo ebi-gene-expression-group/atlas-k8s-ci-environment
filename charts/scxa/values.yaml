@@ -1,1 +1,15 @@
 # Default values for scxa.
+
+tomcat:
+  httpPort: 8080
+
+solr:
+  namespace: set-per-env
+  numShards: "4"
+  timeout: "30000"
+  scxaAnalytics:
+    collection: scxa-analytics
+  bioentities:
+    collection: bioentities
+  scxagene2experiment:
+    collection: gene2experiment

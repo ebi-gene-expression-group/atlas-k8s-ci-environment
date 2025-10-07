@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "app.fullname" . }}-config
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+data:
+  server.xml: |
+    <Server port="8005" shutdown="SHUTDOWN">
+      <GlobalNamingResources>
+        <Resource name="UserDatabase" auth="Container"
+                  type="org.apache.catalina.UserDatabase"
+                  description="User database that can be updated and saved"
+                  factory="org.apache.catalina.users.MemoryUserDatabaseFactory"
+                  pathname="conf/tomcat-users.xml" />
+      </GlobalNamingResources>
+      <Service name="Catalina">
+        <Connector port="{{ .Values.tomcat.httpPort }}" 
+                   protocol="HTTP/1.1"
+                   connectionTimeout="20000"
+                   redirectPort="8443" />
+        <Engine name="Catalina" defaultHost="localhost">
+          <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
+                 resourceName="UserDatabase"/>
+          <Host name="localhost" appBase="webapps"
+                unpackWARs="true" autoDeploy="true">
+            <Valve className="org.apache.catalina.valves.RemoteIpValve" />
+          </Host>
+        </Engine>
+      </Service>
+    </Server> 
+
+  # Manager webapp context (allows external connections for testing)
+  manager-context.xml: |
+    <Context antiResourceLocking="false" privileged="true">
+      <CookieProcessor className="org.apache.tomcat.util.http.Rfc6265CookieProcessor"
+                       sameSiteCookies="strict" />
+      <Manager sessionAttributeValueClassNameFilter="java\.lang\.(?:Boolean|Integer|Long|Number|String)|org\.apache\.catalina\.filters\.CsrfPreventionFilter\$LruCache(?:\$1)?|java\.util\.(?:Linked)?HashMap"/>
+      <!-- Allow connections from localhost and Kubernetes cluster IPs -->
+      <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+             allow="127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+|192\.168\.\d+\.\d+" />
+    </Context>
+
+  configuration.properties: |
+    data.files.location = {{ include "app.dataDir" . }}
+    experiment.files.location = {{ include "app.experimentsDir" . }}
+    experiment.design.location= {{ include "app.expdesignDir" . }}
+
+{{/*  experiment_ids: {{ .Values.experiment_ids}}*/}}
+
+  logback.xml: |
+    <configuration>
+      <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+      </appender>
+      <root level="INFO">
+        <appender-ref ref="STDOUT" />
+      </root>
+      <logger name="uk.ac.ebi.atlas" level="DEBUG" additivity="false">
+        <appender-ref ref="STDOUT"/>
+      </logger>
+    </configuration>
+
+  species: |
+    anopheles_gambiae arabidopsis_thaliana caenorhabditis_elegans
+    callithrix_jacchus danio_rerio drosophila_melanogaster gallus_gallus
+    homo_sapiens mus_musculus oryctolagus_cuniculus oryza_sativa_indica_group
+    oryza_sativa_japonica_group ovis_aries plasmodium_berghei
+    plasmodium_falciparum_3d7 rattus_norvegicus saccharomyces_cerevisiae
+    schistosoma_mansoni solanum_lycopersicum xenopus_tropicalis zea_mays
+
+  # Solr configuration
+  SOLR_HOST: "{{ include "app.solrHost" . }}"
+  SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
+  SOLR_BIOENTITIES_COLLECTION: "{{ .Values.solr.bioentities.collection  }}"
+  SOLR_SCXA_ANALYTICS_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
+  SOLR_SCXA_GENE2EXPERIMENT_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
+  SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
+  SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
+
