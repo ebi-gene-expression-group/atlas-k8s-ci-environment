@@ -1,4 +1,0 @@
-# Values for scxa test env
-environment: test
-
-experiment_ids: "E-CURD-4 E-EHCA-2 E-GEOD-71585 E-GEOD-81547 E-GEOD-99058 E-MTAB-5061 E-ENAD-53"
