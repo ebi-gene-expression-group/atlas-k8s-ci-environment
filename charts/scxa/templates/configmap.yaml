@@ -46,7 +46,7 @@ data:
     experiment.files.location = {{ include "app.experimentsDir" . }}
     experiment.design.location= {{ include "app.expdesignDir" . }}
 
-{{/*  experiment_ids: {{ .Values.experiment_ids}}*/}}
+  experiment_ids: {{ .Values.experiment_ids | quote }}
 
   logback.xml: |
     <configuration>
