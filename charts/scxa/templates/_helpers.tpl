@@ -44,6 +44,18 @@ Selector labels
 {{- end }}
 
 {{/*
+Create the name of the service account to use
+*/}}
+{{ define "app.serviceAccountName" -}}
+    {{- if .Values.serviceAccount.create }}
+        {{ default (include "app.fullname" .) .Values.serviceAccount.name }}
+    {{- else }}
+        {{ default "default" .Values.serviceAccount.name }}
+    {{- end }}
+{{- end }}
+
+
+{{/*
 Root directory for data mounts
 */}}
 {{- define "app.dataDir" -}}
@@ -57,6 +69,11 @@ Root directory for data mounts
 {{- define "app.expdesignDir" -}}
     {{ include "app.dataDir" . }}/expdesign
 {{- end }}
+
+{{- define "app.tomcatDir" -}}
+    /usr/local/tomcat
+{{- end }}
+
 
 {{/*
 Solr Zookeeper hosts URL

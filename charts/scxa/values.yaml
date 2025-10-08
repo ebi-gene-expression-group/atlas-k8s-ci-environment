@@ -1,5 +1,11 @@
 # Default values for scxa.
 
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+
 tomcat:
   httpPort: 8080
 
@@ -13,3 +19,25 @@ solr:
     collection: bioentities
   scxagene2experiment:
     collection: gene2experiment
+
+podAnnotations: {}
+podSecurityContext: {}
+
+securityContext: {}
+
+image:
+  repository: tomcat
+  pullPolicy: IfNotPresent
+  tag: "8-jdk11"
+imagePullSecrets: []
+
+resources: {}
+
+serviceAccount:
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+  annotations: {}
+  # Optional: registry credentials applied to all Pods using this SA
+  imagePullSecrets: [ ]
