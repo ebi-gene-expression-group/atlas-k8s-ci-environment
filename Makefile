@@ -19,7 +19,17 @@ else
     $(info No .env file found, using system environment variables)
 endif
 
-RELEASE ?= gxa
+RELEASE ?= scxa
+
+# Define DEPLOY_CTX_PATH based on RELEASE
+ifeq ($(RELEASE),gxa)
+    DEPLOY_CTX_PATH = /gxa
+else ifeq ($(RELEASE),scxa)
+    DEPLOY_CTX_PATH = /gxa/sc
+else
+    $(error Error: unknown RELEASE $(RELEASE). Supported values are gxa or scxa)
+endif
+$(info Using deploy context path: $(DEPLOY_CTX_PATH))
 
 ENV ?= test
 # SUPPORTED_ENVS = test dev prod
@@ -40,7 +50,7 @@ NODE_HOSTNAME ?= $(shell kubectl get nodes -o jsonpath='{.items[0].metadata.name
 NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
 TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
 
-WAR_FILE_DIR ?= /Users/amnon/Downloads
+WAR_FILE_DIR ?= charts/$(RELEASE)/war
 .PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
 
 
@@ -108,7 +118,7 @@ deploy-war:
 		--fail \
 		--include \
 		--verbose \
-		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=/gxa&update=true" \
+		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=$(DEPLOY_CTX_PATH)&update=true" \
 		--upload-file $(WAR_FILE_DIR)/gxa.war; \
 	echo "Listing deployed applications..."; \
 	curl -u deployer:$$DEPLOYER_PASSWORD \
@@ -117,7 +127,7 @@ deploy-war:
 		"$(TOMCAT_SERVER_URL)/manager/text/list"; \
 	echo "Checking application homepage..."; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa" \
+		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)" \
 		--location \
 		-O
 

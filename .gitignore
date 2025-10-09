@@ -3,3 +3,4 @@
 .dockerconfig.json
 
 /tmp/**
+/charts/*/war/
