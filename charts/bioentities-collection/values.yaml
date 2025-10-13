@@ -1,6 +1,7 @@
 # Default values for bioentities-collection.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
+webAppName: ""
 
 replicaCount: 1
 
@@ -80,3 +81,19 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+nfs:
+  server: hh-isi-srv-vlan1496.ebi.ac.uk
+  snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
+
+solr:
+  user: admin
+  numShards: "4"
+  timeout: "30000"
+  createSecret: true
+  bioentities:
+    collection: bioentities
+    jsonl:
+      enabled: false
+    populator:
+      enabled: false

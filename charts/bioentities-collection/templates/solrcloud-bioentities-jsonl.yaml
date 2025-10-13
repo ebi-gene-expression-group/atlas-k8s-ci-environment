@@ -29,14 +29,14 @@ spec:
       volumes:
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.secretsVolume" . | nindent 8 }}
-        {{- include "app.gxaCodonVolume" . | nindent 8 }}
+        {{- include "app.appCodonVolume" . | nindent 8 }} # TODO: Check if this is fine
         {{- include "app.bioentitiesJsonlVolume" . | nindent 8 }}
         - name: bioentity-properties-volume
           emptyDir: {}
         - name: webapp-volume
           emptyDir: {}
       containers:
-        - name: {{ include "app.name" . }}-solrcloud-bioentities-jsonl
+        - name: {{ .Values.webAppName }}-solrcloud-bioentities-jsonl # TODO: Check if this is fine
           image: openjdk:11
           env:
             - name: JAVA_TOOL_OPTIONS

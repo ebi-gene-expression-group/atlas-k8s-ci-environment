@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "bioentities-collection.name" -}}
+{{- define "app.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "bioentities-collection.fullname" -}}
+{{- define "app.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "bioentities-collection.chart" -}}
+{{- define "app.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "bioentities-collection.labels" -}}
-helm.sh/chart: {{ include "bioentities-collection.chart" . }}
-{{ include "bioentities-collection.selectorLabels" . }}
+{{- define "app.labels" -}}
+helm.sh/chart: {{ include "app.chart" . }}
+{{ include "app.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,18 +45,146 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "bioentities-collection.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "bioentities-collection.name" . }}
+{{- define "app.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "app.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "bioentities-collection.serviceAccountName" -}}
+{{- define "app.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "bioentities-collection.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "app.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
+{{- end }}
+
+{{/*
+NFS volume mounts, used in deployments and jobs
+*/}}
+{{- define "app.appCodonVolume" -}}
+- name: {{ .Values.webAppName }}-codon-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/ro/{{ .Values.webAppName }}_codon
+{{- end }}
+
+
+{{- define "app.servicesVolume" -}}
+- name: services-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/services
+{{- end }}
+
+{{- define "app.bioentitiesJsonlVolume" -}}
+- name: bioentities-jsonl-vol
+  persistentVolumeClaim:
+    claimName: bioentities-jsonl-rwo
+{{- end }}
+
+{{/*
+Secrets volume mount
+*/}}
+{{- define "app.secretsVolume" -}}
+- name: {{ include "app.name" . }}-secrets
+  secret:
+    secretName: {{ include "app.fullname" . }}-secrets
+{{- end }}
+
+{{/*
+Root directory for data mounts
+*/}}
+{{- define "app.dataDir" -}}
+    /atlas-data
+{{- end }}
+
+{{- define "app.experimentsDir" -}}
+    {{ include "app.dataDir" . }}/exp
+{{- end }}
+
+{{- define "app.bioentityPropertiesDir" -}}
+    {{ include "app.dataDir" . }}/bioentity_properties
+{{- end }}
+
+{{- define "app.bioentityPropertiesSourceDir" -}}
+    {{ include "app.dataDir" . }}/bioentity_properties_source
+{{- end }}
+
+{{- define "app.bioentitiesJsonlDir" -}}
+    {{ include "app.dataDir" . }}/bioentities-jsonl
+{{- end }}
+
+{{/*
+Gradle CLI arguments for running the CLI application
+*/}}
+{{- define "app.gradleCliArgs" -}}
+    {{ include "app.jvmProxyArgs" . }} \
+    {{- include "app.loggingArgs" . }}
+{{- end }}
+
+{{- define "app.loggingArgs" -}}
+    {{- if eq .Values.loggingLevel "DEBUG" }}
+        -Dlogging.level.root=DEBUG \
+        -Dlogging.level.uk.ac.ebi.atlas=DEBUG \
+        -Dlogging.level.org.springframework=DEBUG
+    {{- else if eq .Values.loggingLevel "INFO" }}
+    {{- end }}
+{{- end }}
+
+{{- define "app.jvmProxyArgs" -}}
+{{- /* Convert comma-separated NO_PROXY to Java's pipe-separated format
+When used in a container, needs env variables to be set up, e.g. from a configmap.
+Notes:
+1. the last system property arg is not followed by a backslash
+2. fpr the non proxy hosts, we use substitution
+*/ -}}
+-Dhttp.proxyHost=${PROXY_HOST} \
+-Dhttp.proxyPort=${PROXY_PORT} \
+-Dhttps.proxyHost=${PROXY_HOST} \
+-Dhttps.proxyPort=${PROXY_PORT} \
+-Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
+{{- end }}
+
+{{/*
+Proxy environment variables, used in containers
+*/}}
+{{- define "app.proxyEnv" -}}
+- name: HTTP_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTP_PROXY
+- name: HTTPS_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTPS_PROXY
+- name: http_proxy
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTP_PROXY
+- name: https_proxy
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTPS_PROXY
+- name: NO_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: NO_PROXY
+- name: PROXY_HOST
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: PROXY_HOST
+- name: PROXY_PORT
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: PROXY_PORT
 {{- end }}
