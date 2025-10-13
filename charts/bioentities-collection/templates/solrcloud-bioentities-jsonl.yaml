@@ -102,7 +102,7 @@ spec:
               subPath: jdbc.properties
             - mountPath: "{{ include "app.bioentityPropertiesDir" . }}"
               name: bioentity-properties-volume
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: {{ .Values.webAppName }}-codon-volume
               mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
               subPath: species-properties.json  
               readOnly: true
