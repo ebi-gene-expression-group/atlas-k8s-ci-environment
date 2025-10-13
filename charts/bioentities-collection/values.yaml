@@ -1,7 +1,7 @@
 # Default values for bioentities-collection.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-webAppName: ""
+webAppName: "scxa"
 
 replicaCount: 1
 
@@ -44,13 +44,14 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
-  # runAsUser: 1000
+  runAsUser: 2921
+  runAsGroup: 1146
 
 service:
   type: ClusterIP
