@@ -24,6 +24,21 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+# Optional docker registry secret managed by this chart
+registrySecret:
+  create: false
+  # If empty and create=true, defaults to "{{ include \"app.fullname\" . }}-registry"
+  # name: ""
+  # Provide the full Docker config JSON content for the key ".dockerconfigjson".
+  # TIP: Populate this via CI secrets; do not commit real credentials to Git.
+  # Example content (abbreviated):
+  # {
+  #   "auths": {
+  #     "ghcr.io": {"auth": "<base64(user:token)>"}
+  #   }
+  # }
+  dockerconfigjson: ""
+
 podAnnotations: {}
 
 podSecurityContext: {}
@@ -97,3 +112,6 @@ solr:
       enabled: false
     populator:
       enabled: false
+
+jdbc:
+  createSecret: true

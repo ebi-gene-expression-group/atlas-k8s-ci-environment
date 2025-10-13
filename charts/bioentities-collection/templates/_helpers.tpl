@@ -188,3 +188,17 @@ Proxy environment variables, used in containers
       name: ebi-proxy
       key: PROXY_PORT
 {{- end }}
+
+{{/*
+Solr Zookeeper hosts URL
+*/}}
+{{- define "app.solrZkHosts" -}}
+    {{ .Values.solr.namespace }}-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
+{{- end }}
+
+{{/*
+Solr hosts URL
+*/}}
+{{- define "app.solrHost" -}}
+    {{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
+{{- end }}
