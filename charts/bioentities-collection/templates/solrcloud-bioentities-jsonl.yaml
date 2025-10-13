@@ -29,14 +29,14 @@ spec:
       volumes:
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.secretsVolume" . | nindent 8 }}
-        {{- include "app.appCodonVolume" . | nindent 8 }} # TODO: Check if this is fine
+        {{- include "app.codonVolume" . | nindent 8 }}
         {{- include "app.bioentitiesJsonlVolume" . | nindent 8 }}
         - name: bioentity-properties-volume
           emptyDir: {}
         - name: webapp-volume
           emptyDir: {}
       containers:
-        - name: {{ .Values.webAppName }}-solrcloud-bioentities-jsonl # TODO: Check if this is fine
+        - name: solrcloud-bioentities-jsonl
           image: openjdk:11
           env:
             - name: JAVA_TOOL_OPTIONS
@@ -102,7 +102,7 @@ spec:
               subPath: jdbc.properties
             - mountPath: "{{ include "app.bioentityPropertiesDir" . }}"
               name: bioentity-properties-volume
-            - name: {{ .Values.webAppName }}-codon-volume
+            - name: codon-volume
               mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
               subPath: species-properties.json  
               readOnly: true

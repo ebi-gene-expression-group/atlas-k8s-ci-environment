@@ -64,8 +64,8 @@ Create the name of the service account to use
 {{/*
 NFS volume mounts, used in deployments and jobs
 */}}
-{{- define "app.appCodonVolume" -}}
-- name: {{ .Values.webAppName }}-codon-volume
+{{- define "app.codonVolume" -}}
+- name: codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/ro/{{ .Values.webAppName }}_codon
