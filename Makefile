@@ -26,8 +26,9 @@ ifeq ($(RELEASE),gxa)
     DEPLOY_CTX_PATH = /gxa
 else ifeq ($(RELEASE),scxa)
     DEPLOY_CTX_PATH = /gxa/sc
+else ifeq ($(RELEASE),bioentities-collection)
 else
-    $(error Error: unknown RELEASE $(RELEASE). Supported values are gxa or scxa)
+    $(error Error: unknown RELEASE $(RELEASE). Supported values are gxa, scxa or bioentities-collection)
 endif
 $(info Using deploy context path: $(DEPLOY_CTX_PATH))
 
