@@ -2,5 +2,6 @@
 .env
 .dockerconfig.json
 
+.idea
 /tmp/**
 /charts/*/war/
