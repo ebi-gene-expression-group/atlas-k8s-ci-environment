@@ -68,7 +68,7 @@ NFS volume mounts, used in deployments and jobs
 - name: codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/{{ .Values.webAppName }}_codon
+    path: /ifs/public/ro/gxa_codon
 {{- end }}
 
 

@@ -85,7 +85,7 @@ spec:
               -PexperimentDesignLocation={{ include "app.bioentityPropertiesDir" . }} \
               -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
               :cli:bootRun --args="bioentities-json --output={{ include "app.bioentitiesJsonlDir" . }}"
-              
+
           volumeMounts:
             # this is the volume where the bioentity_properties files are stored
             # a subset of files are linked to the root directory
@@ -104,7 +104,7 @@ spec:
               name: bioentity-properties-volume
             - name: codon-volume
               mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
-              subPath: species-properties.json  
+              subPath: species-properties.json
               readOnly: true
             - name: webapp-volume
               mountPath: /atlas-web-bulk
