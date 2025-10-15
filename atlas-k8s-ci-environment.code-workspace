@@ -1,7 +1,7 @@
 {
 	"folders": [
 		{
-			"path": ".",
+			"path": "."
 		},
 		{
 			"path": "../index-gxa"
@@ -9,6 +9,9 @@
 		{
 			"name": "index-bioentities",
 			"path": "../index-bioentities"
+		},
+		{
+			"path": "../atlas-web-bulk"
 		}
 	],
 	"settings": {
@@ -25,6 +28,7 @@
 			}
 		],
 		"makefile.configureOnOpen": false,
-		"nextflow.telemetry.enabled": true
+		"nextflow.telemetry.enabled": true,
+		"java.compile.nullAnalysis.mode": "automatic"
 	}
 }

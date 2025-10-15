@@ -107,8 +107,8 @@ tomcat:
 loggingLevel: DEBUG
 
 jdbc:
-  populator:
-    run: false
+  # populator:
+  #   run: false
 
 solr:
   # namespace: set-per-env

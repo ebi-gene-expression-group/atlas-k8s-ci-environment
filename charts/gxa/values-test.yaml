@@ -13,11 +13,18 @@ experiment_ids: "E-CURD-23,E-CURD-30,E-ERAD-475,E-GEOD-16879,E-GEOD-18068,E-GEOD
 tomcat:
   createSecret: true
 
-loggingLevel: DEBUG
+loggingLevel: INFO
+
+debug:
+  enabled: false
+  port: 5005
+  suspend: true
 
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
   createSecret: true
+  populator:
+    enabled: false
 
 solr:
   namespace: gxa-dev-solrcloud
@@ -32,9 +39,9 @@ solr:
     loggingLevel: DEBUG
   bioentities:
     jsonl:
-      enabled: true
+      enabled: false
     populator:
-      enabled: true
+      enabled: false
       gitBranch: develop
     collection: bioentities
 
