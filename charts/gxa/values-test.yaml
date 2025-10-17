@@ -32,7 +32,7 @@ solr:
   createSecret: true
   bulkAnalytics:
     jsonl:
-      enabled: true
+      enabled: false
     populator:
       enabled: true
     collection: bulk-analytics

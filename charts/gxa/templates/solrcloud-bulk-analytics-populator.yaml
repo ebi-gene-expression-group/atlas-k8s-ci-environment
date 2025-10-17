@@ -50,7 +50,7 @@ spec:
               valueFrom:
                 configMapKeyRef:
                   name: {{ include "app.fullname" . }}-config
-                  key: SOLR_ANALYTICS_COLLECTION
+                  key: SOLR_BULK_ANALYTICS_COLLECTION
             - name: SCHEMA_VERSION
               value: "1"
             # Consider moving this to an export line in the script (?)
@@ -89,6 +89,8 @@ spec:
               name: bulk-analytics-jsonl-vol
             - mountPath: "{{ include "app.dataDir" . }}/scratch"
               name: scratch-bulk-analytics-vol
+      {{/* only wait for previous job if it is enabled */}}
+      {{- if and .Values.solr .Values.solr.bulkAnalytics.jsonl .Values.solr.bulkAnalytics.jsonl.enabled | default false -}}
       initContainers:
         - name: wait-for-previous-job
           image: dtzar/helm-kubectl:3.16.2
@@ -98,5 +100,6 @@ spec:
           - "--for=condition=complete"
           - "--timeout=1h"
           - "job/bulk-analytics-jsonl"
+      {{- end }}
       restartPolicy: Never
 {{- end }}
