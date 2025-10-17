@@ -61,6 +61,34 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/* Minimal RBAC rules for jobs read access when using kubectl in init containers */}}
+{{- define "app.jobsRbac" -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "app.fullname" . }}-jobs-reader
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "app.fullname" . }}-jobs-reader-binding
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "app.serviceAccountName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "app.fullname" . }}-jobs-reader
+{{- end }}
+
 {{/*
 NFS volume mounts, used in deployments and jobs
 */}}
