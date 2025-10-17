@@ -23,6 +23,26 @@ Other directories are the legacy k8s files that would be reorganised into helm c
 
 To install the GXA chart:
 
+Create a `.dockerconfig.json` file with content:
+
+```json
+{
+  "auths": {
+    "dockerhub.ebi.ac.uk": {
+      "username": "...",
+      "password": "..."
+    }
+  }
+}
+```
+
+This file will not be saved to git, as it is included in the `.gitignore`
+The username and password are of the access token with `read_registry` scope you create in gitlab [group](https://gitlab.ebi.ac.uk/groups/ebi-gene-expression/-/settings/access_tokens) or project’s access tokens page.
+Helm will create a `ServiceAccount` that defines an `imagePullSecret`  using which pods can access the docker image repository on gitlab. We need this because dockerhub has rate limitation, and we get many “too many requests” errors.
+
+
+run makefile
+
 ```sh
 ENV=test make deploy
 ```

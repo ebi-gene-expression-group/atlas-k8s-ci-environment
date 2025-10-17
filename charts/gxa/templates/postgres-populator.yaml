@@ -1,4 +1,4 @@
-{{- if .Values.jdbc.populator.enabled | default false -}}
+{{- if and .Values.jdbc .Values.jdbc.populator (.Values.jdbc.populator.enabled | default false) -}}
 apiVersion: batch/v1
 kind: Job
 metadata:

@@ -153,17 +153,7 @@ Root directory for data mounts
 Gradle CLI arguments for running the CLI application
 */}}
 {{- define "app.gradleCliArgs" -}} 
-{{ include "app.jvmProxyArgs" . }} \
-{{- include "app.loggingArgs" . }}
-{{- end }}
-
-{{- define "app.loggingArgs" -}}
-{{- if eq .Values.loggingLevel "DEBUG" }}
--Dlogging.level.root=DEBUG \
--Dlogging.level.uk.ac.ebi.atlas=DEBUG \
--Dlogging.level.org.springframework=DEBUG 
-{{- else if eq .Values.loggingLevel "INFO" }}
-{{- end }}
+{{ include "app.jvmProxyArgs" . }} 
 {{- end }}
 
 {{/*
