@@ -8,3 +8,7 @@ type: application
 version: 0.1.1
 
 appVersion: "17.2.0"
+
+dependencies:
+  - name: bioentities-collection
+    version: "0.1.0"
