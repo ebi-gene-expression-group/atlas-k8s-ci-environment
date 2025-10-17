@@ -16,6 +16,8 @@ solr:
   bioentities:
     jsonl:
       enabled: true
+    populator:
+      enabled: true
     collection: bioentities
 
 

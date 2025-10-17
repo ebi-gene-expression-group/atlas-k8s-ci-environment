@@ -111,6 +111,7 @@ solr:
       enabled: false
     populator:
       enabled: false
+      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
 
 jdbc:
   createSecret: true
