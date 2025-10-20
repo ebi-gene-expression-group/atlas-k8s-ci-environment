@@ -1,0 +1,16 @@
+# values for gxa test env
+environment: test
+
+loggingLevel: DEBUG
+
+jdbc:
+  url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
+  createSecret: true
+
+solr:
+  namespace: scxa-dev-solrcloud
+  user: admin
+  createSecret: true
+
+nfs:
+  snapshotComponent: experiments_test

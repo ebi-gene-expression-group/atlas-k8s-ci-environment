@@ -23,6 +23,20 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
+registrySecret:
+  create: false
+  # If empty and create=true, defaults to "{{ include \"app.fullname\" . }}-registry"
+  # name: ""
+  # Provide the full Docker config JSON content for the key ".dockerconfigjson".
+  # TIP: Populate this via CI secrets; do not commit real credentials to Git.
+  # Example content (abbreviated):
+  # {
+  #   "auths": {
+  #     "ghcr.io": {"auth": "<base64(user:token)>"}
+  #   }
+  # }
+  dockerconfigjson: ""
+
 podAnnotations: {}
 
 podSecurityContext: {}
@@ -80,3 +94,17 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+solr:
+  namespace: scxa-dev-solrcloud
+  user: admin
+  numShards: "4"
+  timeout: "30000"
+  createSecret: true
+  scxaAnalytics:
+    populator:
+      enabled: true
+    collection: scxa-analytics
+
+nfs:
+  server: hh-isi-srv-vlan1496.ebi.ac.uk

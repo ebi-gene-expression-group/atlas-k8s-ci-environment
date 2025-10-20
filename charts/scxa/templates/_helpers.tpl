@@ -60,3 +60,93 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Root directory for data mounts
+*/}}
+{{- define "app.dataDir" -}}
+/atlas-data
+{{- end }}
+
+{{- define "app.experimentsDir" -}}
+{{ include "app.dataDir" . }}/exp
+{{- end }}
+
+{{- define "app.servicesDir" -}}
+{{ include "app.dataDir" . }}/services
+{{- end }}
+
+{{/*
+NFS volume mounts, used in deployments and jobs
+*/}}
+
+{{- define "app.servicesVolume" -}}
+- name: services-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/services
+{{- end }}
+
+{{/*
+Secrets volume mount
+*/}}
+{{- define "app.secretsVolume" -}}
+- name: {{ include "app.name" . }}-secrets
+  secret:
+    secretName: {{ include "app.fullname" . }}-secrets
+{{- end }}
+
+{{/*
+Proxy environment variables, used in containers
+*/}}
+{{- define "app.proxyEnv" -}}
+- name: HTTP_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTP_PROXY
+- name: HTTPS_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTPS_PROXY
+- name: http_proxy
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTP_PROXY
+- name: https_proxy
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: HTTPS_PROXY
+- name: NO_PROXY
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: NO_PROXY
+- name: PROXY_HOST
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: PROXY_HOST
+- name: PROXY_PORT
+  valueFrom:
+    configMapKeyRef:
+      name: ebi-proxy
+      key: PROXY_PORT
+{{- end }}
+
+{{/*
+Solr Zookeeper hosts URL
+*/}}
+{{- define "app.solrZkHosts" -}}
+{{ .Values.solr.namespace }}-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
+{{- end }}
+
+{{/*
+Solr hosts URL
+*/}}
+{{- define "app.solrHost" -}}
+{{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
+{{- end }}
