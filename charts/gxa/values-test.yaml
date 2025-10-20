@@ -35,6 +35,7 @@ solr:
       enabled: false
     populator:
       enabled: true
+      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
     collection: bulk-analytics
     loggingLevel: DEBUG
   bioentities:
@@ -42,7 +43,7 @@ solr:
       enabled: false
     populator:
       enabled: false
-      gitBranch: develop
+      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
     collection: bioentities
 
 

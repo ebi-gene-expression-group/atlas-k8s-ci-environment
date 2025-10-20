@@ -27,6 +27,19 @@ spec:
         - name: {{ include "app.name" . }}-solrcloud-populator
           image: openjdk:11
           env:
+            {{- include "app.proxyEnv" . | nindent 12 }}
+            # From Secret (sensitive credentials)
+            - name: SOLR_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_USER
+            - name: SOLR_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_PASS
+            # From ConfigMap (non-sensitive configuration)
             - name: SOLR_HOST
               valueFrom:
                 configMapKeyRef:
@@ -37,6 +50,11 @@ spec:
                 configMapKeyRef:
                   name: {{ include "app.fullname" . }}-config
                   key: SOLR_HOST
+            - name: SOLR_COLLECTION
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_BULK_ANALYTICS_COLLECTION
             - name: SOLR_NUM_SHARDS
               valueFrom:
                 configMapKeyRef:
@@ -46,16 +64,13 @@ spec:
               value: "10000"
             - name: SOLR_COMMIT_DOCS
               value: "500000"
-            - name: SOLR_COLLECTION
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "app.fullname" . }}-config
-                  key: SOLR_BULK_ANALYTICS_COLLECTION
             - name: SCHEMA_VERSION
               value: "1"
             # Consider moving this to an export line in the script (?)
             - name: SOLR_PROCESSORS
               value: "dedupe"
+            - name: GIT_BRANCH
+              value: {{ .Values.solr.bulkAnalytics.populator.gitBranch | default "develop" | quote }}
           resources:
             requests:
               cpu: 0.5
@@ -71,19 +86,24 @@ spec:
               
               cd /work
               
-              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/index-bioentities.git
-              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/solr-bulk.git
+              git clone --recurse-submodules --depth 1 --single-branch --branch ${GIT_BRANCH} https://github.com/ebi-gene-expression-group/index-bioentities.git
+              git clone --recurse-submodules --depth 1 --single-branch --branch ${GIT_BRANCH} https://github.com/ebi-gene-expression-group/solr-bulk.git
               
               cd /work/solr-bulk/bin
               ./create-bulk-analytics-collection.sh
               ./create-bulk-analytics-schema.sh
 
-              # We go back to index-bioentities/bin because the solr-jsonl-chunk-loader.sh script isn’t in the solr-bulk repository
+              # We go back to index-bioentities/bin because the solr-jsonl-chunk-loader.sh script isn't in the solr-bulk repository
               cd {{ include "app.dataDir" . }}/scratch
-              for FILE in `ls {{include "app.bulkAnalyticsJsonlDir" . }}/*.jsonl`
+              for FILE in `ls -Sr {{include "app.bulkAnalyticsJsonlDir" . }}/*.jsonl`
               do
-                INPUT_JSONL=${FILE} /work/index-bioentities/bin/solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
+                INPUT_JSONL=${FILE} /work/index-bioentities/bin/solr-jsonl-chunk-loader.sh \
+                  >> /dev/stdout 2>&1 \
+                  || echo "ERROR: Failed to process file: ${FILE}"
               done
+              {{- if .Values.debug.enabled }}
+              sleep 60000
+              {{- end }}
           volumeMounts:
             - mountPath: "{{ include "app.bulkAnalyticsJsonlDir" . }}"
               name: bulk-analytics-jsonl-vol
