@@ -55,6 +55,22 @@ spec:
           #   periodSeconds: 30
           #   timeoutSeconds: 10
           #   failureThreshold: 20
+          env:
+            # From Secret (sensitive credentials)
+            - name: SOLR_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_USER
+            - name: SOLR_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_PASS
+            {{- /* These properties are required so that the bioentities SolrClient create 
+             in the SolrConfig class is authenticated */}}
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
