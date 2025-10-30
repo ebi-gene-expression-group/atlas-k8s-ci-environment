@@ -104,7 +104,7 @@ solr:
   scxaAnalytics:
     populator:
       enabled: true
-    collection: scxa-analytics
+    collection: scxa-analytics-v8
 
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
