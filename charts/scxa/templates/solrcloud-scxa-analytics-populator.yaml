@@ -20,11 +20,10 @@ spec:
               - key: solrcloud.pem
                 path: scxa-solrcloud.pem
         {{- include "app.secretsVolume" . | nindent 8 }}
+        {{- include "app.scxaCodonVolume" . | nindent 8 }}
         - name: solr-config
           configMap:
             name: {{ include "app.fullname" . }}-config
-        - name: {{ include "app.name" . }}-data-vol
-          emptyDir: { }
       containers:
         - name: scxa-analytics-populator
           image: openjdk:11
@@ -38,7 +37,12 @@ spec:
             - name: SIGNING_PRIVATE_KEY
               value: "/keys/scxa-solrcloud.pem"
             - name: SCXA_ONTOLOGY
-              value: "/var/solr/data/userfiles/scatlas.owl"
+              value: "file://var/solr/data/userfiles/scatlas.owl"
+            - name: EXP_IDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: experiment_ids
             {{- include "app.proxyEnv" . | nindent 12 }}
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -100,13 +104,7 @@ spec:
               # install dependencies, TODO: should build an use a custom image with dependencies installed
               apt-get update && apt-get install -y jq
 
-              mkdir {{ include "app.experimentsDir" . }}/magetab
-              ln -s {{ include "app.servicesDir" . }}/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* \
-                    {{ include "app.experimentsDir" . }}/magetab
-
-              mkdir /work
-
-              cd /work
+              mkdir /work && cd /work
 
               git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/index-scxa.git
 
@@ -116,18 +114,20 @@ spec:
               ./create-scxa-analytics-collection.sh
               ./create-scxa-analytics-schema.sh
               ./create-scxa-analytics-suggesters.sh
+
               for EXP_ID in ${EXP_IDS}
               do
                 CONDENSED_SDRF_TSV=/atlas-data/exp/magetab/$${EXP_ID}/$${EXP_ID}.condensed-sdrf.tsv \
                 ./load-scxa-analytics.sh
               done
+
               ./build-scxa-analytics-suggestions.sh
           volumeMounts:
+            - name: {{ include "app.name" . }}-codon-volume
+              mountPath: {{ include "app.dataDir" . }}/exp/magetab
             - name: scxa-biosolr-private-key-vol
               mountPath: /keys
               readOnly: true
-            - name: {{ include "app.name" . }}-data-vol
-              mountPath: "{{ include "app.experimentsDir" . }}"
             - name: solr-config
               mountPath: /etc/solr
               readOnly: true

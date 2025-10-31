@@ -80,6 +80,13 @@ Root directory for data mounts
 NFS volume mounts, used in deployments and jobs
 */}}
 
+{{- define "app.scxaCodonVolume" -}}
+- name: {{ include "app.name" . }}-codon-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/ro/scxa_codon/atlas_sc_experiments
+{{- end }}
+
 {{- define "app.servicesVolume" -}}
 - name: services-volume
   nfs:
