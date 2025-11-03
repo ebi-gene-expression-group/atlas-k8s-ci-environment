@@ -153,6 +153,7 @@ Root directory for data mounts
 Gradle CLI arguments for running the CLI application
 */}}
 {{- define "app.gradleCliArgs" -}} 
+--quiet \
 {{ include "app.jvmProxyArgs" . }} 
 {{- end }}
 

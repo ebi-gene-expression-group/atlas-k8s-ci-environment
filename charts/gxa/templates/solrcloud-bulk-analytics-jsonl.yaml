@@ -1,18 +1,4 @@
 {{- if and .Values.solr .Values.solr.bulkAnalytics.jsonl .Values.solr.bulkAnalytics.jsonl.enabled | default false -}}
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: bulk-analytics-jsonl-rwo
-  labels:
-    {{- include "app.labels" . | nindent 4 }}
-spec:
-  storageClassName: standard-nfs-production 
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 200Gi
----
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -103,7 +89,7 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              set -e
+              # set -e
 
               git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/atlas-web-bulk.git
               cp /secrets/jdbc.properties \
@@ -156,9 +142,9 @@ spec:
               subPath: jdbc.properties
 
       {{/* only wait for previous job if it is enabled */}}
-      {{- if and .Values.solr .Values.solr.bioentities.jsonl .Values.solr.bioentities.jsonl.enabled | default false -}}
+      {{- if and .Values.solr .Values.solr.bioentities.populator .Values.solr.bioentities.populator.enabled | default false -}}
       initContainers:
-      - name: wait-for-previous-job1
+      - name: wait-for-previous-job
         image: dtzar/helm-kubectl:3.16.2
         command: ["kubectl"]
         args:
