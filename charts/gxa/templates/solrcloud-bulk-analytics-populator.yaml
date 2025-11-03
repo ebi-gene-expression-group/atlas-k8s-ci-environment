@@ -73,10 +73,10 @@ spec:
               value: {{ .Values.solr.bulkAnalytics.populator.gitBranch | default "develop" | quote }}
           resources:
             requests:
-              cpu: 0.5
+              cpu: "0.5"
               memory: 256Mi
             limits:
-              cpu: 0.55
+              cpu: "0.55"
               memory: 1Gi
           command: ["/bin/bash", "-c"]
           args:

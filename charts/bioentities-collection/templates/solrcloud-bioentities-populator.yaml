@@ -22,6 +22,8 @@ spec:
         - name: {{ include "app.name" . }}-solrcloud-populator
           image: openjdk:11
           env:
+            - name: JAVA_TOOLS_OPTIONS
+              value: "-Dfile.encoding=UTF-8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"${SOLR_USER}:${SOLR_PASS}\""
             {{- include "app.proxyEnv" . | nindent 12 }}
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -74,21 +76,21 @@ spec:
               value: {{ .Values.solr.bioentities.populator.gitBranch | default "develop" | quote }}
           resources:
             requests:
-              cpu: 1
+              cpu: "1"
               memory: 500Mi
             limits:
-              cpu: 1
+              cpu: "1"
               memory: 1Gi
           command: ["/bin/bash", "-c"]
           args:
-            - |  
-              set -ev            
+            - |
+              set -ev
               mkdir /work
-              
+
               cd /work
-              
+
               git clone --recurse-submodules --depth 1 --single-branch --branch ${GIT_BRANCH} https://github.com/ebi-gene-expression-group/index-bioentities.git
-  
+
               cd index-bioentities/bin
               ./create-bioentities-collection.sh
               ./create-bioentities-schema.sh

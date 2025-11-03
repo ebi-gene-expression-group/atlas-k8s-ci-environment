@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/component: webapp
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.autoscaling.minReplicas }}
   {{- end }}
   selector:
     matchLabels:
@@ -33,7 +33,7 @@ spec:
         - name: {{ include "app.name" . }}-webapp
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -188,7 +188,7 @@ spec:
             - name: experiments-snapshot
               mountPath: /experiments_snapshot                 
         - name: {{ include "app.name" . }}-init-tomcat-manager
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [ "sh"]
           args:

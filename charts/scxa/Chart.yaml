@@ -1,7 +1,0 @@
-apiVersion: v2
-icon: "https://www.ebi.ac.uk/gxa/resources/images/expression-atlas.png"
-name: scxa
-description: A Helm chart for Kubernetes for the deployment of Single Cell Expression Atlas
-type: application
-version: 0.1.0
-appVersion: "37.4.0"
