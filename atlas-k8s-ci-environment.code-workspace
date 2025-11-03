@@ -1,17 +1,20 @@
 {
 	"folders": [
 		{
+			"name": "atlas-k8s-ci-environment",
 			"path": "."
 		},
 		{
-			"path": "../index-gxa"
+			"name": "atlas-web-bulk",
+			"path": "../atlas-web-bulk"
 		},
 		{
 			"name": "index-bioentities",
 			"path": "../index-bioentities"
 		},
 		{
-			"path": "../atlas-web-bulk"
+			"name": "solr-bulk",
+			"path": "../solr-bulk"
 		}
 	],
 	"settings": {

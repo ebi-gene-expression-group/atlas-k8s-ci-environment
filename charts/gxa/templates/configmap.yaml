@@ -46,7 +46,7 @@ data:
     experiment.files.location = {{- include "app.experimentsDir" . }}
     experiment.design.location= {{ include "app.expdesignDir" . }}
 
-  experiment_ids: {{ .Values.experiment_ids}}
+  experiment_ids: {{ .Values.experiment_ids | quote }}
 
   logback.xml: |
     <configuration>
@@ -73,6 +73,7 @@ data:
   SOLR_HOST: "{{ include "app.solrHost" . }}"
   SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
   SOLR_BIOENTITIES_COLLECTION: "{{ .Values.solr.bioentities.collection  }}"
+  SOLR_BULK_ANALYTICS_COLLECTION: "{{ .Values.solr.bulkAnalytics.collection  }}"
   SOLR_BULK_ANALYTICS_NUM_SHARDS: "{{ .Values.solr.bulkAnalytics.numShards | default "4" }}"
   SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
   SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"

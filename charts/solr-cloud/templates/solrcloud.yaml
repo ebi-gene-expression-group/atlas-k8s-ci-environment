@@ -28,6 +28,7 @@ spec:
           memory: {{ .Values.solr.resources.limits.memory }}
         requests:
           memory: {{ .Values.solr.resources.requests.memory }}
+      {{- if .Values.solr.secret.enabled }}
       volumes:
         - name: keys-secret
           source:
@@ -36,6 +37,7 @@ spec:
           defaultContainerMount:
             name: keys-secret
             mountPath: {{ .Values.solr.secret.mountPath }}
+      {{- end }}
   zookeeperRef:
     provided:
       persistence:

@@ -45,7 +45,7 @@ $(info Using environment: $(ENV))
 ENV_VALUES = charts/$(RELEASE)/values-$(ENV).yaml
 NAMESPACE = $(RELEASE)-$(ENV)
 APP_VERSION = 37.0.5
-
+CURL_DEBUG_OPTS=--progress-bar
 # Simple variables for node hostname and port
 NODE_HOSTNAME ?= $(shell kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
@@ -114,21 +114,36 @@ deploy-war:
 		echo "ERROR: Failed to get deployer password"; \
 		exit 1; \
 	fi; \
-	echo "Deploying WAR file... to $(TOMCAT_SERVER_URL)"; \
+	echo "$(BOLD)$(GREEN)Deploying WAR file... to $(TOMCAT_SERVER_URL)$(RESET)"; \
 	curl -u deployer:$$DEPLOYER_PASSWORD \
 		--fail \
 		--include \
-		--verbose \
-		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=$(DEPLOY_CTX_PATH)&update=true" \
+		$(CURL_DEBUG_OPTS) \
+		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=/gxa&update=true" \
 		--upload-file $(WAR_FILE_DIR)/gxa.war; \
-	echo "Listing deployed applications..."; \
-	curl -u deployer:$$DEPLOYER_PASSWORD \
+	echo "$(BOLD)$(GREEN)Listing deployed applications...$(RESET)"; \
+	curl -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \
-		--verbose \
+		$(CURL_DEBUG_OPTS) \
 		"$(TOMCAT_SERVER_URL)/manager/text/list"; \
-	echo "Checking application homepage..."; \
+	echo "$(BOLD)$(GREEN)Checking application homepage...$(RESET)"; \
 	curl --fail \
 		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)" \
+		--location \
+		-O
+	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
+	curl --fail \
+		"$(TOMCAT_SERVER_URL)/gxa/experiments" \
+		--location \
+		-O
+	@echo "$(BOLD)$(GREEN)Checking app health check endpoint ...$(RESET)"; \
+	curl --fail \
+		"$(TOMCAT_SERVER_URL)/gxa/json/health" \
+		--location
+
+	@echo "$(BOLD)$(GREEN)Checking experiment REST resource ...$(RESET)"; \
+	curl --fail \
+		"$(TOMCAT_SERVER_URL)/gxa/json/experiments/E-MTAB-3827" \
 		--location \
 		-O
 

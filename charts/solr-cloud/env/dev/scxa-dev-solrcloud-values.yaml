@@ -1,11 +1,9 @@
-namespace: scxa-dev-solrcloud
-
 solr:
   replicas: 4
   image:
     tag: 8.7.0
   javaMem: "-Xms2000m -Xmx3000m"
-  opts: "-Denable.packages=true -Dblob.max.size.mb=100"
+  opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983"
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
   resources:
     limits:
@@ -17,6 +15,7 @@ solr:
     size: 20Gi
     reclaimPolicy: Retain
   secret:
+    enabled: false
     name: scxa-solrcloud-package-store-keys
     mountPath: /keys
 
@@ -28,3 +27,6 @@ zookeeper:
   resources:
     limits:
       memory: 512Mi
+
+service:
+   nodePort: null   # Assign a port (30000–32767)
