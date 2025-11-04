@@ -149,17 +149,14 @@ Root directory for data mounts
 Gradle CLI arguments for running the CLI application
 */}}
 {{- define "app.gradleCliArgs" -}}
-    {{ include "app.jvmProxyArgs" . }} \
-    {{- include "app.loggingArgs" . }}
+{{ include "app.jvmProxyArgs" . }}
 {{- end }}
 
 {{- define "app.loggingArgs" -}}
-    {{- if eq .Values.loggingLevel "DEBUG" }}
-        -Dlogging.level.root=DEBUG \
-        -Dlogging.level.uk.ac.ebi.atlas=DEBUG \
-        -Dlogging.level.org.springframework=DEBUG
-    {{- else if eq .Values.loggingLevel "INFO" }}
-    {{- end }}
+{{- if eq .Values.loggingLevel "DEBUG" }}
+-Dlogging.level.root=DEBUG -Dlogging.level.uk.ac.ebi.atlas=DEBUG -Dlogging.level.org.springframework=DEBUG
+{{- else if eq .Values.loggingLevel "INFO" }}
+{{- end }}
 {{- end }}
 
 {{- define "app.jvmProxyArgs" -}}
@@ -169,11 +166,7 @@ Notes:
 1. the last system property arg is not followed by a backslash
 2. fpr the non proxy hosts, we use substitution
 */ -}}
--Dhttp.proxyHost=${PROXY_HOST} \
--Dhttp.proxyPort=${PROXY_PORT} \
--Dhttps.proxyHost=${PROXY_HOST} \
--Dhttps.proxyPort=${PROXY_PORT} \
--Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
+-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
 {{- end }}
 
 {{/*
