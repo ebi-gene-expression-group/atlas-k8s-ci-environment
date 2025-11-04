@@ -16,3 +16,15 @@ nfs:
   snapshotComponent: experiments_test
 
 experiment_ids: "E-CURD-4 E-EHCA-2 E-GEOD-71585 E-GEOD-81547 E-GEOD-99058 E-MTAB-5061 E-ENAD-53"
+
+bioentities-collection:
+  enabled: true
+  jdbc:
+    url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
+    createSecret: true
+  solr:
+    bioentities:
+      jsonl:
+        enabled: true
+      populator:
+        enabled: true

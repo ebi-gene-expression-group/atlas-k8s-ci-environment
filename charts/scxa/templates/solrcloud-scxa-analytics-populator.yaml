@@ -139,6 +139,6 @@ spec:
           - "wait"
           - "--for=condition=complete"
           - "--timeout=1h"
-          - "job/bioentities-jsonl"
+          - "job/bioentities-populator"
       restartPolicy: Never
 {{- end }}

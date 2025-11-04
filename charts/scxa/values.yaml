@@ -106,14 +106,8 @@ solr:
       enabled: true
     collection: scxa-analytics-v8
 
+jdbc:
+  createSecret: true
+
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
-
-bioentities-collection:
-  enabled: true
-  solr:
-    bioentities:
-      jsonl:
-        enabled: true
-      populator:
-        enabled: true

@@ -58,8 +58,9 @@ WAR_FILE_DIR ?= charts/$(RELEASE)/war
 # Set helm --set arguments based on environment variables
 HELM_SET_ARGS = --set appVersion=$(APP_VERSION)
 ifdef JDBC_PASSWORD
-$(info Setting jdbc.password from JDBC_PASSWORD environment variable)
+$(info Setting jdbc.password and bioentities-collection.jdbc.password from JDBC_PASSWORD environment variable)
 HELM_SET_ARGS += --set jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
+HELM_SET_ARGS += --set bioentities-collection.jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
 endif
 ifdef SOLR_PASSWORD
 $(info Setting solr.password from SOLR_PASSWORD environment variable)
