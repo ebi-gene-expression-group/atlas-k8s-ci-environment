@@ -23,8 +23,15 @@ bioentities-collection:
     url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
     createSecret: true
   solr:
+    namespace: "scxa-dev-solrcloud"
+    user: admin
+    numShards: "4"
+    timeout: "30000"
+    createSecret: true
     bioentities:
+      collection: bioentities
       jsonl:
         enabled: true
       populator:
         enabled: true
+        gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
