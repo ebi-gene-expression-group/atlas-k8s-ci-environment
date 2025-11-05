@@ -1,13 +1,14 @@
-# Default values for bioentities-collection.
+# Default values for scxa.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
+
 replicaCount: 1
 
 image:
-  repository: nginx
+  repository: tomcat
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "8-jdk11"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -22,7 +23,6 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-# Optional docker registry secret managed by this chart
 registrySecret:
   create: false
   # If empty and create=true, defaults to "{{ include \"app.fullname\" . }}-registry"
@@ -42,17 +42,16 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext:
+securityContext: {}
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
-#  runAsUser: 2921
-#  runAsGroup: 1146
+  # runAsUser: 1000
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
 
 ingress:
@@ -96,24 +95,19 @@ tolerations: []
 
 affinity: {}
 
-nfs:
-  server: hh-isi-srv-vlan1496.ebi.ac.uk
-  snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
-
 solr:
+  namespace: scxa-dev-solrcloud
   user: admin
   numShards: "4"
   timeout: "30000"
   createSecret: true
-  bioentities:
-    collection: bioentities
-    jsonl:
-      enabled: false
+  scxaAnalytics:
     populator:
-      enabled: false
-      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
+      enabled: true
+    collection: scxa-analytics-v8
 
 jdbc:
   createSecret: true
 
-experiment_ids: ""
+nfs:
+  server: hh-isi-srv-vlan1496.ebi.ac.uk

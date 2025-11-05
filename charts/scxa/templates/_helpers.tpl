@@ -61,56 +61,37 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{/* Minimal RBAC rules for jobs read access when using kubectl in init containers */}}
-{{- define "app.jobsRbac" -}}
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "app.fullname" . }}-jobs-reader
-  labels:
-    {{- include "app.labels" . | nindent 4 }}
-rules:
-- apiGroups: ["batch"]
-  resources: ["jobs"]
-  verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "app.fullname" . }}-jobs-reader-binding
-  labels:
-    {{- include "app.labels" . | nindent 4 }}
-subjects:
-- kind: ServiceAccount
-  name: {{ include "app.serviceAccountName" . }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "app.fullname" . }}-jobs-reader
+{{/*
+Root directory for data mounts
+*/}}
+{{- define "app.dataDir" -}}
+/atlas-data
+{{- end }}
+
+{{- define "app.experimentsDir" -}}
+{{ include "app.dataDir" . }}/exp
+{{- end }}
+
+{{- define "app.servicesDir" -}}
+{{ include "app.dataDir" . }}/services
 {{- end }}
 
 {{/*
 NFS volume mounts, used in deployments and jobs
 */}}
-{{- define "app.codonVolume" -}}
-- name: codon-volume
+
+{{- define "app.scxaCodonVolume" -}}
+- name: {{ include "app.name" . }}-codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/gxa_codon
+    path: /ifs/public/ro/scxa_codon/atlas_sc_experiments
 {{- end }}
-
 
 {{- define "app.servicesVolume" -}}
 - name: services-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/services
-{{- end }}
-
-{{- define "app.bioentitiesJsonlVolume" -}}
-- name: bioentities-jsonl-vol
-  persistentVolumeClaim:
-    claimName: bioentities-jsonl-rwo
 {{- end }}
 
 {{/*
@@ -120,53 +101,6 @@ Secrets volume mount
 - name: {{ include "app.name" . }}-secrets
   secret:
     secretName: {{ include "app.fullname" . }}-secrets
-{{- end }}
-
-{{/*
-Root directory for data mounts
-*/}}
-{{- define "app.dataDir" -}}
-    /atlas-data
-{{- end }}
-
-{{- define "app.experimentsDir" -}}
-    {{ include "app.dataDir" . }}/exp
-{{- end }}
-
-{{- define "app.bioentityPropertiesDir" -}}
-    {{ include "app.dataDir" . }}/bioentity_properties
-{{- end }}
-
-{{- define "app.bioentityPropertiesSourceDir" -}}
-    {{ include "app.dataDir" . }}/bioentity_properties_source
-{{- end }}
-
-{{- define "app.bioentitiesJsonlDir" -}}
-    {{ include "app.dataDir" . }}/bioentities-jsonl
-{{- end }}
-
-{{/*
-Gradle CLI arguments for running the CLI application
-*/}}
-{{- define "app.gradleCliArgs" -}}
-{{ include "app.jvmProxyArgs" . }}
-{{- end }}
-
-{{- define "app.loggingArgs" -}}
-{{- if eq .Values.loggingLevel "DEBUG" }}
--Dlogging.level.root=DEBUG -Dlogging.level.uk.ac.ebi.atlas=DEBUG -Dlogging.level.org.springframework=DEBUG
-{{- else if eq .Values.loggingLevel "INFO" }}
-{{- end }}
-{{- end }}
-
-{{- define "app.jvmProxyArgs" -}}
-{{- /* Convert comma-separated NO_PROXY to Java's pipe-separated format
-When used in a container, needs env variables to be set up, e.g. from a configmap.
-Notes:
-1. the last system property arg is not followed by a backslash
-2. fpr the non proxy hosts, we use substitution
-*/ -}}
--Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
 {{- end }}
 
 {{/*
@@ -214,12 +148,12 @@ Proxy environment variables, used in containers
 Solr Zookeeper hosts URL
 */}}
 {{- define "app.solrZkHosts" -}}
-    {{ .Values.solr.namespace }}-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
+{{ .Values.solr.namespace }}-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
 {{- end }}
 
 {{/*
 Solr hosts URL
 */}}
 {{- define "app.solrHost" -}}
-    {{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
+{{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
 {{- end }}
