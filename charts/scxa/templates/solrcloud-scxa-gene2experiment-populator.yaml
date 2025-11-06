@@ -1,0 +1,121 @@
+{{- if and .Values.solr .Values.solr.gene2experiment.populator .Values.solr.scxaAnalytics.populator.enabled | default false -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scxa-gene2experiment-populator
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
+      volumes:
+        {{- include "app.secretsVolume" . | nindent 8 }}
+        {{- include "app.scxaCodonVolume" . | nindent 8 }}
+        - name: solr-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+      containers:
+        - name: scxa-gene2experiment-populator
+          image: openjdk:11
+          env:
+            - name: JAVA_TOOLS_OPTIONS
+              value: "-Dfile.encoding=UTF-8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"${SOLR_USER}:${SOLR_PASS}\""
+            - name: EXP_IDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: experiment_ids
+            {{- include "app.proxyEnv" . | nindent 12 }}
+            # From Secret (sensitive credentials)
+            - name: SOLR_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_USER
+            - name: SOLR_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_PASS
+            # From ConfigMap (non-sensitive configuration)
+            - name: SOLR_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_HOST
+            - name: SOLR_HOSTS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_HOST
+            - name: SOLR_ZK_HOSTS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_ZK_HOSTS
+            - name: SOLR_COLLECTION
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_SCXA_GENE2EXPERIMENT_COLLECTION
+            - name: SOLR_NUM_SHARDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_NUM_SHARDS
+            - name: SOLR_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: SOLR_TIMEOUT
+            # Job-specific environment variables
+            - name: SCHEMA_VERSION
+              value: "1"
+          resources:
+            requests:
+              cpu: "1"
+              memory: 500Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -ev
+
+              mkdir /work && cd /work
+
+              git clone --recurse-submodules --depth 1 --single-branch https://github.com/ebi-gene-expression-group/index-scxa.git
+
+              cd index-scxa/bin
+              export PATH=.:$${PATH}
+
+              ./create-scxa-gene2experiment-collection.sh
+              ./create-scxa-gene2experiment-schema.sh
+              for EXP_ID in ${EXP_IDS}
+              do
+              EXP_ID=$${EXP_ID} \
+              MATRIX_MARKT_ROWS_GENES_FILE=/atlas-data/exp/magetab/$${EXP_ID}/$${EXP_ID}.aggregated_filtered_normalised_counts.mtx_rows \
+              ./load-scxa-gene2experiment.sh
+              done
+          volumeMounts:
+            - name: {{ include "app.name" . }}-codon-volume
+              mountPath: {{ include "app.dataDir" . }}/exp/magetab
+            - name: solr-config
+              mountPath: /etc/solr
+              readOnly: true
+      initContainers:
+        - name: wait-for-previous-job
+          image: dtzar/helm-kubectl:3.16.2
+          command: ["kubectl"]
+          args:
+          - "wait"
+          - "--for=condition=complete"
+          - "--timeout=1h"
+          - "job/scxa-analytics-populator"
+      restartPolicy: Never
+{{- end }}
