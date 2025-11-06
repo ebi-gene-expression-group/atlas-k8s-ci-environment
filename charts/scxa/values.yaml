@@ -105,6 +105,10 @@ solr:
     populator:
       enabled: true
     collection: scxa-analytics-v8
+  gene2experiment:
+    populator:
+      enabled: true
+    collection: scxa-gene2experiment-v1
 
 jdbc:
   createSecret: true
