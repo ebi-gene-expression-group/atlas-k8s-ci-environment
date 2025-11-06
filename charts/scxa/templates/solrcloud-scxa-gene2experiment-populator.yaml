@@ -1,4 +1,4 @@
-{{- if and .Values.solr .Values.solr.gene2experiment.populator .Values.solr.scxaAnalytics.populator.enabled | default false -}}
+{{- if and .Values.solr .Values.solr.gene2experiment.populator .Values.solr.gene2experiment.populator.enabled | default false -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
