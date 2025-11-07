@@ -49,3 +49,22 @@ solr:
 
 nfs:
   snapshotComponent: experiments_test
+
+bioentities-collection:
+  enabled: true
+  jdbc:
+    url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
+    createSecret: true
+  solr:
+    namespace: "gxa-dev-solrcloud"
+    user: admin
+    numShards: "4"
+    timeout: "30000"
+    createSecret: true
+    bioentities:
+      collection: bioentities
+      jsonl:
+        enabled: true
+      populator:
+        enabled: true
+        gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
