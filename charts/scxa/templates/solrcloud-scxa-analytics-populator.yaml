@@ -20,7 +20,7 @@ spec:
               - key: solrcloud.pem
                 path: scxa-solrcloud.pem
         {{- include "app.secretsVolume" . | nindent 8 }}
-        {{- include "app.scxaCodonVolume" . | nindent 8 }}
+        {{- include "app.scxaExperimentsVolume" . | nindent 8 }}
         - name: solr-config
           configMap:
             name: {{ include "app.fullname" . }}-config
@@ -123,7 +123,7 @@ spec:
 
               ./build-scxa-analytics-suggestions.sh
           volumeMounts:
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: {{ include "app.name" . }}-exp-volume
               mountPath: {{ include "app.dataDir" . }}/exp/magetab
             - name: scxa-biosolr-private-key-vol
               mountPath: /keys

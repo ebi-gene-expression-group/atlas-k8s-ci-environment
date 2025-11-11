@@ -4,6 +4,7 @@ metadata:
   name: {{ include "app.fullname" . }}
   labels:
     {{- include "app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webapp
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -19,6 +20,7 @@ spec:
       {{- end }}
       labels:
         {{- include "app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: webapp
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -28,25 +30,122 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ include "app.name" . }}-webapp
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "tomcat:8-jdk11" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.tomcat.httpPort }}
               protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
+          env:
+            # From Secret (sensitive credentials)
+            - name: SOLR_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_USER
+            - name: SOLR_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-secrets
+                  key: SOLR_PASS
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: {{ include "app.name" . }}-exp-volume
+              mountPath: {{ include "app.dataDir" . }}/exp/magetab
+            - name: {{ include "app.name" . }}-codon-volume
+              mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
+              subPath: release-metadata.json
+              readOnly: true
+            - name: {{ include "app.name" . }}-codon-volume
+              mountPath: {{ include "app.experimentsDir" . }}/species-properties.json
+              subPath: species-properties.json
+              readOnly: true
+            - name: services-volume
+              mountPath: {{ include "app.dataDir" . }}/bioentity_properties
+              subPath: fg/atlas/bioentity_properties
+              readOnly: true
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
+              subPath: tomcat-users.xml
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: /webapp-properties/jdbc.properties
+              subPath: jdbc.properties
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: /webapp-properties/solr.properties
+              subPath: solr.properties
+            - name: configuration-properties
+              mountPath: /webapp-properties/configuration.properties
+              subPath: configuration.properties
+            - name: tomcat-logback-xml
+              mountPath: /webapp-properties/logback.xml
+              subPath: logback.xml
+            - name: tomcat-logs
+              mountPath: {{ include "app.tomcatDir" . }}/logs
+            - name: tomcat-work
+              mountPath: {{ include "app.tomcatDir" . }}/work
+            - name: tomcat-webapps
+              mountPath: {{ include "app.tomcatDir" . }}/webapps
+            # Mount managed manager context.xml into the manager webapp
+            - name: tomcat-server-config
+              mountPath: {{ include "app.tomcatDir" . }}/webapps/manager/META-INF/context.xml
+              subPath: manager-context.xml
+            - name: tomcat-server-config
+              mountPath: {{ include "app.tomcatDir" . }}/conf/server.xml
+              subPath: server.xml
+            - name: tomcat-config
+              mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
+      volumes:
+        {{- include "app.secretsVolume" . | nindent 8 }}
+        {{- include "app.scxaExperimentsVolume" . | nindent 8 }}
+        {{- include "app.servicesVolume" . | nindent 8 }}
+        {{- include "app.scxaCodonVolume" . | nindent 8 }}
+        - name: tomcat-logs
+          emptyDir: {}
+        - name: tomcat-work
+          emptyDir: {}
+        - name: tomcat-webapps
+          emptyDir: {}
+        - name: tomcat-config
+          emptyDir: {}
+        - name: configuration-properties
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+            items:
+              - key: configuration.properties
+                path: configuration.properties
+        - name: tomcat-server-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+            items:
+              - key: server.xml
+                path: server.xml
+              - key: manager-context.xml
+                path: manager-context.xml
+        - name: tomcat-logback-xml
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+            items:
+              - key: logback.xml
+                path: logback.xml
+      initContainers:
+      - name: {{ include "app.name" . }}-init-tomcat-manager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: [ "sh"]
+        args:
+          - "-c"
+          - |
+            set -vx
+            cp -rv {{ include "app.tomcatDir" . }}/webapps.dist/manager {{ include "app.tomcatDir" . }}/webapps/
+        volumeMounts:
+          - name: tomcat-webapps
+            mountPath: {{ include "app.tomcatDir" . }}/webapps
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

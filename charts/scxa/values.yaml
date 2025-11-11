@@ -95,6 +95,10 @@ tolerations: []
 
 affinity: {}
 
+tomcat:
+  httpPort: 8080
+  createSecret: true
+
 solr:
   namespace: scxa-dev-solrcloud
   user: admin
@@ -102,12 +106,8 @@ solr:
   timeout: "30000"
   createSecret: true
   scxaAnalytics:
-    populator:
-      enabled: true
     collection: scxa-analytics-v8
   gene2experiment:
-    populator:
-      enabled: true
     collection: scxa-gene2experiment-v1
 
 jdbc:

@@ -11,6 +11,12 @@ solr:
   namespace: scxa-dev-solrcloud
   user: admin
   createSecret: true
+  scxaAnalytics:
+    populator:
+      enabled: false
+  gene2experiment:
+    populator:
+      enabled: false
 
 nfs:
   snapshotComponent: experiments_test
@@ -31,7 +37,7 @@ bioentities-collection:
     bioentities:
       collection: bioentities
       jsonl:
-        enabled: true
+        enabled: false
       populator:
-        enabled: true
+        enabled: false
         gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s

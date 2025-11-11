@@ -61,6 +61,34 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/* Minimal RBAC rules for jobs read access when using kubectl in init containers */}}
+{{- define "app.jobsRbac" -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "app.fullname" . }}-jobs-reader
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "app.fullname" . }}-jobs-reader-binding
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "app.serviceAccountName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "app.fullname" . }}-jobs-reader
+{{- end }}
+
 {{/*
 Root directory for data mounts
 */}}
@@ -76,15 +104,26 @@ Root directory for data mounts
 {{ include "app.dataDir" . }}/services
 {{- end }}
 
+{{- define "app.tomcatDir" -}}
+/usr/local/tomcat
+{{- end }}
+
 {{/*
 NFS volume mounts, used in deployments and jobs
 */}}
+
+{{- define "app.scxaExperimentsVolume" -}}
+- name: {{ include "app.name" . }}-exp-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/ro/scxa_codon/atlas_sc_experiments
+{{- end }}
 
 {{- define "app.scxaCodonVolume" -}}
 - name: {{ include "app.name" . }}-codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/scxa_codon/atlas_sc_experiments
+    path: /ifs/public/ro/scxa_codon
 {{- end }}
 
 {{- define "app.servicesVolume" -}}

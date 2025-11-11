@@ -14,7 +14,7 @@ spec:
       serviceAccountName: {{ include "app.serviceAccountName" . }}
       volumes:
         {{- include "app.secretsVolume" . | nindent 8 }}
-        {{- include "app.scxaCodonVolume" . | nindent 8 }}
+        {{- include "app.scxaExperimentsVolume" . | nindent 8 }}
         - name: solr-config
           configMap:
             name: {{ include "app.fullname" . }}-config
@@ -103,7 +103,7 @@ spec:
               ./load-scxa-gene2experiment.sh
               done
           volumeMounts:
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: {{ include "app.name" . }}-exp-volume
               mountPath: {{ include "app.dataDir" . }}/exp/magetab
             - name: solr-config
               mountPath: /etc/solr
