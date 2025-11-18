@@ -23,6 +23,11 @@ spec:
           image: openjdk:11
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.debug.jvm }}
+          ports:
+            - containerPort: 5005
+              name: jdwp
+          {{- end }}
           env:
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8"
@@ -52,30 +57,44 @@ spec:
 
               cd /atlas-web-bulk/
 
+              {{- if .Values.debug.enabled }}
+              set -v
+              {{- end }}
               mkdir {{ include "app.experimentsDir" . }}/magetab
-              ln -s {{ include "app.servicesDir" . }}/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* \
-                    {{ include "app.experimentsDir" . }}/magetab 
-              ls -lt {{ include "app.experimentsDir" . }}/magetab 
-
-              ./gradlew \
-              {{ include "app.gradleCliArgs" . | indent 14 }} \
-              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
-              -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
-              ":cli:bootRun" --args="create-update-experiment -e $(echo ${EXP_IDS})"
               
-              ./gradlew \
-              {{ include "app.gradleCliArgs" . | indent 14 }} \
-              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
-              -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
-              ":cli:bootRun" --args="update-experiment-design -e $(echo ${EXP_IDS})"
-                            
-              ./gradlew \
-              {{ include "app.gradleCliArgs" . | indent 14 }} \
-              -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
-              -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
-              ":cli:bootRun" --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
+              EXPERIMENTS_SOURCE_DIR="{{- include "app.experimentsSourceDir" . -}}"
+              if [ ! -d "$EXPERIMENTS_SOURCE_DIR" ]; then
+                echo "ERROR: experimentsSourceDir does not exist: $EXPERIMENTS_SOURCE_DIR" >&2
+              else
+                echo "experimentsSourceDir exists: $EXPERIMENTS_SOURCE_DIR"
+                echo "found $(ls "$EXPERIMENTS_SOURCE_DIR" | wc -l) source experiments"
 
-              sleep 5000
+                ln -s "$EXPERIMENTS_SOURCE_DIR"/* \
+                      {{ include "app.experimentsDir" . }}/magetab 
+                echo "linked $(ls {{ include "app.experimentsDir" . }}/magetab | wc -l) experiments"
+
+                ./gradlew \
+                {{ include "app.gradleCliArgs" . | indent 14 }} \
+                -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+                -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
+                ":cli:bootRun" --args="create-update-experiment -e $(echo ${EXP_IDS})"
+                
+                ./gradlew \
+                {{ include "app.gradleCliArgs" . | indent 14 }} \
+                -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+                -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
+                ":cli:bootRun" --args="update-experiment-design -e $(echo ${EXP_IDS})"
+                              
+                ./gradlew \
+                {{ include "app.gradleCliArgs" . | indent 14 }} \
+                -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+                -PexperimentDesignLocation={{ include "app.expdesignDir" . }} \
+                ":cli:bootRun" --args="update-baseline-coexpression -e $(echo ${EXP_IDS})"
+              fi
+
+              {{- if .Values.debug.enabled }}
+              sleep 50000
+              {{- end }}
           volumeMounts:
             - name: {{ include "app.name" . }}-expdesign-vol
               mountPath: "{{ include "app.expdesignDir" . }}"
@@ -84,7 +103,7 @@ spec:
             - name: services-volume
               mountPath: "{{ include "app.servicesDir" . }}"
             - name: {{ include "app.name" . }}-codon-volume
-              mountPath: "{{ include "app.experimentsDir" . }}/gxa-codon"
+              mountPath: "{{ include "app.dataDir" . }}/gxa_codon"
             - name: {{ include "app.name" . }}-codon-volume
               mountPath: "{{ include "app.experimentsDir" . }}/species-properties.json"
               subPath: species-properties.json  

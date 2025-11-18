@@ -104,11 +104,6 @@ Notes:
 -Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
 {{- end }}
 
-{{- define "app.experimentsDirName" -}}
-{{- if eq .Values.environment "test" }}
-experiments_test{{- else }}
-experiments{{- end }}
-{{- end }}
 
 {{/*
 Root directory for data mounts
@@ -147,6 +142,13 @@ Root directory for data mounts
 
 {{- define "app.bioentitiesJsonlDir" -}}
 {{ include "app.dataDir" . }}/bioentities-jsonl
+{{- end }}
+
+{{/*
+Source directory for experiments on NFS
+*/}}
+{{- define "app.experimentsSourceDir" -}}
+{{- include "app.dataDir" . -}}/gxa_codon/{{- .Values.nfs.snapshotComponent -}}
 {{- end }}
 
 {{/*

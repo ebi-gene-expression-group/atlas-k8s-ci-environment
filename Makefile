@@ -63,7 +63,7 @@ $(info Setting registrySecret.dockerconfigjson from DOCKER_CONFIG_JSON environme
 HELM_SET_ARGS += --set-file registrySecret.dockerconfigjson="$(subst ",,$(DOCKER_CONFIG_JSON))"
 endif
 
-deploy:
+deploy: init-k8s
 	@echo "$(BOLD)$(GREEN)Deploying to environment: $(ENV)$(RESET)"
 	@echo "$(CYAN)Using values file: $(ENV_VALUES)$(RESET)"
 	helm upgrade --install \
@@ -80,8 +80,11 @@ deploy-test:
 uninstall:
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE) 
 
+init-k8s:
+	kubectx $(K8S_CONTEXT)
+	kubectl config set-context --current --namespace=$(NAMESPACE)
 # Delete Kubernetes job
-delete-jobs:
+delete-jobs: init-k8s
 	@echo "$(BOLD)$(MAGENTA)Deleting Kubernetes jobs... from $(NAMESPACE)$(RESET)"
 
 	kubectl delete job --selector app.kubernetes.io/name=$(RELEASE) --namespace $(NAMESPACE) || true
@@ -91,7 +94,7 @@ workflow: delete-jobs deploy-test
 	@echo "$(BOLD)$(GREEN)Workflow completed: job deleted and deployed to test environment$(RESET)" 
 
 # Deploy WAR file using curl commands
-deploy-war:
+deploy-war: init-k8s
 	@echo "$(BOLD)$(GREEN)Deploying WAR file using curl commands...$(RESET)"
 	@set -e; \
 	DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \

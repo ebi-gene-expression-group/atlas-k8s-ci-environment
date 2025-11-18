@@ -132,5 +132,5 @@ solr:
   #     gitBranch: "develop"
 
 nfs:
-  server: hh-isi-srv-vlan1496.ebi.ac.uk
-  snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
+  server: "hh-isi-srv-vlan1496.ebi.ac.uk"
+  snapshotComponent: "experiments"
