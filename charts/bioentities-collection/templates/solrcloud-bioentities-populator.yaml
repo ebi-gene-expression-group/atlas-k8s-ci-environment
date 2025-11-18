@@ -96,7 +96,7 @@ spec:
               ./create-bioentities-schema.sh
               ./create-bioentities-suggesters.sh
 
-              for FILE in `ls {{ include "app.bioentitiesJsonlDir" . }}/*.jsonl | head -1`
+              for FILE in `ls {{ include "app.bioentitiesJsonlDir" . }}/*.jsonl`
               do
                 echo "Processing jsonlfile: ${FILE}"
                 INPUT_JSONL=${FILE} ./solr-jsonl-chunk-loader.sh >> /dev/stdout 2>&1
