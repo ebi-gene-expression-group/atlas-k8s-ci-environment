@@ -100,6 +100,10 @@ Root directory for data mounts
 {{ include "app.dataDir" . }}/exp
 {{- end }}
 
+{{- define "app.expdesignDir" -}}
+{{ include "app.dataDir" . }}/expdesign
+{{- end }}
+
 {{- define "app.servicesDir" -}}
 {{ include "app.dataDir" . }}/services
 {{- end }}
@@ -116,7 +120,7 @@ NFS volume mounts, used in deployments and jobs
 - name: {{ include "app.name" . }}-exp-volume
   nfs:
     server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/scxa_codon/atlas_sc_experiments
+    path: /ifs/public/ro/scxa_codon/{{ .Values.nfs.scxaExpVolPath}}
 {{- end }}
 
 {{- define "app.scxaCodonVolume" -}}

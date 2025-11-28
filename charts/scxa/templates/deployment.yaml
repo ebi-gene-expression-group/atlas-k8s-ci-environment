@@ -70,6 +70,9 @@ spec:
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
+            - name: {{ include "app.name" . }}-exp-volume
+              mountPath: {{ include "app.expdesignDir" . }}
+              subPath: expDesign
             - name: {{ include "app.name" . }}-secrets
               mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
               subPath: tomcat-users.xml
