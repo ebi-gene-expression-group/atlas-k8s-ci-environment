@@ -112,6 +112,7 @@ solr:
 
 jdbc:
   createSecret: true
+  username: atlasprd3
 
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk

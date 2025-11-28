@@ -103,5 +103,14 @@ spec:
               readOnly: true
             - name: webapp-volume
               mountPath: /atlas-web-bulk
+      initContainers:
+        - name: wait-for-previous-job
+          image: dtzar/helm-kubectl:3.16.2
+          command: [ "kubectl" ]
+          args:
+            - "wait"
+            - "--for=condition=complete"
+            - "--timeout=1h"
+            - "job/{{ .Values.parentChartName . }}-postgres-populator"
       restartPolicy: Never
 {{- end }}

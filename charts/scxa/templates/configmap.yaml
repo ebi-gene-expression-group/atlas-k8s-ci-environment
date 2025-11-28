@@ -78,3 +78,8 @@ data:
   SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
   SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
 
+  # PostGreSQL configuration
+  POSTGRES_HOST: "{{ .Values.jdbc.host }}"
+  POSTGRES_DB: "{{ .Values.jdbc.db }}"
+
+
