@@ -5,3 +5,4 @@
 .idea
 /tmp/**
 /charts/*/war/
+**/charts/*.tgz

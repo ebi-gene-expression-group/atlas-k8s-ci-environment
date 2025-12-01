@@ -1,0 +1,6 @@
+dependencies:
+- name: bioentities-collection
+  repository: file://../bioentities-collection
+  version: 0.1.0
+digest: sha256:b5435bc4395ae5abc71925903cef813a47ac91eac26611dae63f48702dce3484
+generated: "2025-12-01T14:19:40.330052Z"

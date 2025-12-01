@@ -46,6 +46,13 @@ ENV_VALUES = charts/$(RELEASE)/values-$(ENV).yaml
 NAMESPACE = $(RELEASE)-$(ENV)
 APP_VERSION = 37.0.5
 CURL_DEBUG_OPTS=--progress-bar
+# Enable Helm debug dry-run mode when DEBUG is set to 1, true or yes
+HELM_DEBUG_FLAGS :=
+DEBUG_ENABLED := $(filter 1 true yes,$(DEBUG))
+ifneq ($(DEBUG_ENABLED),)
+$(info Running Helm in DEBUG dry-run mode (DEBUG=$(DEBUG)))
+HELM_DEBUG_FLAGS = --debug --dry-run
+endif
 # Simple variables for node hostname and port
 NODE_HOSTNAME ?= $(shell kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
@@ -85,7 +92,7 @@ deploy: init-k8s
 	  --namespace $(NAMESPACE) \
 	  --create-namespace \
 	  -f $(ENV_VALUES) \
-	  $(HELM_SET_ARGS)
+	  $(HELM_SET_ARGS) $(HELM_DEBUG_FLAGS)
 
 deploy-test:
 	$(MAKE) deploy ENV=test
