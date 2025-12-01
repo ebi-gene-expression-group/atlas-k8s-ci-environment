@@ -17,6 +17,9 @@ spec:
         - name: scratch-bulk-analytics-vol
           ephemeral:
             volumeClaimTemplate:
+              metadata:
+                labels:
+                  {{- include "app.labels" . | nindent 18 }}
               spec:
                 accessModes: [ "ReadWriteOnce" ]
                 storageClassName: "standard-nfs-production"
@@ -81,7 +84,7 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |  
-              set -ev            
+              set -v            
               mkdir /work
               
               cd /work
@@ -89,14 +92,16 @@ spec:
               git clone --recurse-submodules --depth 1 --single-branch --branch ${GIT_BRANCH} https://github.com/ebi-gene-expression-group/index-bioentities.git
               git clone --recurse-submodules --depth 1 --single-branch --branch ${GIT_BRANCH} https://github.com/ebi-gene-expression-group/index-gxa.git
               
-              cd /work/solr-bulk/bin
+              cd /work/index-gxa/bin
               ./create-bulk-analytics-collection.sh
               set -vx
               ./create-bulk-analytics-schema.sh
 
               # We go back to index-bioentities/bin because the solr-jsonl-chunk-loader.sh script isn't in the solr-bulk repository
               cd {{ include "app.dataDir" . }}/scratch
-              for FILE in `ls -Sr {{include "app.bulkAnalyticsJsonlDir" . }}/*.jsonl`
+              JSONL_DIR="{{- include "app.bulkAnalyticsJsonlDir" . -}}"
+              echo "found $(ls -Sr ${JSONL_DIR}/*.jsonl | wc -l) jsonl files"
+              for FILE in `ls -Sr ${JSONL_DIR}/*.jsonl`
               do
                 INPUT_JSONL=${FILE} /work/index-bioentities/bin/solr-jsonl-chunk-loader.sh \
                   >> /dev/stdout 2>&1 \

@@ -22,6 +22,12 @@ spec:
         - name: webapp-volume
           emptyDir: {}
         {{- include "app.bulkAnalyticsJsonlVolume" . | nindent 8 }}
+        - name: logback-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+            items:
+              - key: logback-spring.xml
+                path: logback-spring.xml
       containers:
         - name: {{ include "app.name" . }}-solrcloud-bulk-analytics-jsonl
           image: openjdk:11
@@ -46,6 +52,8 @@ spec:
                   key: SOLR_PASS
             {{- /* These properties are required so that the bioentities SolrClient create 
              in the SolrConfig class is authenticated */}}
+            - name: ERROR_LOG_FILE
+              value: "{{ include "app.bulkAnalyticsJsonlDir" . }}/errors.log"
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
             {{- include "app.proxyEnv" . | nindent 12 }}
@@ -74,8 +82,6 @@ spec:
             - name: SCHISTOSOME_EXP_IDS
               value: "E-MTAB-451"
             {{- if eq .Values.loggingLevel "DEBUG" }}
-            - name: LOGGING_LEVEL_ROOT
-              value: "DEBUG"
             - name: LOGGING_LEVEL_UK_AC_EBI
               value: "DEBUG"
             {{- end }}
@@ -96,6 +102,14 @@ spec:
               cp /secrets/jdbc.properties \
                   /secrets/solr.properties \
                   /atlas-web-bulk/cli/src/main/resources/
+              cp /config/logback-spring.xml \
+                  /atlas-web-bulk/cli/src/main/resources/
+              
+              # Ensure error log directory exists and verify log file path
+              mkdir -p {{ include "app.bulkAnalyticsJsonlDir" . }}
+              echo "Error log file will be created at: ${ERROR_LOG_FILE}"
+              echo "Directory exists: $(test -d {{ include "app.bulkAnalyticsJsonlDir" . }} && echo 'yes' || echo 'no')"
+              echo "Directory is writable: $(test -w {{ include "app.bulkAnalyticsJsonlDir" . }} && echo 'yes' || echo 'no')"
 
               cd /atlas-web-bulk
 
@@ -152,6 +166,8 @@ spec:
             - name: {{ include "app.name" . }}-secrets
               mountPath: /secrets/jdbc.properties
               subPath: jdbc.properties
+            - name: logback-config
+              mountPath: /config
 
       {{/* only wait for previous jobs if they are enabled */}}
       initContainers:

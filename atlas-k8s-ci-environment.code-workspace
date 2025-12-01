@@ -15,6 +15,9 @@
 		{
 			"name": "solr-bulk",
 			"path": "../solr-bulk"
+		},
+		{
+			"path": "../index-gxa"
 		}
 	],
 	"settings": {
