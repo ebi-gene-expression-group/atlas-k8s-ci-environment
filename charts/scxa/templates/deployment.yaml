@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/component: webapp
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.autoscaling.minReplicas }}
+  replicas: {{ .Values.replicaCount }}
   {{- end }}
   selector:
     matchLabels:
@@ -31,32 +31,14 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ include "app.name" . }}-webapp
-          {{- with .Values.securityContext }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "tomcat:8-jdk11" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
               containerPort: {{ .Values.tomcat.httpPort }}
               protocol: TCP
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
-          #   initialDelaySeconds: 30
-          #   periodSeconds: 30
-          #   timeoutSeconds: 10
-          #   failureThreshold: 20
-          # readinessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
-          #   initialDelaySeconds: 30
-          #   periodSeconds: 30
-          #   timeoutSeconds: 10
-          #   failureThreshold: 20
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -69,25 +51,18 @@ spec:
                 secretKeyRef:
                   name: {{ include "app.fullname" . }}-secrets
                   key: SOLR_PASS
-            {{- /* These properties are required so that the bioentities SolrClient create
-             in the SolrConfig class is authenticated */}}
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            {{- /* app data mounts */}}
+            - name: {{ include "app.name" . }}-exp-volume
+              mountPath: {{ include "app.dataDir" . }}/exp/magetab
             - name: {{ include "app.name" . }}-codon-volume
-              mountPath: {{ include "app.dataDir" . }}/gxa_codon
-              readOnly: true
-            - name: experiments-snapshot
-              mountPath: {{ include "app.experimentsDir" . }}/magetab
-              readOnly: true
-            - name: gxa-volume
               mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
-            - name: gxa-codon-volume
+            - name: {{ include "app.name" . }}-codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/species-properties.json
               subPath: species-properties.json
               readOnly: true
@@ -95,27 +70,21 @@ spec:
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
-            - name: {{ include "app.name" . }}-expdesign-vol
-              mountPath: {{ include "app.expdesignDir" . }}
-            - name: services-volume
-              mountPath: {{ include "app.servicesDir" . }}
-            {{- /* webapp properties mounts */}}
-            - name: configuration-properties
-              mountPath: /webapp-properties/configuration.properties
-              subPath: configuration.properties
-            - name: tomcat-logback-xml
-              mountPath: /webapp-properties/logback.xml
-              subPath: logback.xml
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
+              subPath: tomcat-users.xml
             - name: {{ include "app.name" . }}-secrets
               mountPath: /webapp-properties/jdbc.properties
               subPath: jdbc.properties
             - name: {{ include "app.name" . }}-secrets
               mountPath: /webapp-properties/solr.properties
               subPath: solr.properties
-            {{- /* tomcat config mounts */}}
-            - name: {{ include "app.name" . }}-secrets
-              mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
-              subPath: tomcat-users.xml
+            - name: configuration-properties
+              mountPath: /webapp-properties/configuration.properties
+              subPath: configuration.properties
+            - name: tomcat-logback-xml
+              mountPath: /webapp-properties/logback.xml
+              subPath: logback.xml
             - name: tomcat-logs
               mountPath: {{ include "app.tomcatDir" . }}/logs
             - name: tomcat-work
@@ -132,11 +101,17 @@ spec:
             - name: tomcat-config
               mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
       volumes:
-        {{- include "app.gxaVolume" . | nindent 8 }}
-        {{- include "app.gxaCodonVolume" . | nindent 8 }}
+        {{- include "app.secretsVolume" . | nindent 8 }}
+        {{- include "app.scxaExperimentsVolume" . | nindent 8 }}
         {{- include "app.servicesVolume" . | nindent 8 }}
-        {{- include "app.expdesignVolume" . | nindent 8 }}
-        - name: experiments-snapshot
+        {{- include "app.scxaCodonVolume" . | nindent 8 }}
+        - name: tomcat-logs
+          emptyDir: {}
+        - name: tomcat-work
+          emptyDir: {}
+        - name: tomcat-webapps
+          emptyDir: {}
+        - name: tomcat-config
           emptyDir: {}
         - name: configuration-properties
           configMap:
@@ -158,56 +133,19 @@ spec:
             items:
               - key: logback.xml
                 path: logback.xml
-        {{- include "app.secretsVolume" . | nindent 8 }}
-        # TODO: do we need to make logs a persistent volume? If we use the cluster's monitoring, there is no need.
-        - name: tomcat-logs
-          emptyDir: {}
-        - name: tomcat-work
-          emptyDir: {}
-        - name: tomcat-webapps
-          emptyDir: {}
-        - name: tomcat-config
-          emptyDir: {}
       initContainers:
-        - name: "{{ include "app.name" . }}-init-experiments-snapshot"
-          {{- with .Values.securityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          image: busybox
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["sh"]
-          args:
-            - "-c"
-            - |
-              set -vx
-              EXPERIMENTS_SOURCE_DIR="{{- include "app.experimentsSourceDir" . -}}"
-              if [ ! -d "$EXPERIMENTS_SOURCE_DIR" ]; then
-                echo "ERROR: experimentsSourceDir does not exist: $EXPERIMENTS_SOURCE_DIR" >&2
-                exit 1
-              fi
-              echo "experimentsSourceDir exists: $EXPERIMENTS_SOURCE_DIR"
-              ln -s -v "$EXPERIMENTS_SOURCE_DIR"/* /experiments_snapshot
-              ls -lt /experiments_snapshot
-          volumeMounts:
-            - name: gxa-codon-volume
-              mountPath: {{ include "app.dataDir" . }}/gxa_codon
-            - name: services-volume
-              mountPath: {{ include "app.servicesDir" . }}
-            - name: experiments-snapshot
-              mountPath: /experiments_snapshot
-        - name: "{{ include "app.name" . }}-init-tomcat-manager"
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "sh"]
-          args:
-            - "-c"
-            - |
-              set -vx
-              cp -rv {{ include "app.tomcatDir" . }}/webapps.dist/manager {{ include "app.tomcatDir" . }}/webapps/
-          volumeMounts:
-            - name: tomcat-webapps
-              mountPath: {{ include "app.tomcatDir" . }}/webapps
+      - name: {{ include "app.name" . }}-init-tomcat-manager
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: [ "sh"]
+        args:
+          - "-c"
+          - |
+            set -vx
+            cp -rv {{ include "app.tomcatDir" . }}/webapps.dist/manager {{ include "app.tomcatDir" . }}/webapps/
+        volumeMounts:
+          - name: tomcat-webapps
+            mountPath: {{ include "app.tomcatDir" . }}/webapps
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

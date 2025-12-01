@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "app.fullname" . }}-config
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+data:
+  experiment_ids: {{ .Values.experiment_ids | quote }}
+
+  species: |
+    danio_rerio homo_sapiens equus_caballus drosophila_melanogaster
+    caenorhabditis_elegans mus_musculus oryza_indica anas_platyrhynchos
+    oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays
+    saccharomyces_cerevisiae schizosaccharomyces_pombe
+
+  # Solr configuration
+  SOLR_HOST: "{{ include "app.solrHost" . }}"
+  SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
+  SOLR_BIOENTITIES_COLLECTION: "{{ .Values.solr.bioentities.collection  }}"
+  SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
+  SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
+

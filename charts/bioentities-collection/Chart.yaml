@@ -1,7 +1,6 @@
 apiVersion: v2
-icon: "https://www.ebi.ac.uk/gxa/resources/images/expression-atlas.png"
-name: scxa
-description: A Helm chart for Kubernetes for the deployment of Single Cell Expression Atlas
+name: bioentities-collection
+description: A Helm chart for Kubernetes for the deployment of bioentities collection for Solr Cloud
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -22,9 +21,4 @@ version: 0.1.0
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: "17.2.0"
-
-dependencies:
-  - name: bioentities-collection
-    version: "0.1.0"
-    repository: "file://../bioentities-collection"
+appVersion: "0.1.0"

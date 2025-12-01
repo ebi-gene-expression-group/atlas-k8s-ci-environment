@@ -19,7 +19,18 @@ else
     $(info No .env file found, using system environment variables)
 endif
 
-RELEASE ?= gxa
+RELEASE ?= scxa
+
+# Define DEPLOY_CTX_PATH based on RELEASE
+ifeq ($(RELEASE),gxa)
+    DEPLOY_CTX_PATH = /gxa
+else ifeq ($(RELEASE),scxa)
+    DEPLOY_CTX_PATH = /gxa/sc
+else ifeq ($(RELEASE),bioentities-collection)
+else
+    $(error Error: unknown RELEASE $(RELEASE). Supported values are gxa, scxa or bioentities-collection)
+endif
+$(info Using deploy context path: $(DEPLOY_CTX_PATH))
 
 ENV ?= test
 # SUPPORTED_ENVS = test dev prod
@@ -40,19 +51,21 @@ NODE_HOSTNAME ?= $(shell kubectl get nodes -o jsonpath='{.items[0].metadata.name
 NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
 TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
 
-WAR_FILE_DIR ?= /Users/amnon/Downloads
+WAR_FILE_DIR ?= charts/$(RELEASE)/war
 .PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
 
 
 # Set helm --set arguments based on environment variables
 HELM_SET_ARGS = --set appVersion=$(APP_VERSION)
 ifdef JDBC_PASSWORD
-$(info Setting jdbc.password from JDBC_PASSWORD environment variable)
+$(info Setting jdbc.password and bioentities-collection.jdbc.password from JDBC_PASSWORD environment variable)
 HELM_SET_ARGS += --set jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
+HELM_SET_ARGS += --set bioentities-collection.jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
 endif
 ifdef SOLR_PASSWORD
-$(info Setting solr.password from SOLR_PASSWORD environment variable)
+$(info Setting solr.password and bioentities-collection.solr.password from SOLR_PASSWORD environment variable)
 HELM_SET_ARGS += --set solr.password="$(subst ",,$(SOLR_PASSWORD))"
+HELM_SET_ARGS += --set bioentities-collection.solr.password="$(subst ",,$(SOLR_PASSWORD))"
 endif
 ifdef TOMCAT_DEPLOYER_PASSWORD
 $(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
@@ -120,7 +133,7 @@ deploy-war: init-k8s
 		"$(TOMCAT_SERVER_URL)/manager/text/list"; \
 	echo "$(BOLD)$(GREEN)Checking application homepage...$(RESET)"; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa" \
+		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)" \
 		--location \
 		-O
 	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
@@ -131,7 +144,7 @@ deploy-war: init-k8s
 	@echo "$(BOLD)$(GREEN)Checking app health check endpoint ...$(RESET)"; \
 	curl --fail \
 		"$(TOMCAT_SERVER_URL)/gxa/json/health" \
-		--location 
+		--location
 
 	@echo "$(BOLD)$(GREEN)Checking experiment REST resource ...$(RESET)"; \
 	curl --fail \

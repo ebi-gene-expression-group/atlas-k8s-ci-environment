@@ -1,14 +1,13 @@
-# Default values for gxa.
+# Default values for bioentities-collection.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-
 replicaCount: 1
 
 image:
-  repository: tomcat
+  repository: nginx
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "8-jdk11"
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
@@ -16,14 +15,12 @@ fullnameOverride: ""
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
-  # Optional: registry credentials applied to all Pods using this SA
-  imagePullSecrets: []
 
 # Optional docker registry secret managed by this chart
 registrySecret:
@@ -38,24 +35,24 @@ registrySecret:
   #     "ghcr.io": {"auth": "<base64(user:token)>"}
   #   }
   # }
-  # dockerconfigjson: ""
+  dockerconfigjson: ""
 
 podAnnotations: {}
 
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: 
+securityContext:
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
-  runAsUser: 2921
-  runAsGroup: 1146
+#  runAsUser: 2921
+#  runAsGroup: 1146
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 80
 
 ingress:
@@ -89,7 +86,7 @@ resources: {}
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 100
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
@@ -99,38 +96,24 @@ tolerations: []
 
 affinity: {}
 
-tomcat:
-  httpPort: 8080
-  # deployerPassword: set-in-commandline
-  # createSecret: false
-
-loggingLevel: DEBUG
-
-jdbc:
-  # populator:
-  #   run: false
+nfs:
+  server: hh-isi-srv-vlan1496.ebi.ac.uk
+  snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
 
 solr:
-  # namespace: set-per-env
-  # user: "solr"
-  # password: "changeme"
-  # collection: "bioentities"
-  # numShards: "4"
-  # timeout: "30000"
-  # createSecret: true
-  # bioentities:
-  #   jsonl:
-  #     enabled: false
-  #   populator:
-  #     enabled: false
-  #     gitBranch: "develop"
-  # bulkAnalytics:
-  #   jsonl:
-  #     enabled: false
-  #   populator:
-  #     enabled: false
-  #     gitBranch: "develop"
+  user: admin
+  numShards: "4"
+  timeout: "30000"
+  createSecret: true
+  bioentities:
+    collection: bioentities
+    jsonl:
+      enabled: false
+    populator:
+      enabled: false
+      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
 
-nfs:
-  server: "hh-isi-srv-vlan1496.ebi.ac.uk"
-  snapshotComponent: "experiments"
+jdbc:
+  createSecret: true
+
+experiment_ids: ""
