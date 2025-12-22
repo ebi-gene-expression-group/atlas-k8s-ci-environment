@@ -148,7 +148,7 @@ Root directory for data mounts
 Source directory for experiments on NFS
 */}}
 {{- define "app.experimentsSourceDir" -}}
-{{- include "app.dataDir" . -}}/gxa_codon/{{- .Values.nfs.snapshotComponent -}}
+{{- include "app.servicesDir" . -}}/fg/atlas/{{- .Values.nfs.snapshotComponent -}}
 {{- end }}
 
 {{/*
@@ -204,11 +204,6 @@ Proxy environment variables, used in containers
 NFS volume mounts, used in deployments and jobs
 */}}
 
-{{- define "app.expdesignVolume" -}}
-- name: {{ include "app.name" . }}-expdesign-vol
-  persistentVolumeClaim:
-    claimName: {{ include "app.name" . }}-expdesign-rwo
-{{- end }}
 
 {{- define "app.gxaCodonVolume" -}}
 - name: {{ include "app.name" . }}-codon-volume
@@ -224,6 +219,14 @@ NFS volume mounts, used in deployments and jobs
     path: /ifs/public/services
 {{- end }}
 
+{{- define "app.expdesignVolume" -}}
+- name: expdesign-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/rw/services/fg/atlas/gxa/expdesign
+    readOnly: false
+{{- end }}
+
 {{- define "app.gxaVolume" -}}
 - name: gxa-volume
   nfs:
@@ -234,7 +237,7 @@ NFS volume mounts, used in deployments and jobs
 {{- define "app.bulkAnalyticsJsonlVolume" -}}
 - name: bulk-analytics-jsonl-vol
   persistentVolumeClaim:
-    claimName: bulk-analytics-jsonl-rwo
+    claimName: bulk-analytics-jsonl-rwm
 {{- end }}
 
 {{- define "app.bioentitiesJsonlVolume" -}}

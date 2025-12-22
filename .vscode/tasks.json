@@ -31,7 +31,7 @@
 			"problemMatcher": [],
 			"options": {
 				"env": {
-					"WAR_FILE_DIR": "/home/amnon/Downloads",
+					"WAR_FILE_DIR": "/Users/amnon/Downloads",
 					"RELEASE": "${input:release}",
 					"ENV": "${input:env}",
 				}

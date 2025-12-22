@@ -80,6 +80,8 @@ spec:
             - name: {{ include "app.name" . }}-codon-volume
               mountPath: {{ include "app.dataDir" . }}/gxa_codon
               readOnly: true
+            - name: admin-volume
+              mountPath: {{ include "app.experimentsDir" . }}/admin
             - name: experiments-snapshot
               mountPath: {{ include "app.experimentsDir" . }}/magetab
               readOnly: true
@@ -95,8 +97,9 @@ spec:
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
-            - name: {{ include "app.name" . }}-expdesign-vol
+            - name: expdesign-volume
               mountPath: {{ include "app.expdesignDir" . }}
+              subPath: fg/atlas/experiments_test/expDesign
             - name: services-volume
               mountPath: {{ include "app.servicesDir" . }}
             {{- /* webapp properties mounts */}}
@@ -137,6 +140,8 @@ spec:
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.expdesignVolume" . | nindent 8 }}
         - name: experiments-snapshot
+          emptyDir: {}
+        - name: admin-volume
           emptyDir: {}
         - name: configuration-properties
           configMap:
@@ -187,8 +192,8 @@ spec:
                 exit 1
               fi
               echo "experimentsSourceDir exists: $EXPERIMENTS_SOURCE_DIR"
-              ln -s -v "$EXPERIMENTS_SOURCE_DIR"/* /experiments_snapshot
-              ls -lt /experiments_snapshot
+              ln -s "$EXPERIMENTS_SOURCE_DIR"/E-* /experiments_snapshot
+              echo "Number of experiments in snapshot: $(ls /experiments_snapshot | wc -l)"
           volumeMounts:
             - name: gxa-codon-volume
               mountPath: {{ include "app.dataDir" . }}/gxa_codon

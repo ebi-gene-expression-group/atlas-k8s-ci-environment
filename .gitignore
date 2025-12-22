@@ -6,3 +6,4 @@
 /tmp/**
 /charts/*/war/
 **/charts/*.tgz
+.helm_ls_cache/

@@ -102,6 +102,7 @@ affinity: {}
 tomcat:
   httpPort: 8080
   # deployerPassword: set-in-commandline
+  # curatorPassword: set-in-commandline
   # createSecret: false
 
 loggingLevel: DEBUG

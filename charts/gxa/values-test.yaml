@@ -8,10 +8,13 @@ tomcat:
 
 loggingLevel: INFO
 
+nfs:
+  snapshotComponent: experiments_test
+
 debug:
-  enabled: true
+  enabled: false
   port: 5005
-  jvm: true
+  jvm: false
 
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
@@ -25,9 +28,9 @@ solr:
   createSecret: true
   bulkAnalytics:
     jsonl:
-      enabled: true
+      enabled: false
     populator:
-      enabled: true
+      enabled: false
       gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
     collection: bulk-analytics
     loggingLevel: DEBUG
@@ -38,26 +41,3 @@ solr:
       enabled: false
       gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
     collection: bioentities
-
-
-nfs:
-  snapshotComponent: experiments_test
-
-bioentities-collection:
-  enabled: true
-  jdbc:
-    url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
-    createSecret: true
-  solr:
-    namespace: "gxa-dev-solrcloud"
-    user: admin
-    numShards: "4"
-    timeout: "30000"
-    createSecret: true
-    bioentities:
-      collection: bioentities
-      jsonl:
-        enabled: true
-      populator:
-        enabled: true
-        gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s

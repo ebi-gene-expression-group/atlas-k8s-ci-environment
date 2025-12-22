@@ -78,6 +78,10 @@ ifdef TOMCAT_DEPLOYER_PASSWORD
 $(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
 HELM_SET_ARGS += --set tomcat.deployerPassword="$(subst ",,$(TOMCAT_DEPLOYER_PASSWORD))"
 endif
+ifdef TOMCAT_CURATOR_PASSWORD
+$(info Setting tomcat.curatorPassword from TOMCAT_CURATOR_PASSWORD environment variable)
+HELM_SET_ARGS += --set tomcat.curatorPassword="$(subst ",,$(TOMCAT_CURATOR_PASSWORD))"
+endif
 ifdef DOCKER_CONFIG_JSON
 $(info Setting registrySecret.dockerconfigjson from DOCKER_CONFIG_JSON environment variable)
 HELM_SET_ARGS += --set-file registrySecret.dockerconfigjson="$(subst ",,$(DOCKER_CONFIG_JSON))"
@@ -120,8 +124,7 @@ deploy-war: init-k8s
 	DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
 		| base64 -d \
-		| yq -oy -p=xml \
-			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'); \
+		| yq -p=xml '.tomcat-users.user[] | select(.["+@username"] == "deployer") | .["+@password"]'); \
 	if [ -z "$$DEPLOYER_PASSWORD" ]; then \
 		echo "ERROR: Failed to get deployer password"; \
 		exit 1; \
@@ -143,16 +146,15 @@ deploy-war: init-k8s
 		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)" \
 		--location \
 		-O
-	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
-	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/experiments" \
-		--location \
-		-O
 	@echo "$(BOLD)$(GREEN)Checking app health check endpoint ...$(RESET)"; \
 	curl --fail \
 		"$(TOMCAT_SERVER_URL)/gxa/json/health" \
 		--location
-
+	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
+	curl --fail \
+		"$(TOMCAT_SERVER_URL)/gxa/json/experiments" \
+		--location \
+		-O
 	@echo "$(BOLD)$(GREEN)Checking experiment REST resource ...$(RESET)"; \
 	curl --fail \
 		"$(TOMCAT_SERVER_URL)/gxa/json/experiments/E-MTAB-3827" \
