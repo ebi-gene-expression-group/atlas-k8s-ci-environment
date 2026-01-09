@@ -77,7 +77,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             {{- /* app data mounts */}}
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.dataDir" . }}/gxa_codon
               readOnly: true
             - name: admin-volume
@@ -89,7 +89,7 @@ spec:
               mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
-            - name: gxa-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/species-properties.json
               subPath: species-properties.json
               readOnly: true
@@ -99,9 +99,12 @@ spec:
               readOnly: true
             - name: expdesign-volume
               mountPath: {{ include "app.expdesignDir" . }}
-              subPath: fg/atlas/experiments_test/expDesign
             - name: services-volume
               mountPath: {{ include "app.servicesDir" . }}
+            - name: services-volume
+              mountPath: {{ include "app.dataDir" . }}/ontology
+              subPath: fg/atlas/ontology
+              readOnly: true
             {{- /* webapp properties mounts */}}
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
@@ -195,7 +198,7 @@ spec:
               ln -s "$EXPERIMENTS_SOURCE_DIR"/E-* /experiments_snapshot
               echo "Number of experiments in snapshot: $(ls /experiments_snapshot | wc -l)"
           volumeMounts:
-            - name: gxa-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.dataDir" . }}/gxa_codon
             - name: services-volume
               mountPath: {{ include "app.servicesDir" . }}

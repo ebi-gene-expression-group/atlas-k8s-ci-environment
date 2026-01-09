@@ -206,7 +206,7 @@ NFS volume mounts, used in deployments and jobs
 
 
 {{- define "app.gxaCodonVolume" -}}
-- name: {{ include "app.name" . }}-codon-volume
+- name: codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/ro/gxa_codon
@@ -223,8 +223,8 @@ NFS volume mounts, used in deployments and jobs
 - name: expdesign-volume
   nfs:
     server: {{ .Values.nfs.server }}
-    path: /ifs/public/rw/services/fg/atlas/gxa/expdesign
-    readOnly: false
+    path: /ifs/public/services/fg/atlas/experiments_test/expDesign
+    readOnly: true
 {{- end }}
 
 {{- define "app.gxaVolume" -}}

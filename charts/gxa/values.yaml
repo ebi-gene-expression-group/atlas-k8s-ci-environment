@@ -42,15 +42,8 @@ registrySecret:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
-securityContext: 
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
+# fg_atlas/
+podSecurityContext:
   runAsUser: 2921
   runAsGroup: 1146
 

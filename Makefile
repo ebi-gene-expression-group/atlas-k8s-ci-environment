@@ -155,9 +155,3 @@ deploy-war: init-k8s
 		"$(TOMCAT_SERVER_URL)/gxa/json/experiments" \
 		--location \
 		-O
-	@echo "$(BOLD)$(GREEN)Checking experiment REST resource ...$(RESET)"; \
-	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/json/experiments/E-MTAB-3827" \
-		--location \
-		-O
-

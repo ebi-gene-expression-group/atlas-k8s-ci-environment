@@ -18,6 +18,10 @@
 		},
 		{
 			"path": "../index-gxa"
+		},
+		{
+			"name": "jenkins-jobs",
+			"path": "../jenkins-jobs"
 		}
 	],
 	"settings": {
