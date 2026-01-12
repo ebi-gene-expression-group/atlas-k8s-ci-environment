@@ -7,9 +7,11 @@ solr:
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
   resources:
     limits:
-      memory: 3Gi
+      memory: 4Gi
+      cpu: 2
     requests:
-      memory: 2Gi
+      memory: 3Gi
+      cpu: 1
   storage:
     className: standard-nfs-production
     size: 20Gi
@@ -26,6 +28,10 @@ zookeeper:
   resources:
     limits:
       memory: 512Mi
+      cpu: 0.5
+    requests:
+      memory: 512Mi
+      cpu: 0.5
 
 service:
    nodePort: null   # Assign a port (30000–32767)
