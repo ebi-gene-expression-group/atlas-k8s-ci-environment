@@ -1,0 +1,12 @@
+1. MongoDB has been deployed successfully!
+
+2. Get MongoDB connection details:
+  export MONGODB_SERVICE=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "mongodb.fullname" . }} -o jsonpath='{.metadata.name}')
+  export MONGODB_HOST={{ include "mongodb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  export MONGODB_PORT={{ .Values.service.port }}
+  echo "MongoDB connection string: mongodb://{{ .Values.auth.rootUsername }}:<password>@$MONGODB_HOST:$MONGODB_PORT/{{ .Values.auth.database }}"
+
+3. Get MongoDB root password:
+  kubectl get secret --namespace {{ .Release.Namespace }} {{ include "mongodb.fullname" . }}-secret -o jsonpath="{.data.root-password}" | base64 -d
+  echo ""
+

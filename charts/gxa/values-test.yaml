@@ -11,6 +11,14 @@ loggingLevel: INFO
 nfs:
   snapshotComponent: experiments_test
 
+resources:
+  requests:
+    memory: "4Gi"
+    cpu: "1"
+  limits:
+    memory: "6Gi"
+    cpu: "1.5"
+
 debug:
   enabled: false
   port: 5005
