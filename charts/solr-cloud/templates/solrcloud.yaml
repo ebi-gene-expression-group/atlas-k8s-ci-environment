@@ -26,8 +26,10 @@ spec:
       resources:
         limits:
           memory: {{ .Values.solr.resources.limits.memory }}
+          cpu: {{ .Values.solr.resources.limits.cpu }}
         requests:
           memory: {{ .Values.solr.resources.requests.memory }}
+          cpu: {{ .Values.solr.resources.requests.cpu }}
       {{- if .Values.solr.secret.enabled }}
       volumes:
         - name: keys-secret
