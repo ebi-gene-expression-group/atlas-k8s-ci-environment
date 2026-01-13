@@ -37,10 +37,19 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.tomcat.debug.enabled }}
+          command: ["catalina.sh"]
+          args: ["jpda", "run"]
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.tomcat.httpPort }}
               protocol: TCP
+            {{- if .Values.tomcat.debug.enabled }}
+            - name: debug
+              containerPort: {{ .Values.tomcat.debug.port }}
+              protocol: TCP
+            {{- end }}
           # livenessProbe:
           #   httpGet:
           #     path: /
@@ -73,6 +82,11 @@ spec:
              in the SolrConfig class is authenticated */}}
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
+            {{- if .Values.tomcat.debug.enabled }}
+            - name: JPDA_ADDRESS
+              value: {{ .Values.tomcat.debug.address | quote }}
+            {{- end }}
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

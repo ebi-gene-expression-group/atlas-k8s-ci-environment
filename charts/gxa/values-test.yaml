@@ -5,6 +5,8 @@ experiment_ids: "E-CURD-23,E-CURD-30,E-ERAD-475,E-GEOD-16879,E-GEOD-18068,E-GEOD
 
 tomcat:
   createSecret: true
+  debug:
+    enabled: true
 
 loggingLevel: INFO
 
@@ -18,11 +20,6 @@ resources:
   limits:
     memory: "6Gi"
     cpu: "1.5"
-
-debug:
-  enabled: false
-  port: 5005
-  jvm: false
 
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"

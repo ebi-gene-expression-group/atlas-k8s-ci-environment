@@ -97,6 +97,12 @@ tomcat:
   # deployerPassword: set-in-commandline
   # curatorPassword: set-in-commandline
   # createSecret: false
+  # Enable JPDA debugging (Java Platform Debugger Architecture)
+  # When enabled, Tomcat will start with debug port 8000 exposed
+  debug:
+    enabled: false
+    port: 8000
+    address: "*:8000"  # Use "*:8000" to listen on all interfaces, or "localhost:8000" for localhost only
 
 loggingLevel: DEBUG
 

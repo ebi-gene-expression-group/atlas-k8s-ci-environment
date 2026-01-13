@@ -11,5 +11,11 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    {{- if .Values.tomcat.debug.enabled }}
+    - port: {{ .Values.tomcat.debug.port }}
+      targetPort: debug
+      protocol: TCP
+      name: debug
+    {{- end }}
   selector:
     {{- include "app.selectorLabels" . | nindent 4 }}
