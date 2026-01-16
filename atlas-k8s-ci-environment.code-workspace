@@ -39,6 +39,13 @@
 		],
 		"makefile.configureOnOpen": false,
 		"nextflow.telemetry.enabled": true,
-		"java.compile.nullAnalysis.mode": "automatic"
+		"java.compile.nullAnalysis.mode": "automatic",
+		"java.configuration.updateBuildConfiguration": "interactive",
+		"java.configuration.runtimes": [
+			{
+				"name": "JavaSE-11",
+				"path": "/usr/lib/jvm/java-11-openjdk-amd64"
+			}
+		]
 	}
 }
