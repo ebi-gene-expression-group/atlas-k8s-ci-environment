@@ -101,9 +101,13 @@ Notes:
 -Dhttp.proxyPort=${PROXY_PORT} \
 -Dhttps.proxyHost=${PROXY_HOST} \
 -Dhttps.proxyPort=${PROXY_PORT} \
--Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
+-Dhttp.nonProxyHosts=${NO_PROXY//,/|}
 {{- end }}
 
+{{- define "app.jvmProxyArgsSingleLine" -}}
+{{- /* Single-line version for environment variables (CATALINA_OPTS, JAVA_OPTS, etc.) */ -}}
+-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=${NO_PROXY//,/|}
+{{- end }}
 
 {{/*
 Root directory for data mounts

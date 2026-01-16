@@ -14,10 +14,10 @@ spec:
       {{- include "app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "app.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: webapp
@@ -78,14 +78,17 @@ spec:
                 secretKeyRef:
                   name: {{ include "app.fullname" . }}-secrets
                   key: SOLR_PASS
+            {{- include "app.proxyEnv" . | nindent 12 }}
             {{- /* These properties are required so that the bioentities SolrClient create
-             in the SolrConfig class is authenticated */}}
+             in the SolrConfig class is authenticated */}}    
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
             {{- if .Values.tomcat.debug.enabled }}
             - name: JPDA_ADDRESS
               value: {{ .Values.tomcat.debug.address | quote }}
             {{- end }}
+            - name: CATALINA_OPTS
+              value: "-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=${NO_PROXY//,/|}"  
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -52,7 +52,7 @@ data:
     <configuration>
       <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
         </encoder>
       </appender>
       <root level="INFO">
@@ -61,42 +61,11 @@ data:
       <logger name="uk.ac.ebi.atlas" level="DEBUG" additivity="false">
         <appender-ref ref="STDOUT"/>
       </logger>
-    </configuration>
-
-  logback-spring.xml: |
-    <configuration debug="false">
-      <springProperty scope="context" name="errorLogFile" source="ERROR_LOG_FILE" defaultValue="{{ include "app.bulkAnalyticsJsonlDir" . }}/errors.log"/>
-      <statusListener class="ch.qos.logback.core.status.OnConsoleStatusListener" />
-      <!-- Console appender - all log levels -->
-      <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-      </appender>
-      
-      <!-- File appender - ERROR level only -->
-      <appender name="ERROR_FILE" class="ch.qos.logback.core.FileAppender">
-        <file>${errorLogFile}</file>
-        <filter class="ch.qos.logback.classic.filter.LevelFilter">
-          <level>ERROR</level>
-          <onMatch>ACCEPT</onMatch>
-          <onMismatch>DENY</onMismatch>
-        </filter>
-        <encoder>
-          <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-        <append>true</append>
-        <immediateFlush>true</immediateFlush>
-      </appender>
-      
-      <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="ERROR_FILE" />
-      </root>
-      
-      <logger name="uk.ac.ebi.atlas" level="DEBUG" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="ERROR_FILE"/>
+      <logger name="org.springframework.web" level="DEBUG" additivity="false">
+        <appender-ref ref="STDOUT"/>
+      </logger>
+      <logger name="org.springframework.jdbc" level="DEBUG" additivity="false">
+        <appender-ref ref="STDOUT"/>
       </logger>
     </configuration>
 
