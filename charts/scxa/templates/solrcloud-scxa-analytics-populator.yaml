@@ -131,14 +131,5 @@ spec:
             - name: solr-config
               mountPath: /etc/solr
               readOnly: true
-      initContainers:
-        - name: wait-for-previous-job
-          image: dtzar/helm-kubectl:3.16.2
-          command: ["kubectl"]
-          args:
-          - "wait"
-          - "--for=condition=complete"
-          - "--timeout=1h"
-          - "job/bioentities-populator"
       restartPolicy: Never
 {{- end }}
