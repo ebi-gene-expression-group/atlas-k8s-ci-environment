@@ -9,17 +9,6 @@
 			"path": "../atlas-web-bulk"
 		},
 		{
-			"name": "index-bioentities",
-			"path": "../index-bioentities"
-		},
-		{
-			"name": "solr-bulk",
-			"path": "../solr-bulk"
-		},
-		{
-			"path": "../index-gxa"
-		},
-		{
 			"name": "jenkins-jobs",
 			"path": "../jenkins-jobs"
 		}

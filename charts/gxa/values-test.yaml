@@ -13,36 +13,15 @@ loggingLevel: INFO
 nfs:
   snapshotComponent: experiments_test
 
-resources:
-  requests:
-    memory: "4Gi"
-    cpu: "1"
-  limits:
-    memory: "6Gi"
-    cpu: "1.5"
 
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
+  user: atlasprd3
+  pool: gxa
   createSecret: true
-  populator:
-    enabled: false
+
 
 solr:
   namespace: gxa-dev-solrcloud
   user: admin
   createSecret: true
-  bulkAnalytics:
-    jsonl:
-      enabled: false
-    populator:
-      enabled: false
-      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
-    collection: bulk-analytics
-    loggingLevel: DEBUG
-  bioentities:
-    jsonl:
-      enabled: false
-    populator:
-      enabled: false
-      gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
-    collection: bioentities

@@ -59,7 +59,7 @@ NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o 
 TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
 
 WAR_FILE_DIR ?= charts/$(RELEASE)/war
-.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
+.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
 
 
 # Set helm --set arguments based on environment variables
@@ -107,15 +107,10 @@ uninstall:
 init-k8s:
 	kubectx $(K8S_CONTEXT)
 	kubectl config set-context --current --namespace=$(NAMESPACE)
-# Delete Kubernetes job
-delete-jobs: init-k8s
-	@echo "$(BOLD)$(MAGENTA)Deleting Kubernetes jobs... from $(NAMESPACE)$(RESET)"
 
-	kubectl delete job --selector app.kubernetes.io/name=$(RELEASE) --namespace $(NAMESPACE) || true
-
-# Workflow: delete job then deploy to test
-workflow: delete-jobs deploy-test
-	@echo "$(BOLD)$(GREEN)Workflow completed: job deleted and deployed to test environment$(RESET)" 
+# Workflow: deploy to test
+workflow: deploy-test
+	@echo "$(BOLD)$(GREEN)Workflow completed: deployed to test environment$(RESET)" 
 
 # Deploy WAR file using curl commands
 deploy-war: init-k8s

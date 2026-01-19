@@ -132,22 +132,6 @@ Root directory for data mounts
 /usr/local/tomcat
 {{- end }}
 
-{{- define "app.bioentityPropertiesDir" -}}
-{{ include "app.dataDir" . }}/bioentity_properties
-{{- end }}
-
-{{- define "app.bioentityPropertiesSourceDir" -}}
-{{ include "app.dataDir" . }}/bioentity_properties_source
-{{- end }}
-
-{{- define "app.bulkAnalyticsJsonlDir" -}}
-{{ include "app.dataDir" . }}/bulk-analytics-jsonl
-{{- end }}
-
-{{- define "app.bioentitiesJsonlDir" -}}
-{{ include "app.dataDir" . }}/bioentities-jsonl
-{{- end }}
-
 {{/*
 Source directory for experiments on NFS
 */}}
@@ -155,13 +139,6 @@ Source directory for experiments on NFS
 {{- include "app.servicesDir" . -}}/fg/atlas/{{- .Values.nfs.snapshotComponent -}}
 {{- end }}
 
-{{/*
-Gradle CLI arguments for running the CLI application
-*/}}
-{{- define "app.gradleCliArgs" -}} 
---quiet \
-{{ include "app.jvmProxyArgs" . }} 
-{{- end }}
 
 {{/*
 Proxy environment variables, used in containers

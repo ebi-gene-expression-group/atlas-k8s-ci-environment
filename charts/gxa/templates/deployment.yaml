@@ -6,9 +6,7 @@ metadata:
     {{- include "app.labels" . | nindent 4 }}
     app.kubernetes.io/component: webapp
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.autoscaling.minReplicas }}
-  {{- end }}
+  replicas: 1
   selector:
     matchLabels:
       {{- include "app.selectorLabels" . | nindent 6 }}
