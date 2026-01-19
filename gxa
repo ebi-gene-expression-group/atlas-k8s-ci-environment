@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Home &lt; Expression Atlas &lt; EMBL-EBI</title>
+    <meta name="description" content="EMBL-EBI Expression Atlas, an open public repository of gene expression pattern data under different biological conditions">
+    <meta name="keywords" content="expression atlas, gene expression, baseline expression, differential expression, functional genomics, public repository, repository, bioinformatics, europe, institute">
+    <meta name="author" content="EBI Functional Genomics Team – https://www.ebi.ac.uk/people/person/christina-ernst">
+    <meta name="HandheldFriendly" content="true" />
+    <meta name="MobileOptimized" content="width" />
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#70BDBD"> <!-- Android Chrome mobile browser tab color -->
+
+    <!-- Add information on the life cycle of this page -->
+    <meta name="ebi:owner" content="Christina Ernst <cernst@ebi.ac.uk>">
+
+    <!-- If you link to any other sites frequently, consider optimising performance with a DNS prefetch -->
+    <link rel="dns-prefetch" href="https://www.ebi.ac.uk/gxa/sc">
+    <link rel="dns-prefetch" href="https://www.ebi.ac.uk/arrayexpress/">
+    <link rel="dns-prefetch" href="https://www.ebi.ac.uk/">
+    <link rel="dns-prefetch" href="https://embl.de/">
+
+    <!-- favicons generated at realfavicongenerator.net, and merged with https://github.com/ebiwd/EBI-Pattern-library/blob/gh-pages/sample-site/boilerplate/blank.html -->
+    <!-- If you have custom icon, replace these as appropriate. You can generate them at realfavicongenerator.net -->
+    <link rel="icon" type="image/x-icon" href="/gxa/resources/favicons/favicon.ico" />
+    <link rel="icon" type="image/png" href="/gxa/resources/favicons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="192×192" href="/gxa/resources/favicons/android-chrome-192x192.png" /> <!-- Android (192px) -->
+    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="/gxa/resources/favicons/apple-icon-114x114.png" /> <!-- For iPhone 4 Retina display (114px) -->
+    <link rel="apple-touch-icon-precomposed" sizes="72x72" href="/gxa/resources/favicons/apple-icon-72x72.png" /> <!-- For iPad (72px) -->
+    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/gxa/resources/favicons/apple-icon-144x144.png" /> <!-- For iPad retina (144px) -->
+    <link rel="apple-touch-icon-precomposed" href="/gxa/resources/favicons/apple-icon-57x57.png" /> <!-- For iPhone (57px) -->
+    <link rel="mask-icon" href="/gxa/resources/favicons/safari-pinned-tab.svg" color="#ffffff" /> <!-- Safari icon for pinned tab -->
+    <meta name="msapplication-TileColor" content="#2b5797" /> <!-- MS Icons -->
+    <meta name="msapplication-TileImage" content="/gxa/resources/favicons/mstile-144x144.png" />
+
+    <!-- CSS: implied media=all -->
+    <!-- CSS concatenated and minified via ant build script-->
+    <link rel="stylesheet" href="https://ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/css/ebi-global.css" type="text/css" media="all" />
+    <link rel="stylesheet" href="https://ebi.emblstatic.net/web_guidelines/EBI-Icon-fonts/v1.3/fonts.css" type="text/css" media="all" />
+
+    <!-- If you have a custom header image or colour -->
+    <meta name="ebi:masthead-color" content="rgb(0,124,130)" />
+    <meta name="ebi:masthead-image" content="/gxa/resources/images/dots-matrix-background.png" />
+
+    <!-- you can replace this with theme-[projectname].css. See http://www.ebi.ac.uk/web/style/colour for details of how to do this -->
+    <!-- also inform ES so we can host your colour palette file -->
+    <!-- <link rel="stylesheet" href="https://dev.ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/css/theme-embl-petrol.css" type="text/css" media="all" /> -->
+    <link rel="stylesheet" href="/gxa/resources/css/foundation/atlas.css" type="text/css" media="all">
+
+    <!-- Use this CSS file for any custom styling -->
+    <link rel="stylesheet" href="/gxa/resources/css/foundation/theme-atlas.css" type="text/css" media="all">
+    <!-- end CSS-->
+
+</head>
+
+<body>
+<div id="skip-to">
+    <ul>
+        <li><a href="#content">Skip to main content</a></li>
+        <li><a href="#local-nav">Skip to local navigation</a></li>
+        <li><a href="#global-nav">Skip to EBI global navigation menu</a></li>
+        <li><a href="#global-nav-expanded">Skip to expanded EBI global navigation menu (includes all sub-sections)</a></li>
+    </ul>
+</div>
+
+<header id="masthead-black-bar" class="clearfix masthead-black-bar expanded">
+    <script>
+        // Hack that solves https://github.com/ebiwd/EBI-Framework/pull/139 (I got tired of waiting)
+        window.addEventListener('load', function() {
+            $('#masthead-black-bar nav')[2].className='row expanded';
+        });
+    </script>
+</header>
+<div>
+    <div id="information-banner" style="background: #C5C5C5; font-size: large"></div>
+    <div data-sticky-container>
+        <header id="masthead" class="masthead" data-sticky data-sticky-on="large" data-top-anchor="content:top" data-btm-anchor="content:bottom">
+            <div class="masthead-inner row expanded">
+                <div class="small-12 large-8 columns">
+                    <a href="home" title="Back to Expression Atlas homepage">
+                        <div class="media-object" id="local-title">
+                            <div class="media-object-section hide-for-small-only">
+                                <img src="/gxa/resources/images/expression-atlas.png" alt="Expression Atlas logo" style="height: 7em">
+                            </div>
+                            <div class="media-object-section">
+                                <h1>Expression&nbsp;Atlas</h1>
+                                <h4 class="show-for-large">Gene expression across species and biological conditions</h4>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="small-12 large-4 columns">
+                    <div class="media-object" style="display: flex; justify-content: flex-end; align-items: center;">
+                        <div class="media-object-section">
+                            <h4 class="show-for-large">Query single cell expression</h4>
+                            <a href="/gxa/sc" title="To Single Cell Expression Atlas" class="button" style="box-shadow: 2px 2px 2px 2px rgba(0,0,0,0.5)">To Single Cell Expression Atlas <i class="icon icon-functional" data-icon=">"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <nav>
+                    <ul id="local-nav" class="dropdown menu float-left" data-description="navigational">
+                        <li id="local-nav-home"><a href="/gxa/home"><i class="icon icon-generic padding-right-medium" data-icon="H"></i>Home</a></li>
+                        <li id="local-nav-experiments"><a href="/gxa/experiments"><i class="icon icon-functional padding-right-medium" data-icon="C"></i>Browse experiments</a></li>
+                        <li id="local-nav-download"><a href="/gxa/download"><i class="icon icon-functional padding-right-medium" data-icon="="></i>Download</a></li>
+                        <li id="local-nav-release-notes"><a href="/gxa/release-notes.html"><i class="icon icon-generic padding-right-medium" data-icon=";"></i>Release notes</a></li>
+                        <li id="local-nav-faq"><a href="/gxa/FAQ.html"><i class="icon icon-generic padding-right-medium" data-icon="G"></i>FAQ</a></li>
+                        <li id="local-nav-help"><a href="/gxa/help/index.html"><i class="icon icon-generic padding-right-medium" data-icon="?"></i>Help</a></li>
+                        <li id="local-nav-licence"><a href="/gxa/licence.html"><i class="icon icon-common padding-right-medium" data-icon="&#xf573;"></i>Licence</a></li>
+                        <li id="local-nav-about"><a href="/gxa/about.html"><i class="icon icon-generic padding-right-medium" data-icon="i"></i>About</a></li>
+                        <li id="local-nav-feedback"><a href="https://www.ebi.ac.uk/support/gxa" target="_blank" data-icon="X"><i class="icon icon-generic padding-right-medium" data-icon="s"></i>Support</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </header>
+    </div>
+</div>
+
+<div id="content">
+    <section id="main-content-area" class="margin-top-large margin-bottom-large" role="main">
+        <div class="row expanded">
+    <div>
+  <div class="small-12 medium-6 columns text-left">
+    <h4>
+      <small>
+        Search across <strong><span>5</span>&nbsp;species</strong>,
+        <strong><span>9</span>&nbsp;studies</strong>,
+        <strong><span>574</span>&nbsp;assays</strong>
+      </small>
+    </h4>
+  </div>
+  <div class="small-12 medium-6 columns hide-for-small-only text-right">
+    <h4>
+      <small>
+        Ensembl&nbsp;<span>104</span>,
+        Ensembl&nbsp;Genomes&nbsp;<span>51</span>,
+        WormBase&nbsp;ParaSite&nbsp;<span>15</span>,
+        EFO&nbsp;<span>3.10.0</span>
+      </small>
+    </h4>
+  </div>
+</div>
+
+</div>
+
+<div class="row column margin-bottom-xlarge expanded">
+    <div>
+    <link rel="stylesheet" type="text/css" href="/gxa/resources/js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.css">
+    <link rel="stylesheet" type="text/css" href="/gxa/resources/js/lib/jquery-json-tag-editor/jquery.json-tag-editor.foundation.css" media="screen">
+
+    <ul class="tabs" data-tabs id="search-tabs">
+        <li class="tabs-title is-active"><a href="#search-atlas" aria-selected="true">Search</a></li>
+    </ul>
+
+    <div class="tabs-content" data-tabs-content="search-tabs">
+        <div class="tabs-panel is-active " id="search-atlas" style="background-color: #e6e6e6;">
+            <form method="get" action="/gxa/search" id="home-search-atlas-form">
+                <div class="row expanded">
+                    <div class="small-12 medium-4 large-5 columns">
+                        <div class="row column">
+                            <label for="home-search-gene-query-input">Gene / Gene properties</label>
+                            <input id="home-search-gene-query-input" type="text" placeholder="Enter gene query…" name="geneQuery"/>
+                        </div>
+                        <div class="row column small margin-top-small">
+                            <!--[{"value":"REG1B"}]-->
+                            Examples: <a href="/gxa/search?geneQuery=%5B%7B%22value%22%3A%22REG1B%22%7D%5D">REG1B</a>,
+                            <!--[{"value":"zinc finger"}]-->
+                            <a href="/gxa/search?geneQuery=%5B%7B%22value%22%3A%22zinc%20finger%22%7D%5D">zinc finger</a>,
+                            <!--[{"value":"O14777", "category":"uniprot"}]-->
+                            <a href="/gxa/search?geneQuery=%5B%7B%22value%22%3A%22O14777%22%2C%20%22category%22%3A%22uniprot%22%7D%5D">O14777 (UniProt)</a>,
+                            <!--[{"value":"GO:0010468", "category":"go"}]-->
+                            <a href="/gxa/search?geneQuery=%5B%7B%22value%22%3A%22GO%3A0010468%22%2C%20%22category%22%3A%22go%22%7D%5D">GO:0010468 (regulation of gene expression)</a>
+                        </div>
+                    </div>
+                    <div class="small-12 medium-4 large-2 columns">
+                        <label for="species">Species</label>
+                        <select id="species" name="species">
+                            <option value="Homo sapiens">Homo sapiens</option>
+                            <option value="Mus musculus">Mus musculus</option>
+                            <option value="Saccharomyces cerevisiae">Saccharomyces cerevisiae</option>
+                            <option value="Drosophila melanogaster">Drosophila melanogaster</option>
+                            <option value="Caenorhabditis elegans">Caenorhabditis elegans</option>
+                            <option value="━━━━━━━━━━━━━━━━" disabled>━━━━━━━━━━━━━━━━</option>
+                            <option value="" selected>Any</option>
+                            <option value="Caenorhabditis elegans">Caenorhabditis elegans</option>
+                            <option value="Drosophila melanogaster">Drosophila melanogaster</option>
+                            <option value="Homo sapiens">Homo sapiens</option>
+                            <option value="Mus musculus">Mus musculus</option>
+                            <option value="Rattus norvegicus">Rattus norvegicus</option>
+                        </select>
+                    </div>
+                    <div id="sample-properties-section" class="small-12 medium-4 large-5 columns">
+                        <div class="row column">
+                            <label for="home-search-condition-query-input">Biological conditions</label>
+                            <input id="home-search-condition-query-input" type="text" placeholder="Enter condition query…" name="conditionQuery" />
+                        </div>
+                        <div class="row column small margin-top-small">
+                            <!--[{"value":"lung"}]-->
+                            Examples: <a href="/gxa/search?conditionQuery=%5B%7B%22value%22%3A%22lung%22%7D%5D">lung</a>,
+                            <!--[{"value":"leaf"}]-->
+                            <a href="/gxa/search?conditionQuery=%5B%7B%22value%22%3A%22leaf%22%7D%5D">leaf</a>,
+                            <!--[{"value":"valproic acid"}]-->
+                            <a href="/gxa/search?conditionQuery=%5B%7B%22value%22%3A%22valproic%20acid%22%7D%5D">valproic acid</a>,
+                            <!--[{"value":"cancer"}]-->
+                            <a href="/gxa/search?conditionQuery=%5B%7B%22value%22%3A%22cancer%22%7D%5D">cancer</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row expanded margin-top-large">
+                    <div class="small-12 columns">
+                        <input id="home-search-atlas-search-button" class="button" type="submit" value="Search"/>
+
+                        <input id="home-search-atlas-clear-button" class="secondary hollow button" type="button" value="Clear"/>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/URI.js/1.17.0/URI.min.js"></script>
+
+    <!-- JSON Tag Editor -->
+    <script defer src="/gxa/resources/js/lib/jquery-json-tag-editor/jquery.caret.min.js"></script>
+    <script defer src="/gxa/resources/js/lib/jquery-json-tag-editor/jquery.json-tag-editor.min.js"></script>
+    <script defer src="/gxa/resources/js/geneQueryTagEditorModule.js"></script>
+
+    <!-- Condition AUTOCOMPLETE -->
+    <script defer src="/gxa/resources/js/lib/arrayexpress-autocomplete/jquery.caret-range-1.0.js"></script>
+    <script defer src="/gxa/resources/js/lib/arrayexpress-autocomplete/jquery.array-express.autocomplete-1.1.0.150319.js"></script>
+    <script defer src="/gxa/resources/js/conditionAutocompleteModule.js"></script>
+
+    <script defer src="/gxa/resources/js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var contextPath = '$contextPath';
+            var geneQueryPlaceHolder = 'Enter gene query…';
+
+            geneQueryTagEditorModule.init('#local-searchbox', '', function(){}, geneQueryPlaceHolder, contextPath);
+            geneQueryTagEditorModule.init('#home-search-gene-query-input', '', function(){}, geneQueryPlaceHolder, contextPath);
+            conditionAutocompleteModule.init('#home-search-condition-query-input', function(){});
+
+            $('#home-search-atlas-clear-button').on('click' , function () {
+                // Remove all tags
+                var $atlasSearchInput = $('#home-search-gene-query-input'),
+                    atlasSearchTags = $atlasSearchInput.jsonTagEditor('getTags')[0].tags;
+                atlasSearchTags.forEach(function (searchTag) {
+                    $atlasSearchInput.jsonTagEditor('removeTag', searchTag.value);
+                });
+
+                var $conditionQuery = $('#home-search-condition-query-input'),
+                    conditionQueryTags = $conditionQuery.jsonTagEditor('getTags')[0].tags;
+                conditionQueryTags.forEach(function (searchTag) {
+                    $conditionQuery.jsonTagEditor('removeTag', searchTag.value);
+                });
+            });
+
+            $('#home-search-atlas-form').submit(function() {
+                var $atlasSearchInput = $('#home-search-gene-query-input'),
+                    atlasSearchTags = $atlasSearchInput.jsonTagEditor('getTags')[0].tags;
+                $atlasSearchInput.val(JSON.stringify(atlasSearchTags));
+
+                var $conditionQuery = $('#home-search-condition-query-input'),
+                    conditionQueryTags = $conditionQuery.jsonTagEditor('getTags')[0].tags;
+                $conditionQuery.val(JSON.stringify(conditionQueryTags));
+            });
+        });
+    </script>
+</div>
+
+</div>
+
+<div class="row column margin-bottom-xlarge expanded">
+    <div>
+  <div id="species-summary-panel"></div>
+
+  <div class="row expanded column text-center margin-top-medium">
+    <a class="button primary" href="/gxa/experiments">Show experiments of all species</a>
+  </div>
+
+  <script defer src="/gxa/resources/js-bundles/homepageSpeciesSummaryPanel.bundle.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function(event) {
+      var sliderSettings = {
+        dots: true,
+        infinite: false,
+        speed: 500,
+        slidesToShow: 6,
+        slidesToScroll: 6,
+        adaptiveHeight: true,
+        autoplay: false,
+        autoplaySpeed: 2000,
+        responsive: [
+          {
+            breakpoint: 1024,
+            settings: {
+              slidesToShow: 3,
+              slidesToScroll: 3,
+              infinite: true,
+              dots: true
+            }
+          },
+          {
+            breakpoint: 600,
+            settings: {
+              slidesToShow: 2,
+              slidesToScroll: 2,
+              dots: true
+            }
+          },
+          {
+            breakpoint: 480,
+            settings: {
+              slidesToShow: 1,
+              slidesToScroll: 1,
+              dots: true
+            }
+          }
+        ]
+      };
+
+      homepageSpeciesSummaryPanel.render({
+                host: '$contextPath',
+                resource: 'json/species-summary?limit=100',
+                carouselCardsRowProps: {
+                  className: 'row expanded small-up-2 medium-up-3 large-up-6',
+                  cardContainerClassName: 'column',
+                  sliderSettings: sliderSettings,
+                  containerHeight: '320px',
+                  sliderHeight: '300px'
+                },
+                onComponentDidMount: function() {
+                  $('#species-summary-panel').foundation();
+                  $('#species-summary-panel').foundationExtendEBI();
+                }
+              },
+              'species-summary-panel');
+    });
+  </script>
+</div>
+
+</div>
+
+<div class="row column margin-bottom-xlarge expanded">
+    <div>
+    <div id="experiments-summary-panel"></div>
+
+    <script defer src="/gxa/resources/js-bundles/homepageExperimentsSummaryPanel.bundle.js"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function(event) {
+            homepageExperimentsSummaryPanel.render(
+                {
+                    host: '$contextPath',
+                    resource: 'json/experiments-summary',
+                    responsiveCardsRowProps: {
+                        className: 'row expanded small-up-2 medium-up-3 large-up-6',
+                        cardContainerClassName: 'column',
+                        imageIconHeight: '3rem'
+                    },
+                    onComponentDidMount: function() {
+                        $('#experiments-summary-panel').foundation();
+                        $('#experiments-summary-panel').foundationExtendEBI();
+                    }
+                },
+                'experiments-summary-panel');
+        });
+    </script>
+
+</div>
+
+</div>
+
+<div class="row expanded margin-top-large" data-equalizer>
+    <div class="small-12 medium-12 large-6 columns">
+        <div>
+    <div id="tools" class="callout" data-equalizer-watch>
+        <h4>Tools</h4>
+
+        <a href="https://github.com/nunofonseca/irap" target="_blank">
+            <div class="media-object">
+                <div class="media-object-section middle">
+                    <h3 class="icon icon-generic" data-icon=":" />
+                </div>
+                <div class="media-object-section middle">
+                    <p>
+                        <strong>iRAP: RNA-seq analysis tool</strong><br>
+                        A flexible pipeline for RNA-seq analysis that integrates many existing tools for filtering and
+                        mapping reads, quantifying expression and testing for differential expression. iRAP is used to
+                        process all RNA-seq data in Expression Atlas.
+                    </p>
+                </div>
+            </div>
+        </a>
+
+        <a href="https://www.bioconductor.org/packages/release/bioc/html/ExpressionAtlas.html" target="_blank">
+            <div class="media-object">
+                <div class="media-object-section middle">
+                    <h3 class="icon icon-functional" data-icon="t" />
+                </div>
+                <div class="media-object-section middle">
+                    <p>
+                        <strong>Expression Atlas R Package on Bioconductor</strong><br>
+                        Search and download pre-packaged data from Expression Atlas inside an R session. Raw counts are
+                        provided for RNA-seq datasets and normalized intensities are available for microarray
+                        experiments. Protocols describing how the data was generated and sample annotations are
+                        contained within the downloaded R objects.
+                    </p>
+                </div>
+            </div>
+        </a>
+
+        <a href="https://github.com/ebi-gene-expression-group/atlas-heatmap" target="_blank">
+            <div class="media-object">
+                <div class="media-object-section middle">
+                    <h3 class="icon icon-conceptual" data-icon="g" />
+                </div>
+                <div class="media-object-section middle">
+                    <p>
+                        <strong>Expression Atlas Heatmap</strong><br>
+                        You can embed the Expression Atlas heatmap as a JavaScript widget on your site. You can build it
+                        from source or you can link directly to our built bundles. Instructions for both methods are
+                        provided in the GitHub repository. It is strongly suggested that you go through all the examples
+                        available in our showcase gallery .
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+    </div>
+    <div class="small-12 medium-12 large-6 columns">
+        <div>
+    <div id="publication-list" class="callout" data-equalizer-watch>
+        <h4>Publications</h4>
+
+        <a href="https://academic.oup.com/nar/article/52/D1/D107/7442051" target="_blank">
+            <div class="media-object">
+                <div class="media-object-section middle">
+                    <h3 class="icon icon-conceptual" data-icon="l" />
+                </div>
+                <div class="media-object-section middle">
+                    <p>
+                        <strong>Expression Atlas update: insights from sequencing data at both bulk and single cell level</strong><br>
+                        <em>Nucleic Acids Research</em>, 01 January 2024.
+                    </p>
+                </div>
+            </div>
+        </a>
+
+        <a href="https://academic.oup.com/nar/article/50/D1/D129/6438036" target="_blank">
+            <div class="media-object">
+                <div class="media-object-section middle">
+                    <h3 class="icon icon-conceptual" data-icon="l" />
+                </div>
+                <div class="media-object-section middle">
+                    <p>
+                        <strong>Expression Atlas update: gene and protein expression in multiple species</strong><br>
+                        <em>Nucleic Acids Research</em>, 24 November 2021.
+                    </p>
+                </div>
+            </div>
+        </a>
+
+        <a href="http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0107026" target="_blank">
+            <div class="media-object">
+                <div class="media-object-section middle">
+                    <h3 class="icon icon-conceptual" data-icon="l" />
+                </div>
+                <div class="media-object-section middle">
+                    <p>
+                        <strong>RNA-Seq gene profiling &ndash; A systematic empirical comparison</strong><br>
+                        <em>PLoS One</em>, 30 September 2014.
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+    </div>
+</div>
+
+<div class="row expanded text-center">
+    <div class="small-centered small-8 medium-4 columns padding-top-large padding-bottom-large">
+        <div>
+    <a class="twitter-timeline" href="https://twitter.com/ExpressionAtlas" data-tweet-limit="1" data-chrome="nofooter noborders"></a>
+    <script defer src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+</div>
+
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(event) {
+        document.getElementById("local-nav-home").className += ' active';
+    });
+</script>
+
+    </section>
+    <footer id="local-footer" class="local-footer" role="local-footer">
+    <div id="local-footer-nav-menu" class="row expanded">
+        <div class="small-12 small-centered medium-8 large-6 columns">
+            <div class="row small-up-1 medium-up-3">
+                <div class="column column-block margin-top-large margin-bottom-large text-center">
+                    <h4 style="color:white">Experiments</h4>
+                    <a href="experiments?experimentType=baseline" target="_blank">Baseline experiments</a><br/>
+                    <a href="experiments?experimentType=differential" target="_blank">Differential experiments</a>
+                </div>
+
+                <div class="column column-block margin-top-large margin-bottom-large text-center">
+                    <h4 style="color:white">Atlas</h4>
+                    <a href="release-notes.html" target="_blank">Release notes</a><br/>
+                    <a href="download.html" target="_blank">Download</a><br/>
+                    <a href="help/index.html" target="_blank">Help</a><br/>
+                    <a href="FAQ.html" target="_blank">FAQ</a><br/>
+                    <a href="about.html" target="_blank">About Atlas</a>
+                </div>
+
+                <div class="column column-block margin-top-large margin-bottom-large text-center">
+                    <h4 style="color:white">Follow us</h4>
+                    <a href="https://twitter.com/ExpressionAtlas" target="_blank">Twitter</a><br/>
+                    <a href="https://www.ebi.ac.uk/support/gxa" target="_blank">Support</a><br/>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="relationships" class="row">
+        <div id="elixir-banner"
+             data-color="none"
+             data-use-cdr-logo="false"
+             data-name="This service"
+             data-description="Expression Atlas is an ELIXIR database service"
+             data-more-information-link="https://www.elixir-europe.org/about-us/who-we-are/nodes/embl-ebi"
+             data-use-basic-styles="false">
+        </div>
+    </div>
+
+    <script defer="defer" src="https://ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/js/elixirBanner.js"></script>
+</footer>
+</div>
+
+<footer>
+    <div id="global-footer" class="global-footer">
+        <nav id="global-nav-expanded" class="global-nav row">
+        </nav>
+        <section id="ebi-footer-meta" class="ebi-footer-meta row">
+        </section>
+    </div>
+</footer>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+<script src="https://code.jquery.com/jquery-migrate-1.4.1.min.js"></script>
+
+<!-- Don’t defer or async, these two need to be loaded before other bundles, which are effectively deferred -->
+<script src="/gxa/resources/js/lib/babel-polyfill.min.js"></script>
+<script src="/gxa/resources/js/lib/fetch-polyfill.min.js"></script>
+<script src="/gxa/resources/js-bundles/vendorCommons.bundle.js"></script>
+<script src="/gxa/resources/js-bundles/informationBanner.bundle.js"></script>
+
+<!-- JavaScript -->
+<script defer="defer" src="https://ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/js/script.js"></script>
+
+<!-- The Foundation theme JavaScript -->
+<script src="https://ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/libraries/foundation-6/js/foundation.js"></script>
+<script src="https://ebi.emblstatic.net/web_guidelines/EBI-Framework/v1.3/js/foundationExtendEBI.js"></script>
+<script>$(document).foundation();</script>
+<script>$(document).foundationExtendEBI();</script>
+
+<link rel="stylesheet" type="text/css" href="/gxa/resources/js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.css">
+<link rel="stylesheet" type="text/css" href="/gxa/resources/js/lib/jquery-json-tag-editor/jquery.json-tag-editor.foundation.css" media="screen">
+<!-- end CSS-->
+
+<!-- Google Analytics details -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-37676851-1', 'auto');
+  ga('send', 'pageview');
+  informationBanner.render({}, 'information-banner');
+</script>
+
+</body>
+</html>

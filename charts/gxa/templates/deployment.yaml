@@ -6,18 +6,16 @@ metadata:
     {{- include "app.labels" . | nindent 4 }}
     app.kubernetes.io/component: webapp
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.autoscaling.minReplicas }}
-  {{- end }}
+  replicas: 1
   selector:
     matchLabels:
       {{- include "app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "app.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: webapp
@@ -31,14 +29,25 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ include "app.name" . }}-webapp
+          {{- with .Values.securityContext }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.tomcat.debug.enabled }}
+          command: ["catalina.sh"]
+          args: ["jpda", "run"]
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.tomcat.httpPort }}
               protocol: TCP
+            {{- if .Values.tomcat.debug.enabled }}
+            - name: debug
+              containerPort: {{ .Values.tomcat.debug.port }}
+              protocol: TCP
+            {{- end }}
           # livenessProbe:
           #   httpGet:
           #     path: /
@@ -67,17 +76,27 @@ spec:
                 secretKeyRef:
                   name: {{ include "app.fullname" . }}-secrets
                   key: SOLR_PASS
-            {{- /* These properties are required so that the bioentities SolrClient create 
-             in the SolrConfig class is authenticated */}}
+            {{- include "app.proxyEnv" . | nindent 12 }}
+            {{- /* These properties are required so that the bioentities SolrClient create
+             in the SolrConfig class is authenticated */}}    
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
+            {{- if .Values.tomcat.debug.enabled }}
+            - name: JPDA_ADDRESS
+              value: {{ .Values.tomcat.debug.address | quote }}
+            {{- end }}
+            - name: CATALINA_OPTS
+              value: "-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=${NO_PROXY//,/|}"  
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             {{- /* app data mounts */}}
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.dataDir" . }}/gxa_codon
               readOnly: true
+            - name: admin-volume
+              mountPath: {{ include "app.experimentsDir" . }}/admin
             - name: experiments-snapshot
               mountPath: {{ include "app.experimentsDir" . }}/magetab
               readOnly: true
@@ -85,18 +104,22 @@ spec:
               mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
-            - name: gxa-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/species-properties.json
-              subPath: species-properties.json  
+              subPath: species-properties.json
               readOnly: true
             - name: services-volume
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
-            - name: {{ include "app.name" . }}-expdesign-vol
+            - name: expdesign-volume
               mountPath: {{ include "app.expdesignDir" . }}
             - name: services-volume
               mountPath: {{ include "app.servicesDir" . }}
+            - name: services-volume
+              mountPath: {{ include "app.dataDir" . }}/ontology
+              subPath: fg/atlas/ontology
+              readOnly: true
             {{- /* webapp properties mounts */}}
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
@@ -136,6 +159,8 @@ spec:
         {{- include "app.expdesignVolume" . | nindent 8 }}
         - name: experiments-snapshot
           emptyDir: {}
+        - name: admin-volume
+          emptyDir: {}
         - name: configuration-properties
           configMap:
             name: {{ include "app.fullname" . }}-config
@@ -167,9 +192,11 @@ spec:
         - name: tomcat-config
           emptyDir: {}
       initContainers:
-        - name: {{ include "app.name" . }}-init-experiments-snapshot
+        - name: "{{ include "app.name" . }}-init-experiments-snapshot"
+          {{- with .Values.securityContext }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           image: busybox
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["sh"]
@@ -177,18 +204,23 @@ spec:
             - "-c"
             - |
               set -vx
-              ln -s -v {{ include "app.servicesDir" . }}/fg/atlas/{{ .Values.nfs.snapshotComponent }}/* /experiments_snapshot
-              ls -lt /experiments_snapshot
+              EXPERIMENTS_SOURCE_DIR="{{- include "app.experimentsSourceDir" . -}}"
+              if [ ! -d "$EXPERIMENTS_SOURCE_DIR" ]; then
+                echo "ERROR: experimentsSourceDir does not exist: $EXPERIMENTS_SOURCE_DIR" >&2
+                exit 1
+              fi
+              echo "experimentsSourceDir exists: $EXPERIMENTS_SOURCE_DIR"
+              ln -s "$EXPERIMENTS_SOURCE_DIR"/E-* /experiments_snapshot
+              echo "Number of experiments in snapshot: $(ls /experiments_snapshot | wc -l)"
           volumeMounts:
-            - name: gxa-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.dataDir" . }}/gxa_codon
             - name: services-volume
-              {{- /* Use a template for the mountPath */}}
               mountPath: {{ include "app.servicesDir" . }}
             - name: experiments-snapshot
-              mountPath: /experiments_snapshot                 
-        - name: {{ include "app.name" . }}-init-tomcat-manager
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
+              mountPath: /experiments_snapshot
+        - name: "{{ include "app.name" . }}-init-tomcat-manager"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [ "sh"]
           args:
@@ -198,7 +230,7 @@ spec:
               cp -rv {{ include "app.tomcatDir" . }}/webapps.dist/manager {{ include "app.tomcatDir" . }}/webapps/
           volumeMounts:
             - name: tomcat-webapps
-              mountPath: {{ include "app.tomcatDir" . }}/webapps                 
+              mountPath: {{ include "app.tomcatDir" . }}/webapps
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

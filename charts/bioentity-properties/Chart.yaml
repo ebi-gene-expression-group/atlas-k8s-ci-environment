@@ -1,5 +1,0 @@
-apiVersion: v2
-name: bioentity-properties
-description: Shared bioentity-properties resources for GXA and SCXA
-version: 0.1.0
-appVersion: "1.0.0" 

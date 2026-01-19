@@ -1,0 +1,139 @@
+{{- if and .Values.mongoimport.enabled .Values.mongoimport.jsonlSource.pvcName }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mongodb.fullname" . }}-mongoimport
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mongoimport
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "mongodb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mongoimport
+    spec:
+      containers:
+        - name: mongoimport
+          image: "{{ .Values.mongoimport.image.repository }}:{{ .Values.mongoimport.image.tag }}"
+          imagePullPolicy: {{ .Values.mongoimport.image.pullPolicy }}
+          env:
+            - name: MONGO_HOST
+              value: {{ include "mongodb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+            - name: MONGO_PORT
+              value: "{{ .Values.service.port }}"
+            - name: MONGO_DATABASE
+              value: {{ .Values.auth.database | default "gxa" | quote }}
+            - name: MONGO_ROOT_USERNAME
+              value: {{ .Values.auth.rootUsername | quote }}
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb.fullname" . }}-secret
+                  key: root-password
+            - name: JSONL_DIR
+              value: {{ .Values.mongoimport.jsonlSource.mountPath | default "/data/jsonl" | quote }}
+            - name: MONGO_COLLECTION
+              value: {{ .Values.mongoimport.collection | default "bulk_analytics" | quote }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              
+              echo "Starting mongoimport job..."
+              echo "MongoDB Host: $MONGO_HOST"
+              echo "MongoDB Port: $MONGO_PORT"
+              echo "MongoDB Database: $MONGO_DATABASE"
+              echo "MongoDB Collection: $MONGO_COLLECTION"
+              echo "JSONL Directory: $JSONL_DIR"
+              
+              # Wait for MongoDB to be ready
+              echo "Waiting for MongoDB to be ready..."
+              until mongosh --host "$MONGO_HOST:$MONGO_PORT" \
+                --username "$MONGO_ROOT_USERNAME" \
+                --password "$MONGO_ROOT_PASSWORD" \
+                --authenticationDatabase admin \
+                --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
+                echo "Waiting for MongoDB..."
+                sleep 2
+              done
+              echo "MongoDB is ready!"
+              
+              # Check if JSONL directory exists and has files
+              if [ ! -d "$JSONL_DIR" ]; then
+                echo "ERROR: JSONL directory does not exist: $JSONL_DIR"
+                exit 1
+              fi
+              
+              JSONL_COUNT=$(find "$JSONL_DIR" -name "*.jsonl" -type f | wc -l)
+              echo "Found $JSONL_COUNT JSONL file(s) in $JSONL_DIR"
+              
+              if [ "$JSONL_COUNT" -eq 0 ]; then
+                echo "WARNING: No JSONL files found in $JSONL_DIR"
+                exit 0
+              fi
+              
+              # Import each JSONL file
+              FAILED=0
+              SUCCESS=0
+              for JSONL_FILE in "$JSONL_DIR"/*.jsonl; do
+                if [ ! -f "$JSONL_FILE" ]; then
+                  continue
+                fi
+                
+                FILENAME=$(basename "$JSONL_FILE")
+                echo "Processing file: $FILENAME"
+                
+                # Extract collection name from filename if needed (e.g., E-MTAB-3827.jsonl -> bulk_analytics)
+                # Or use the default collection name
+                COLLECTION_NAME="$MONGO_COLLECTION"
+                
+                # Import the JSONL file (mongoimport handles JSONL as newline-delimited JSON)
+                if mongoimport \
+                  --host "$MONGO_HOST:$MONGO_PORT" \
+                  --username "$MONGO_ROOT_USERNAME" \
+                  --password "$MONGO_ROOT_PASSWORD" \
+                  --authenticationDatabase admin \
+                  --db "$MONGO_DATABASE" \
+                  --collection "$COLLECTION_NAME" \
+                  --file "$JSONL_FILE" \
+                  --type json \
+                  {{- if .Values.mongoimport.drop }}
+                  --drop \
+                  {{- end }}
+                  {{- if .Values.mongoimport.upsert }}
+                  --upsert \
+                  {{- end }}
+                  {{- if .Values.mongoimport.upsertFields }}
+                  --upsertFields {{ .Values.mongoimport.upsertFields }} \
+                  {{- end }}
+                  ; then
+                  echo "SUCCESS: Imported $FILENAME"
+                  SUCCESS=$((SUCCESS + 1))
+                else
+                  echo "ERROR: Failed to import $FILENAME"
+                  FAILED=$((FAILED + 1))
+                fi
+              done
+              
+              echo "Import completed: $SUCCESS successful, $FAILED failed"
+              
+              if [ "$FAILED" -gt 0 ]; then
+                exit 1
+              fi
+          {{- if .Values.mongoimport.resources }}
+          resources:
+            {{- toYaml .Values.mongoimport.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: jsonl-source
+              mountPath: {{ .Values.mongoimport.jsonlSource.mountPath | default "/data/jsonl" }}
+              readOnly: true
+      volumes:
+        - name: jsonl-source
+          persistentVolumeClaim:
+            claimName: {{ .Values.mongoimport.jsonlSource.pvcName }}
+      restartPolicy: Never
+  backoffLimit: {{ .Values.mongoimport.backoffLimit | default 3 }}
+{{- end }}
+

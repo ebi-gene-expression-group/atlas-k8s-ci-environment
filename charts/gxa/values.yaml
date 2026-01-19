@@ -42,15 +42,8 @@ registrySecret:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
-securityContext: 
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
+# fg_atlas/
+podSecurityContext:
   runAsUser: 2921
   runAsGroup: 1146
 
@@ -58,40 +51,13 @@ service:
   type: NodePort
   port: 80
 
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 2
-  targetCPUUtilizationPercentage: 80
-  # targetMemoryUtilizationPercentage: 80
+resources:
+  requests:
+    memory: "4Gi"
+    cpu: "1"
+  limits:
+    memory: "6Gi"
+    cpu: "1.5"
 
 nodeSelector: {}
 
@@ -102,35 +68,18 @@ affinity: {}
 tomcat:
   httpPort: 8080
   # deployerPassword: set-in-commandline
+  # curatorPassword: set-in-commandline
   # createSecret: false
+  # Enable JPDA debugging (Java Platform Debugger Architecture)
+  # When enabled, Tomcat will start with debug port 8000 exposed
+  debug:
+    enabled: false
+    port: 8000
+    address: "*:8000"  # Use "*:8000" to listen on all interfaces, or "localhost:8000" for localhost only
 
 loggingLevel: DEBUG
 
-jdbc:
-  # populator:
-  #   run: false
-
-solr:
-  # namespace: set-per-env
-  # user: "solr"
-  # password: "changeme"
-  # collection: "bioentities"
-  # numShards: "4"
-  # timeout: "30000"
-  # createSecret: true
-  # bioentities:
-  #   jsonl:
-  #     enabled: false
-  #   populator:
-  #     enabled: false
-  #     gitBranch: "develop"
-  # bulkAnalytics:
-  #   jsonl:
-  #     enabled: false
-  #   populator:
-  #     enabled: false
-  #     gitBranch: "develop"
 
 nfs:
-  server: hh-isi-srv-vlan1496.ebi.ac.uk
-  snapshotComponent: .snapshot/gxa_codon_2025-07-14_14:10/experiments
+  server: "hh-isi-srv-vlan1496.ebi.ac.uk"
+  snapshotComponent: "experiments"

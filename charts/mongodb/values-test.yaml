@@ -1,0 +1,19 @@
+# values for mongodb test env
+
+auth:
+  rootUsername: admin
+  rootPassword: ""  # Set via MONGODB_ROOT_PASSWORD environment variable or .env file
+  database: gxa
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""  # Use default storage class
+
+mongoimport:
+  enabled: true
+  jsonlSource:
+    pvcName: bulk-analytics-jsonl-rwm
+    mountPath: "/data/jsonl"
+  collection: "bulk_analytics"
+

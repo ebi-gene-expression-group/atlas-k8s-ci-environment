@@ -79,7 +79,12 @@ spec:
               done
 
               cd /atlas-web-bulk
-              ./gradlew --no-watch-fs {{ include "app.gradleCliArgs" . | indent 14 }} -PdataFilesLocation={{ include "app.dataDir" . }} -PexperimentDesignLocation={{ include "app.bioentityPropertiesDir" . }} -PexperimentFilesLocation={{ include "app.experimentsDir" . }} :cli:bootRun --args="bioentities-json --output={{ include "app.bioentitiesJsonlDir" . }}"
+              ./gradlew --no-watch-fs {{ include "app.gradleCliArgs" . | indent 14 }} \
+                -PdataFilesLocation={{ include "app.dataDir" . }} \
+                -PexperimentDesignLocation={{ include "app.bioentityPropertiesDir" . }} \
+                -PexperimentFilesLocation={{ include "app.experimentsDir" . }} \
+                :cli:bootRun \
+                --args="bioentities-json --output={{ include "app.bioentitiesJsonlDir" . }}"
 
           volumeMounts:
             # this is the volume where the bioentity_properties files are stored

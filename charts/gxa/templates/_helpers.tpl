@@ -101,13 +101,12 @@ Notes:
 -Dhttp.proxyPort=${PROXY_PORT} \
 -Dhttps.proxyHost=${PROXY_HOST} \
 -Dhttps.proxyPort=${PROXY_PORT} \
--Dhttp.nonProxyHosts=$(echo ${NO_PROXY} | sed 's/,/|/g')
+-Dhttp.nonProxyHosts=${NO_PROXY//,/|}
 {{- end }}
 
-{{- define "app.experimentsDirName" -}}
-{{- if eq .Values.environment "test" }}
-experiments_test{{- else }}
-experiments{{- end }}
+{{- define "app.jvmProxyArgsSingleLine" -}}
+{{- /* Single-line version for environment variables (CATALINA_OPTS, JAVA_OPTS, etc.) */ -}}
+-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=${NO_PROXY//,/|}
 {{- end }}
 
 {{/*
@@ -133,29 +132,13 @@ Root directory for data mounts
 /usr/local/tomcat
 {{- end }}
 
-{{- define "app.bioentityPropertiesDir" -}}
-{{ include "app.dataDir" . }}/bioentity_properties
-{{- end }}
-
-{{- define "app.bioentityPropertiesSourceDir" -}}
-{{ include "app.dataDir" . }}/bioentity_properties_source
-{{- end }}
-
-{{- define "app.bulkAnalyticsJsonlDir" -}}
-{{ include "app.dataDir" . }}/bulk-analytics-jsonl
-{{- end }}
-
-{{- define "app.bioentitiesJsonlDir" -}}
-{{ include "app.dataDir" . }}/bioentities-jsonl
-{{- end }}
-
 {{/*
-Gradle CLI arguments for running the CLI application
+Source directory for experiments on NFS
 */}}
-{{- define "app.gradleCliArgs" -}} 
---quiet \
-{{ include "app.jvmProxyArgs" . }} 
+{{- define "app.experimentsSourceDir" -}}
+{{- include "app.servicesDir" . -}}/fg/atlas/{{- .Values.nfs.snapshotComponent -}}
 {{- end }}
+
 
 {{/*
 Proxy environment variables, used in containers
@@ -202,14 +185,9 @@ Proxy environment variables, used in containers
 NFS volume mounts, used in deployments and jobs
 */}}
 
-{{- define "app.expdesignVolume" -}}
-- name: {{ include "app.name" . }}-expdesign-vol
-  persistentVolumeClaim:
-    claimName: {{ include "app.name" . }}-expdesign-rwo
-{{- end }}
 
 {{- define "app.gxaCodonVolume" -}}
-- name: {{ include "app.name" . }}-codon-volume
+- name: codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/ro/gxa_codon
@@ -222,6 +200,14 @@ NFS volume mounts, used in deployments and jobs
     path: /ifs/public/services
 {{- end }}
 
+{{- define "app.expdesignVolume" -}}
+- name: expdesign-volume
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/services/fg/atlas/experiments_test/expDesign
+    readOnly: true
+{{- end }}
+
 {{- define "app.gxaVolume" -}}
 - name: gxa-volume
   nfs:
@@ -232,7 +218,7 @@ NFS volume mounts, used in deployments and jobs
 {{- define "app.bulkAnalyticsJsonlVolume" -}}
 - name: bulk-analytics-jsonl-vol
   persistentVolumeClaim:
-    claimName: bulk-analytics-jsonl-rwo
+    claimName: bulk-analytics-jsonl-rwm
 {{- end }}
 
 {{- define "app.bioentitiesJsonlVolume" -}}

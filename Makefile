@@ -46,13 +46,20 @@ ENV_VALUES = charts/$(RELEASE)/values-$(ENV).yaml
 NAMESPACE = $(RELEASE)-$(ENV)
 APP_VERSION = 37.0.5
 CURL_DEBUG_OPTS=--progress-bar
+# Enable Helm debug dry-run mode when DEBUG is set to 1, true or yes
+HELM_DEBUG_FLAGS :=
+DEBUG_ENABLED := $(filter 1 true yes,$(DEBUG))
+ifneq ($(DEBUG_ENABLED),)
+$(info Running Helm in DEBUG dry-run mode (DEBUG=$(DEBUG)))
+HELM_DEBUG_FLAGS = --debug --dry-run
+endif
 # Simple variables for node hostname and port
 NODE_HOSTNAME ?= $(shell kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
 NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)
 TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
 
 WAR_FILE_DIR ?= charts/$(RELEASE)/war
-.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall delete-jobs workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
+.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
 
 
 # Set helm --set arguments based on environment variables
@@ -71,12 +78,16 @@ ifdef TOMCAT_DEPLOYER_PASSWORD
 $(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
 HELM_SET_ARGS += --set tomcat.deployerPassword="$(subst ",,$(TOMCAT_DEPLOYER_PASSWORD))"
 endif
+ifdef TOMCAT_CURATOR_PASSWORD
+$(info Setting tomcat.curatorPassword from TOMCAT_CURATOR_PASSWORD environment variable)
+HELM_SET_ARGS += --set tomcat.curatorPassword="$(subst ",,$(TOMCAT_CURATOR_PASSWORD))"
+endif
 ifdef DOCKER_CONFIG_JSON
 $(info Setting registrySecret.dockerconfigjson from DOCKER_CONFIG_JSON environment variable)
 HELM_SET_ARGS += --set-file registrySecret.dockerconfigjson="$(subst ",,$(DOCKER_CONFIG_JSON))"
 endif
 
-deploy:
+deploy: init-k8s
 	@echo "$(BOLD)$(GREEN)Deploying to environment: $(ENV)$(RESET)"
 	@echo "$(CYAN)Using values file: $(ENV_VALUES)$(RESET)"
 	helm upgrade --install \
@@ -85,7 +96,7 @@ deploy:
 	  --namespace $(NAMESPACE) \
 	  --create-namespace \
 	  -f $(ENV_VALUES) \
-	  $(HELM_SET_ARGS)
+	  $(HELM_SET_ARGS) $(HELM_DEBUG_FLAGS)
 
 deploy-test:
 	$(MAKE) deploy ENV=test
@@ -93,25 +104,22 @@ deploy-test:
 uninstall:
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE) 
 
-# Delete Kubernetes job
-delete-jobs:
-	@echo "$(BOLD)$(MAGENTA)Deleting Kubernetes jobs... from $(NAMESPACE)$(RESET)"
+init-k8s:
+	kubectx $(K8S_CONTEXT)
+	kubectl config set-context --current --namespace=$(NAMESPACE)
 
-	kubectl delete job --selector app.kubernetes.io/name=$(RELEASE) --namespace $(NAMESPACE) || true
-
-# Workflow: delete job then deploy to test
-workflow: delete-jobs deploy-test
-	@echo "$(BOLD)$(GREEN)Workflow completed: job deleted and deployed to test environment$(RESET)" 
+# Workflow: deploy to test
+workflow: deploy-test
+	@echo "$(BOLD)$(GREEN)Workflow completed: deployed to test environment$(RESET)" 
 
 # Deploy WAR file using curl commands
-deploy-war:
+deploy-war: init-k8s
 	@echo "$(BOLD)$(GREEN)Deploying WAR file using curl commands...$(RESET)"
 	@set -e; \
 	DEPLOYER_PASSWORD=$$(kubectl get secret $(RELEASE)-secrets --namespace $(NAMESPACE) \
 		-o jsonpath='{.data.tomcat-users\.xml}' \
 		| base64 -d \
-		| yq -oy -p=xml \
-			'.tomcat-users.user | select(.["+@username"] == "deployer") | .+@password'); \
+		| yq -p=xml '.tomcat-users.user[] | select(.["+@username"] == "deployer") | .["+@password"]'); \
 	if [ -z "$$DEPLOYER_PASSWORD" ]; then \
 		echo "ERROR: Failed to get deployer password"; \
 		exit 1; \
@@ -133,19 +141,12 @@ deploy-war:
 		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)" \
 		--location \
 		-O
-	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
-	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/experiments" \
-		--location \
-		-O
 	@echo "$(BOLD)$(GREEN)Checking app health check endpoint ...$(RESET)"; \
 	curl --fail \
 		"$(TOMCAT_SERVER_URL)/gxa/json/health" \
 		--location
-
-	@echo "$(BOLD)$(GREEN)Checking experiment REST resource ...$(RESET)"; \
+	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/json/experiments/E-MTAB-3827" \
+		"$(TOMCAT_SERVER_URL)/gxa/json/experiments" \
 		--location \
 		-O
-

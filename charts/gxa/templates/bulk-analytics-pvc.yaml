@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: bulk-analytics-jsonl-rwo
+  name: bulk-analytics-jsonl-rwm
   labels:
     {{- include "app.labels" . | nindent 4 }}
   annotations:
@@ -9,7 +9,7 @@ metadata:
 spec:
   storageClassName: standard-nfs-production 
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 200Gi

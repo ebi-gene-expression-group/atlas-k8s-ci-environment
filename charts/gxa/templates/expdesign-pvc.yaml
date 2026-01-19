@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "app.name" . }}-expdesign-rwo
+  name: expdesign-rwo
   labels:
     {{- include "app.labels" . | nindent 4 }}
 spec:

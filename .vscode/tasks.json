@@ -1,0 +1,75 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "deploy gxa to test",
+			"type": "shell",
+			"command": "make workflow",
+			"problemMatcher": [
+				{
+					"owner": "deploy-errors",
+					"fileLocation": "absolute",
+					"pattern": {
+						"regexp": "^(Error|ERROR|FATAL|FAILED):\\s*(.*)$",
+						"message": 2,
+						"severity": 1
+					}
+				}
+			],
+			"options": {
+				"env": {
+					"RELEASE": "${input:release}",
+					"ENV": "${input:env}",
+					"DEBUG": "${input:debug}"
+				}
+			}
+		},
+		{
+			"label": "deploy-war",
+			"type": "shell",
+			"command": "make deploy-war",
+			"problemMatcher": [],
+			"options": {
+				"env": {
+					"WAR_FILE_DIR": "/Users/amnon/Downloads",
+					"RELEASE": "${input:release}",
+					"ENV": "${input:env}",
+				}
+			}
+		},
+	],
+	"inputs": [
+
+				{
+					"id": "release",
+					"type": "pickString",
+					"description": "app release: gxa or scxa",
+					"options": [
+						"gxa",
+						"scxa"
+					],
+					"default": "gxa"
+				},
+				{
+					"id": "env",
+					"type": "pickString",
+					"description": "environment: test or dev or prod",
+					"options": [
+						"test",
+						"dev",
+						"prod"
+					],
+					"default": "test"
+				},
+				{
+					"id": "debug",
+					"type": "pickString",
+					"description": "enable debug mode",
+					"options": [
+						"true",
+						"false"
+					],
+					"default": "false"
+				}
+			]
+}
