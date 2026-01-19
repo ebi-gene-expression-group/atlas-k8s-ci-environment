@@ -14,35 +14,9 @@ solr:
   namespace: scxa-dev-solrcloud
   user: admin
   createSecret: true
-  scxaAnalytics:
-    populator:
-      enabled: false
-  gene2experiment:
-    populator:
-      enabled: false
 
 nfs:
   snapshotComponent: experiments_test
   scxaExpVolPath: "atlas_sc_test_experiments"
 
 experiment_ids: "E-ANND-1 E-ANND-2 E-ANND-3 E-ANND-5 E-CURD-101 E-CURD-102 E-CURD-112 E-CURD-114 E-CURD-117 E-CURD-118 E-CURD-144 E-CURD-21 E-CURD-53 E-CURD-55 E-CURD-77 E-CURD-88 E-ENAD-16 E-ENAD-18 E-ENAD-19 E-ENAD-49 E-ENAD-50 E-GEOD-102475 E-GEOD-103011 E-GEOD-141730 E-GEOD-147987 E-GEOD-149689 E-GEOD-150728 E-GEOD-158761 E-GEOD-161642 E-GEOD-234602 E-GEOD-83139 E-GEOD-89910 E-HCAD-23 E-HCAD-30 E-HCAD-32 E-MTAB-10197 E-MTAB-10371 E-MTAB-10448 E-MTAB-10596 E-MTAB-10894 E-MTAB-11006 E-MTAB-11104 E-MTAB-12532 E-MTAB-3707 E-MTAB-7078 E-MTAB-8498 E-MTAB-8751 E-MTAB-9067 E-MTAB-9388 E-MTAB-9801"
-
-bioentities-collection:
-  parentChartName: scxa
-  enabled: true
-  jdbc:
-    url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
-    createSecret: true
-  solr:
-    namespace: "scxa-dev-solrcloud"
-    user: admin
-    numShards: "4"
-    timeout: "30000"
-    createSecret: true
-    bioentities:
-      collection: bioentities
-      jsonl:
-        enabled: false
-      populator:
-        enabled: false
-        gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s

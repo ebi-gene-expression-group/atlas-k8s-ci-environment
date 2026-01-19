@@ -105,10 +105,6 @@ solr:
   numShards: "4"
   timeout: "30000"
   createSecret: true
-  scxaAnalytics:
-    collection: scxa-analytics-v8
-  gene2experiment:
-    collection: scxa-gene2experiment-v1
 
 jdbc:
   createSecret: true

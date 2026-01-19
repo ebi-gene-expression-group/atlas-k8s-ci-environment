@@ -73,8 +73,6 @@ data:
   # Solr configuration
   SOLR_HOST: "{{ include "app.solrHost" . }}"
   SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
-  SOLR_SCXA_ANALYTICS_COLLECTION: "{{ .Values.solr.scxaAnalytics.collection  }}"
-  SOLR_SCXA_GENE2EXPERIMENT_COLLECTION: "{{ .Values.solr.gene2experiment.collection  }}"
   SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
   SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
 
