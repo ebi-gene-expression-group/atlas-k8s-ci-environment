@@ -98,6 +98,10 @@ affinity: {}
 tomcat:
   httpPort: 8080
   createSecret: true
+  debug:
+    enabled: false
+    port: 8000
+    address: "*:8000"  # Use "*:8000" to listen on all interfaces, or "localhost:8000" for localhost only
 
 solr:
   namespace: scxa-dev-solrcloud

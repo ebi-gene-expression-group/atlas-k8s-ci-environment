@@ -117,14 +117,14 @@ NFS volume mounts, used in deployments and jobs
 */}}
 
 {{- define "app.scxaExperimentsVolume" -}}
-- name: {{ include "app.name" . }}-exp-volume
+- name: experiments-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/ro/scxa_codon/{{ .Values.nfs.scxaExpVolPath}}
 {{- end }}
 
 {{- define "app.scxaCodonVolume" -}}
-- name: {{ include "app.name" . }}-codon-volume
+- name: codon-volume
   nfs:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/ro/scxa_codon
