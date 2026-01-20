@@ -85,7 +85,7 @@ $(info Setting registrySecret.dockerconfigjson from DOCKER_CONFIG_JSON environme
 HELM_SET_ARGS += --set-file registrySecret.dockerconfigjson="$(subst ",,$(DOCKER_CONFIG_JSON))"
 endif
 
-deploy:
+deploy: init-k8s
 	@echo "$(BOLD)$(GREEN)Deploying to environment: $(ENV)$(RESET)"
 	@echo "$(CYAN)Using values file: $(ENV_VALUES)$(RESET)"
 	helm upgrade --install \
