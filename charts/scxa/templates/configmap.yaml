@@ -11,8 +11,6 @@ data:
     oryza_sativa brachypodium_distachyon schistosoma_mansoni zea_mays
     saccharomyces_cerevisiae schizosaccharomyces_pombe
 
-  experiment_ids: {{ .Values.experiment_ids | quote }}
-
   server.xml: |
     <Server port="8005" shutdown="SHUTDOWN">
         <GlobalNamingResources>
@@ -68,16 +66,10 @@ data:
         <logger name="uk.ac.ebi.atlas" level="DEBUG" additivity="false">
             <appender-ref ref="STDOUT"/>
         </logger>
+        <logger name="org.springframework.web" level="DEBUG" additivity="false">
+            <appender-ref ref="STDOUT"/>
+        </logger>
+        <logger name="org.springframework.jdbc" level="DEBUG" additivity="false">
+            <appender-ref ref="STDOUT"/>
+        </logger>
     </configuration>
-
-  # Solr configuration
-  SOLR_HOST: "{{ include "app.solrHost" . }}"
-  SOLR_ZK_HOSTS: "{{ include "app.solrZkHosts" . }}"
-  SOLR_NUM_SHARDS: "{{ .Values.solr.numShards | default "4" }}"
-  SOLR_TIMEOUT: "{{ .Values.solr.timeout | default "30000" }}"
-
-  # PostGreSQL configuration
-  POSTGRES_HOST: "{{ .Values.jdbc.host }}"
-  POSTGRES_DB: "{{ .Values.jdbc.db }}"
-
-
