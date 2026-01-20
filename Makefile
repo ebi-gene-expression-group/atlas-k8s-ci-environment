@@ -129,8 +129,8 @@ deploy-war: init-k8s
 		--fail \
 		--include \
 		$(CURL_DEBUG_OPTS) \
-		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=/gxa&update=true" \
-		--upload-file $(WAR_FILE_DIR)/gxa.war; \
+		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=$(DEPLOY_CTX_PATH)&update=true" \
+		--upload-file $(WAR_FILE_DIR)/$(RELEASE).war; \
 	echo "$(BOLD)$(GREEN)Listing deployed applications...$(RESET)"; \
 	curl -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \
@@ -143,10 +143,10 @@ deploy-war: init-k8s
 		-O
 	@echo "$(BOLD)$(GREEN)Checking app health check endpoint ...$(RESET)"; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/json/health" \
+		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)/json/health" \
 		--location
 	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/json/experiments" \
+		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)/json/experiments" \
 		--location \
 		-O
