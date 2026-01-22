@@ -25,6 +25,12 @@ data:
           <Host name="localhost" appBase="webapps"
                 unpackWARs="true" autoDeploy="true">
             <Valve className="org.apache.catalina.valves.RemoteIpValve" />
+            <Valve className="org.apache.catalina.valves.AccessLogValve"
+                   directory="logs"
+                   prefix="access_log"
+                   suffix=".log"
+                   pattern="%h %l %u %t %m %U %q %s %b %D"
+                   resolveHosts="false"/>
           </Host>
         </Engine>
       </Service>

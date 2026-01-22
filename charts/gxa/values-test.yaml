@@ -6,7 +6,7 @@ experiment_ids: "E-CURD-23,E-CURD-30,E-ERAD-475,E-GEOD-16879,E-GEOD-18068,E-GEOD
 tomcat:
   createSecret: true
   debug:
-    enabled: true
+    enabled: false
 
 loggingLevel: INFO
 

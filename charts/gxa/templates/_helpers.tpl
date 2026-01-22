@@ -208,12 +208,6 @@ NFS volume mounts, used in deployments and jobs
     readOnly: true
 {{- end }}
 
-{{- define "app.gxaVolume" -}}
-- name: gxa-volume
-  nfs:
-    server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/gxa
-{{- end }}
 
 {{- define "app.bulkAnalyticsJsonlVolume" -}}
 - name: bulk-analytics-jsonl-vol

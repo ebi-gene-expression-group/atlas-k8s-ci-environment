@@ -100,7 +100,7 @@ spec:
             - name: experiments-snapshot
               mountPath: {{ include "app.experimentsDir" . }}/magetab
               readOnly: true
-            - name: gxa-volume
+            - name: codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
@@ -153,7 +153,6 @@ spec:
             - name: tomcat-config
               mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
       volumes:
-        {{- include "app.gxaVolume" . | nindent 8 }}
         {{- include "app.gxaCodonVolume" . | nindent 8 }}
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.expdesignVolume" . | nindent 8 }}
@@ -192,7 +191,7 @@ spec:
         - name: tomcat-config
           emptyDir: {}
       initContainers:
-        - name: "{{ include "app.name" . }}-init-experiments-snapshot"
+        - name: "init-experiments-snapshot"
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

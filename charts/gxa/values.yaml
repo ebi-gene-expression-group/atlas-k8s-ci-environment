@@ -79,7 +79,6 @@ tomcat:
 
 loggingLevel: DEBUG
 
-
 nfs:
   server: "hh-isi-srv-vlan1496.ebi.ac.uk"
   snapshotComponent: "experiments"
