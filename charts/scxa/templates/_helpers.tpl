@@ -120,7 +120,7 @@ NFS volume mounts, used in deployments and jobs
 - name: experiments-volume
   nfs:
     server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/scxa_codon/{{ .Values.nfs.scxaExpVolPath}}
+    path: /ifs/public/services/fg/atlas/{{ .Values.nfs.scxaExpVolPath}}
 {{- end }}
 
 {{- define "app.scxaCodonVolume" -}}

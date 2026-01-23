@@ -17,4 +17,4 @@ solr:
 
 nfs:
   snapshotComponent: experiments_test
-  scxaExpVolPath: "atlas_sc_test_experiments"
+  scxaExpVolPath: "sc_experiments_test"

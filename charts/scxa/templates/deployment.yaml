@@ -77,7 +77,6 @@ spec:
             {{- /* app data mounts */}}
             - name: experiments-volume
               mountPath: {{ include "app.dataDir" . }}/exp/magetab
-              subPath: release-metadata.json
             - name: admin-volume
               mountPath: {{ include "app.experimentsDir" . }}/admin
             - name: codon-volume
