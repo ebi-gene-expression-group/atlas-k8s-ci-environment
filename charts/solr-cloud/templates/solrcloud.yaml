@@ -31,7 +31,7 @@ spec:
           memory: {{ .Values.solr.resources.requests.memory }}
           cpu: {{ .Values.solr.resources.requests.cpu }}
       volumes:
-        {{- if .Values.solr.secret.enabled }}
+      {{- if .Values.solr.secret.enabled }}
         - name: keys-secret
           source:
             secret:
@@ -39,21 +39,21 @@ spec:
           defaultContainerMount:
             name: keys-secret
             mountPath: {{ .Values.solr.secret.mountPath }}
-        {{- end }}
-        {{- if .Values.solr.bioSolr.enabled }}
+      {{- end }}
+      {{- if .Values.solr.bioSolr.enabled}}
         - name: bio-solr-volume
-          {{- include "bioSolr.volume.source" . | nindent 10 }}
+          {{- include "bioSolr.volume.source" . | nindent 8 }}
           defaultContainerMount:
             name: bio-solr-volume
             mountPath: /var/solr/data/filestore/biosolr
             subPath: fg/atlas/biosolr
         - name: scatlas-owl-volume
-          {{- include "bioSolr.volume.source" . | nindent 10 }}
+          {{- include "bioSolr.volume.source" . | nindent 8 }}
           defaultContainerMount:
             name: scatlas-owl-volume
             mountPath: /var/solr/data/userfiles/scatlas.owl
             subPath: fg/atlas/biosolr/scatlas.owl
-        {{- end }}
+      {{- end }}
   zookeeperRef:
     provided:
       persistence:
