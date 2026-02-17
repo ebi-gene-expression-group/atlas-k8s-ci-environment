@@ -20,6 +20,8 @@ solr:
     enabled: false
     name: scxa-solrcloud-package-store-keys
     mountPath: /keys
+  bioSolr:
+    enabled: true
 
 zookeeper:
   replicas: 3
