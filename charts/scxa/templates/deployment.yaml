@@ -31,14 +31,25 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ include "app.name" . }}-webapp
+          {{- with .Values.securityContext }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "tomcat:8-jdk11" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.tomcat.debug.enabled }}
+          command: [ "catalina.sh" ]
+          args: [ "jpda", "run" ]
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.tomcat.httpPort }}
               protocol: TCP
+            {{- if .Values.tomcat.debug.enabled }}
+            - name: debug
+              containerPort: {{ .Values.tomcat.debug.port }}
+              protocol: TCP
+            {{- end }}
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -53,16 +64,26 @@ spec:
                   key: SOLR_PASS
             - name: JAVA_TOOL_OPTIONS
               value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
+            {{- if .Values.tomcat.debug.enabled }}
+            - name: JPDA_ADDRESS
+              value: {{ .Values.tomcat.debug.address | quote }}
+            {{- end }}
+            - name: CATALINA_OPTS
+              value: "-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=${NO_PROXY//,/|}"
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            - name: {{ include "app.name" . }}-exp-volume
+            {{- /* app data mounts */}}
+            - name: experiments-volume
               mountPath: {{ include "app.dataDir" . }}/exp/magetab
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: admin-volume
+              mountPath: {{ include "app.experimentsDir" . }}/admin
+            - name: codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
               subPath: release-metadata.json
               readOnly: true
-            - name: {{ include "app.name" . }}-codon-volume
+            - name: codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/species-properties.json
               subPath: species-properties.json
               readOnly: true
@@ -70,21 +91,26 @@ spec:
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties
               readOnly: true
-            - name: {{ include "app.name" . }}-secrets
-              mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
-              subPath: tomcat-users.xml
-            - name: {{ include "app.name" . }}-secrets
-              mountPath: /webapp-properties/jdbc.properties
-              subPath: jdbc.properties
-            - name: {{ include "app.name" . }}-secrets
-              mountPath: /webapp-properties/solr.properties
-              subPath: solr.properties
+            - name: experiments-volume
+              mountPath: {{ include "app.expdesignDir" . }}
+              subPath: expDesign
+            {{- /* webapp properties mounts */}}
             - name: configuration-properties
               mountPath: /webapp-properties/configuration.properties
               subPath: configuration.properties
             - name: tomcat-logback-xml
               mountPath: /webapp-properties/logback.xml
               subPath: logback.xml
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: /webapp-properties/jdbc.properties
+              subPath: jdbc.properties
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: /webapp-properties/solr.properties
+              subPath: solr.properties
+            {{- /* tomcat config mounts */}}
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: {{ include "app.tomcatDir" . }}/conf/tomcat-users.xml
+              subPath: tomcat-users.xml
             - name: tomcat-logs
               mountPath: {{ include "app.tomcatDir" . }}/logs
             - name: tomcat-work
@@ -101,18 +127,11 @@ spec:
             - name: tomcat-config
               mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
       volumes:
-        {{- include "app.secretsVolume" . | nindent 8 }}
         {{- include "app.scxaExperimentsVolume" . | nindent 8 }}
         {{- include "app.servicesVolume" . | nindent 8 }}
         {{- include "app.scxaCodonVolume" . | nindent 8 }}
-        - name: tomcat-logs
-          emptyDir: {}
-        - name: tomcat-work
-          emptyDir: {}
-        - name: tomcat-webapps
-          emptyDir: {}
-        - name: tomcat-config
-          emptyDir: {}
+        - name: admin-volume
+          emptyDir: { }
         - name: configuration-properties
           configMap:
             name: {{ include "app.fullname" . }}-config
@@ -133,6 +152,15 @@ spec:
             items:
               - key: logback.xml
                 path: logback.xml
+        {{- include "app.secretsVolume" . | nindent 8 }}
+        - name: tomcat-logs
+          emptyDir: {}
+        - name: tomcat-work
+          emptyDir: {}
+        - name: tomcat-webapps
+          emptyDir: {}
+        - name: tomcat-config
+          emptyDir: {}
       initContainers:
       - name: {{ include "app.name" . }}-init-tomcat-manager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"

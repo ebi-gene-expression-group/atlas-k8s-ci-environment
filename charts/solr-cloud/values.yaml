@@ -29,3 +29,6 @@ zookeeper:
 
 service:
    nodePort: null   # Assign a port (30000–32767)
+
+nfs:
+  server: hh-isi-srv-vlan1496.ebi.ac.uk

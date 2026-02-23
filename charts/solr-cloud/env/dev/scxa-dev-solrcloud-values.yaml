@@ -3,13 +3,15 @@ solr:
   image:
     tag: 8.7.0
   javaMem: "-Xms2000m -Xmx3000m"
-  opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983"
+  opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983 -Dsolr.max.booleanClauses=100000000"
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
   resources:
     limits:
       memory: 3Gi
+      cpu: 2
     requests:
       memory: 2Gi
+      cpu: 1
   storage:
     className: standard-nfs-production
     size: 20Gi
@@ -18,6 +20,8 @@ solr:
     enabled: false
     name: scxa-solrcloud-package-store-keys
     mountPath: /keys
+  bioSolr:
+    enabled: true
 
 zookeeper:
   replicas: 3

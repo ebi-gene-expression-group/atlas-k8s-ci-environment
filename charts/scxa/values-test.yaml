@@ -4,6 +4,9 @@ environment: test
 loggingLevel: DEBUG
 
 jdbc:
+  username: atlasprd3
+  populator:
+    enabled: true
   url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
   createSecret: true
 
@@ -11,33 +14,7 @@ solr:
   namespace: scxa-dev-solrcloud
   user: admin
   createSecret: true
-  scxaAnalytics:
-    populator:
-      enabled: false
-  gene2experiment:
-    populator:
-      enabled: false
 
 nfs:
   snapshotComponent: experiments_test
-
-experiment_ids: "E-CURD-4 E-EHCA-2 E-GEOD-71585 E-GEOD-81547 E-GEOD-99058 E-MTAB-5061 E-ENAD-53"
-
-bioentities-collection:
-  enabled: true
-  jdbc:
-    url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
-    createSecret: true
-  solr:
-    namespace: "scxa-dev-solrcloud"
-    user: admin
-    numShards: "4"
-    timeout: "30000"
-    createSecret: true
-    bioentities:
-      collection: bioentities
-      jsonl:
-        enabled: false
-      populator:
-        enabled: false
-        gitBranch: feature/amnon-GXA-333-populate-solr-on-k8s
+  scxaExpVolPath: "sc_experiments_test"

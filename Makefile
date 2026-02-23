@@ -26,9 +26,9 @@ ifeq ($(RELEASE),gxa)
     DEPLOY_CTX_PATH = /gxa
 else ifeq ($(RELEASE),scxa)
     DEPLOY_CTX_PATH = /gxa/sc
-else ifeq ($(RELEASE),bioentities-collection)
+else ifeq ($(RELEASE))
 else
-    $(error Error: unknown RELEASE $(RELEASE). Supported values are gxa, scxa or bioentities-collection)
+    $(error Error: unknown RELEASE $(RELEASE). Supported values are gxa, scxa)
 endif
 $(info Using deploy context path: $(DEPLOY_CTX_PATH))
 
@@ -70,14 +70,12 @@ WAR_FILE_NAME ?= gxa.war
 # Set helm --set arguments based on environment variables
 HELM_SET_ARGS = --set appVersion=$(APP_VERSION)
 ifdef JDBC_PASSWORD
-$(info Setting jdbc.password and bioentities-collection.jdbc.password from JDBC_PASSWORD environment variable)
+$(info Setting jdbc.password from JDBC_PASSWORD environment variable)
 HELM_SET_ARGS += --set jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
-HELM_SET_ARGS += --set bioentities-collection.jdbc.password="$(subst ",,$(JDBC_PASSWORD))"
 endif
 ifdef SOLR_PASSWORD
-$(info Setting solr.password and bioentities-collection.solr.password from SOLR_PASSWORD environment variable)
+$(info Setting solr.password from SOLR_PASSWORD environment variable)
 HELM_SET_ARGS += --set solr.password="$(subst ",,$(SOLR_PASSWORD))"
-HELM_SET_ARGS += --set bioentities-collection.solr.password="$(subst ",,$(SOLR_PASSWORD))"
 endif
 ifdef TOMCAT_DEPLOYER_PASSWORD
 $(info Setting tomcat.deployerPassword from TOMCAT_DEPLOYER_PASSWORD environment variable)
@@ -134,8 +132,8 @@ deploy-war: init-k8s
 		--fail \
 		--include \
 		$(CURL_DEBUG_OPTS) \
-		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=/gxa&update=true" \
-		--upload-file "$(WAR_FILE_DIR)/$(WAR_FILE_NAME)"; \
+		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=$(DEPLOY_CTX_PATH)&update=true" \
+		--upload-file $(WAR_FILE_DIR)/$(RELEASE).war; \
 	echo "$(BOLD)$(GREEN)Listing deployed applications...$(RESET)"; \
 	curl -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \
@@ -148,10 +146,10 @@ deploy-war: init-k8s
 		-O
 	@echo "$(BOLD)$(GREEN)Checking app health check endpoint ...$(RESET)"; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/json/health" \
+		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)/json/health" \
 		--location
 	echo "$(BOLD)$(GREEN)Checking experiments page...$(RESET)"; \
 	curl --fail \
-		"$(TOMCAT_SERVER_URL)/gxa/json/experiments" \
+		"$(TOMCAT_SERVER_URL)$(DEPLOY_CTX_PATH)/json/experiments" \
 		--location \
 		-O
