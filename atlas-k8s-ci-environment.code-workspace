@@ -11,6 +11,9 @@
 		{
 			"name": "jenkins-jobs",
 			"path": "../jenkins-jobs"
+		},
+		{
+			"path": "../atlas-web-single-cell"
 		}
 	],
 	"settings": {
@@ -33,8 +36,12 @@
 		"java.configuration.runtimes": [
 			{
 				"name": "JavaSE-11",
-				"path": "/usr/lib/jvm/java-11-openjdk-amd64"
+				"path": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
+				"default": true
 			}
-		]
+		],
+		"java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
+		"openctx.enable": true,
+		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home"
 	}
 }

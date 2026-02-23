@@ -58,6 +58,15 @@ is also populated to ensure Java-based proxy support.
 - **SolrCloud:** host and ZK endpoints are configured via `values.yaml` and injected
   into `configuration.properties` and secrets for authenticated access.
 
+## Namespaces and environments
+
+- The chart does not create a `Namespace` resource. Use Helm's `--create-namespace`
+  (already used by `make deploy`) or create the namespace ahead of time.
+- Each environment is expected to have its own values file named
+  `values-<env>.yaml` under `charts/gxa/`.
+- You can scaffold a new environment values file from the test template:
+  `scripts/create-env.sh <env> [release]` (defaults to `gxa`).
+
 ## Configuration
 
 ### Webapp configuration

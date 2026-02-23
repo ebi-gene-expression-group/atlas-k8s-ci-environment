@@ -1,5 +1,5 @@
 # values for gxa test env
-environment: test
+environment: staging
 
 tomcat:
   createSecret: true
@@ -12,13 +12,13 @@ nfs:
   snapshotComponent: experiments_test
 
 jdbc:
-  url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
+  url: "jdbc:postgresql://pgsql-hlvm-038:5432/gxpatlaspro"
   user: atlasprd3
   pool: gxa
   createSecret: true
 
 
 solr:
-  namespace: gxa-dev-solrcloud
+  namespace: gxa-staging-solrcloud
   user: admin
   createSecret: true

@@ -36,15 +36,19 @@ ENV ?= test
 # SUPPORTED_ENVS = test dev prod
 SUPPORTED_ENVS = test
 
-# Validate environment variable
-ifeq ($(filter $(ENV),$(SUPPORTED_ENVS)),)
-$(error Error: unknown ENV $(ENV). must be one of: $(SUPPORTED_ENVS))
-endif
-$(info Using environment: $(ENV))
-
 ENV_VALUES = charts/$(RELEASE)/values-$(ENV).yaml
+
+# Validate environment variable (allow custom envs with values files)
+ifneq ($(filter $(ENV),$(SUPPORTED_ENVS)),)
+$(info Using environment: $(ENV))
+else
+ifeq ($(wildcard $(ENV_VALUES)),)
+$(error Error: unknown ENV $(ENV). must be one of: $(SUPPORTED_ENVS) or have $(ENV_VALUES))
+endif
+$(info Using custom environment: $(ENV))
+endif
 NAMESPACE = $(RELEASE)-$(ENV)
-APP_VERSION = 37.0.5
+APP_VERSION = 37.6.0
 CURL_DEBUG_OPTS=--progress-bar
 # Enable Helm debug dry-run mode when DEBUG is set to 1, true or yes
 HELM_DEBUG_FLAGS :=
@@ -59,7 +63,8 @@ NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o 
 TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
 
 WAR_FILE_DIR ?= charts/$(RELEASE)/war
-.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context
+WAR_FILE_NAME ?= gxa.war
+.PHONY: deploy deploy-test deploy-dev deploy-prod uninstall workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context ensure-registry-secret
 
 
 # Set helm --set arguments based on environment variables
@@ -125,12 +130,12 @@ deploy-war: init-k8s
 		exit 1; \
 	fi; \
 	echo "$(BOLD)$(GREEN)Deploying WAR file... to $(TOMCAT_SERVER_URL)$(RESET)"; \
-	curl -u deployer:$$DEPLOYER_PASSWORD \
+	curl -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \
 		--include \
 		$(CURL_DEBUG_OPTS) \
 		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=/gxa&update=true" \
-		--upload-file $(WAR_FILE_DIR)/gxa.war; \
+		--upload-file "$(WAR_FILE_DIR)/$(WAR_FILE_NAME)"; \
 	echo "$(BOLD)$(GREEN)Listing deployed applications...$(RESET)"; \
 	curl -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \

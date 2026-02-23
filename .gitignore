@@ -7,3 +7,4 @@
 /charts/*/war/
 **/charts/*.tgz
 .helm_ls_cache/
+.DS_Store
