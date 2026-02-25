@@ -154,15 +154,17 @@ spec:
                 path: logback.xml
         {{- include "app.secretsVolume" . | nindent 8 }}
         - name: tomcat-logs
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: tomcat-logs
         - name: tomcat-work
           emptyDir: {}
         - name: tomcat-webapps
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: tomcat-webapps
         - name: tomcat-config
           emptyDir: {}
       initContainers:
-      - name: {{ include "app.name" . }}-init-tomcat-manager
+      - name: init-tomcat-manager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         command: [ "sh"]

@@ -3,17 +3,22 @@ environment: test
 
 loggingLevel: DEBUG
 
+tomcat:
+  createSecret: false
+  debug:
+    enabled: true
+
 jdbc:
   username: atlasprd3
   populator:
     enabled: true
   url: "jdbc:postgresql://pgsql-dlvm-062.ebi.ac.uk:5432/gxpscxatst"
-  createSecret: true
+  createSecret: false
 
 solr:
   namespace: scxa-dev-solrcloud
   user: admin
-  createSecret: true
+  createSecret: false
 
 nfs:
   snapshotComponent: experiments_test

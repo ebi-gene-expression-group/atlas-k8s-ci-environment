@@ -72,4 +72,10 @@ data:
         <logger name="org.springframework.jdbc" level="DEBUG" additivity="false">
             <appender-ref ref="STDOUT"/>
         </logger>
+        <logger name="org.apache.solr" level="DEBUG" additivity="false">
+            <appender-ref ref="STDOUT"/>
+        </logger>
+        <logger name="org.apache.http" level="DEBUG" additivity="false">
+            <appender-ref ref="STDOUT"/>
+        </logger>
     </configuration>
