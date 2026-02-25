@@ -2,7 +2,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "deploy gxa to test",
+			"label": "deploy expression atlas chart",
 			"type": "shell",
 			"command": "make workflow",
 			"problemMatcher": [
@@ -12,6 +12,15 @@
 					"pattern": {
 						"regexp": "^(Error|ERROR|FATAL|FAILED):\\s*(.*)$",
 						"message": 2,
+						"severity": 1
+					}
+				},
+				{
+					"owner": "shell",
+					"fileLocation": "relative",
+					"pattern": {
+						"regexp": "^(\\w+:.+)$",
+						"message": 0,
 						"severity": 1
 					}
 				}
@@ -28,7 +37,18 @@
 			"label": "deploy-war",
 			"type": "shell",
 			"command": "make deploy-war",
-			"problemMatcher": [],
+			"problemMatcher": [
+				{
+					"owner": "shell",
+					"fileLocation": "relative",
+					"pattern": {
+						"regexp": "^(\\w+):\\s*\\((\\d+)\\)\\s*(.+)$",
+						"file": 1,
+						"message": 3,
+						"severity": "error"
+					}
+				}
+			],
 			"options": {
 				"env": {
 					"RELEASE": "${input:release}",

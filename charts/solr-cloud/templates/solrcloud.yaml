@@ -31,29 +31,29 @@ spec:
           memory: {{ .Values.solr.resources.requests.memory }}
           cpu: {{ .Values.solr.resources.requests.cpu }}
       volumes:
-      {{- if .Values.solr.secret.enabled }}
-        - name: keys-secret
-          source:
-            secret:
-              secretName: {{ .Values.solr.secret.name }}
-          defaultContainerMount:
-            name: keys-secret
-            mountPath: {{ .Values.solr.secret.mountPath }}
-      {{- end }}
-      {{- if .Values.solr.bioSolr.enabled}}
-        - name: bio-solr-volume
-          {{- include "bioSolr.volume.source" . | nindent 8 }}
-          defaultContainerMount:
-            name: bio-solr-volume
-            mountPath: /var/solr/data/filestore/biosolr
-            subPath: fg/atlas/biosolr
-        - name: scatlas-owl-volume
-          {{- include "bioSolr.volume.source" . | nindent 8 }}
-          defaultContainerMount:
-            name: scatlas-owl-volume
-            mountPath: /var/solr/data/userfiles/scatlas.owl
-            subPath: fg/atlas/biosolr/scatlas.owl
-      {{- end }}
+        {{- if .Values.solr.secret.enabled }}
+          - name: keys-secret
+            source:
+              secret:
+                secretName: {{ .Values.solr.secret.name }}
+            defaultContainerMount:
+              name: keys-secret
+              mountPath: {{ .Values.solr.secret.mountPath }}
+        {{- end }}
+        {{- if .Values.solr.bioSolr.enabled }}
+          - name: bio-solr-volume
+            {{- include "bioSolr.volume.source" . | nindent 12 }}
+            defaultContainerMount:
+              name: bio-solr-volume
+              mountPath: /var/solr/data/filestore/biosolr/2.0.0/biosolr.jar
+              subPath: fg/atlas/biosolr/solr-ontology-update-processor-2.0.0.jar
+          - name: scatlas-owl-volume
+            {{- include "bioSolr.volume.source" . | nindent 12 }}
+            defaultContainerMount:
+              name: scatlas-owl-volume
+              mountPath: /var/solr/data/userfiles/scatlas.owl
+              subPath: fg/atlas/biosolr/scatlas.owl
+        {{- end }}
   zookeeperRef:
     provided:
       persistence:

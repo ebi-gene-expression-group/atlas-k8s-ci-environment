@@ -6,7 +6,10 @@
 		},
 		{
 			"name": "atlas-web-bulk",
-			"path": "../atlas-web-bulk"
+			"path": "../atlas-web-bulk",
+			"settings": {
+				"java.import.exclusions": ["**"]
+			}
 		},
 		{
 			"name": "jenkins-jobs",

@@ -49,7 +49,7 @@ $(info Using custom environment: $(ENV))
 endif
 NAMESPACE = $(RELEASE)-$(ENV)
 APP_VERSION = 37.6.0
-CURL_DEBUG_OPTS=--progress-bar
+CURL_DEBUG_OPTS ?= --progress-bar
 # Enable Helm debug dry-run mode when DEBUG is set to 1, true or yes
 HELM_DEBUG_FLAGS :=
 DEBUG_ENABLED := $(filter 1 true yes,$(DEBUG))
@@ -63,7 +63,7 @@ NODE_PORT ?= $(shell kubectl get service $(RELEASE) --namespace $(NAMESPACE) -o 
 TOMCAT_SERVER_URL ?= http://$(NODE_HOSTNAME):$(NODE_PORT)
 
 WAR_FILE_DIR ?= charts/$(RELEASE)/war
-WAR_FILE_NAME ?= gxa.war
+WAR_FILE_NAME ?= $(RELEASE).war
 .PHONY: deploy deploy-test deploy-dev deploy-prod uninstall workflow get-tomcat-users get-tomcat-user-value get-tomcat-usernames get-tomcat-passwords get-tomcat-user get-tomcat-deployer-password deploy-war get-node-info check-tomcat-users test-tomcat-manager inspect-manager-context ensure-registry-secret
 
 
@@ -128,12 +128,12 @@ deploy-war: init-k8s
 		exit 1; \
 	fi; \
 	echo "$(BOLD)$(GREEN)Deploying WAR file... to $(TOMCAT_SERVER_URL)$(RESET)"; \
-	curl -u "deployer:$$DEPLOYER_PASSWORD" \
+	curl --verbose -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \
 		--include \
 		$(CURL_DEBUG_OPTS) \
 		"$(TOMCAT_SERVER_URL)/manager/text/deploy?path=$(DEPLOY_CTX_PATH)&update=true" \
-		--upload-file $(WAR_FILE_DIR)/$(RELEASE).war; \
+		--upload-file "$(WAR_FILE_DIR)/$(WAR_FILE_NAME)"; \
 	echo "$(BOLD)$(GREEN)Listing deployed applications...$(RESET)"; \
 	curl -u "deployer:$$DEPLOYER_PASSWORD" \
 		--fail \
