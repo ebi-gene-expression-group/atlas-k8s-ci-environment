@@ -183,11 +183,13 @@ spec:
         {{- include "app.secretsVolume" . | nindent 8 }}
         # TODO: do we need to make logs a persistent volume? If we use the cluster's monitoring, there is no need.
         - name: tomcat-logs
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: tomcat-logs
         - name: tomcat-work
           emptyDir: {}
         - name: tomcat-webapps
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: tomcat-webapps
         - name: tomcat-config
           emptyDir: {}
       initContainers:
@@ -218,7 +220,7 @@ spec:
               mountPath: {{ include "app.servicesDir" . }}
             - name: experiments-snapshot
               mountPath: /experiments_snapshot
-        - name: "{{ include "app.name" . }}-init-tomcat-manager"
+        - name: init-tomcat-manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [ "sh"]

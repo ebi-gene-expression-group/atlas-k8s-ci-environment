@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tomcat-logs
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+spec:
+  storageClassName: standard-nfs-production 
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
