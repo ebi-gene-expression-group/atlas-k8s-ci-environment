@@ -20,7 +20,7 @@ JSON_RESOURCES="${JSON_RESOURCES:-resources/DATA resources/PLOTS}"
 # (Add timestamps with: ./script.sh | ts '[%Y-%m-%dT%H:%M:%S]'  # requires moreutils)
 CURL_OPTS=(-fsS -o /dev/null -w '%{remote_ip} - - "GET %{url_effective} HTTP/1.1" %{http_code} %{size_download} %{time_total}\n')
 # For each experiment, extract profiles.rows[].id and hit bioentity info URLs.
-curl -fsSL "$EXPERIMENTS_JSON_URL" \
+curl -sSL "$EXPERIMENTS_JSON_URL" \
   | jq -r '.experiments[].experimentAccession' \
   | { if [[ -n "$LIMIT" ]]; then head -n "$LIMIT"; else cat; fi; } \
   | shuf \
@@ -31,6 +31,4 @@ curl -fsSL "$EXPERIMENTS_JSON_URL" \
       for resource in $JSON_RESOURCES; do
         curl "${CURL_OPTS[@]}" "${EXPERIMENT_JSON_URL_TEMPLATE}/${accession}/${resource}" &
       done
-    done \
-  | sort -k9 -n -r \
-  | head -5
+    done 
