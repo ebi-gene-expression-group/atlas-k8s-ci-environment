@@ -47,6 +47,8 @@ Selector labels
 */}}
 {{- define "solr-cloud.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "solr-cloud.name" . }}
+app.kubernetes.io/component: solr-cloud
+app.kubernetes.io/part-of: {{ .Release.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 

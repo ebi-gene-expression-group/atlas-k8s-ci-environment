@@ -45,7 +45,7 @@
 						"regexp": "^(\\w+):\\s*\\((\\d+)\\)\\s*(.+)$",
 						"file": 1,
 						"message": 3,
-						"severity": "error"
+						"severity": 1
 					}
 				}
 			],
