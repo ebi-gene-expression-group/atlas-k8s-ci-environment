@@ -50,6 +50,28 @@ spec:
               containerPort: {{ .Values.tomcat.debug.port }}
               protocol: TCP
             {{- end }}
+          startupProbe:
+            httpGet:
+              path: /gxa/sc/json/experiments
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 30
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /gxa/sc/json/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /gxa/sc/json/experiments
+              port: http
+            periodSeconds: 120
+            timeoutSeconds: 30
+            failureThreshold: 3
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER

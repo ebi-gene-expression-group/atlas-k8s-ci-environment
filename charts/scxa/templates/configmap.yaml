@@ -22,15 +22,21 @@ data:
         </GlobalNamingResources>
         <Service name="Catalina">
             <Connector port="{{ .Values.tomcat.httpPort }}"
-                       protocol="HTTP/1.1"
-                       connectionTimeout="20000"
-                       redirectPort="8443"/>
+                        protocol="HTTP/1.1"
+                        connectionTimeout="20000"
+                        redirectPort="8443"/>
             <Engine name="Catalina" defaultHost="localhost">
                 <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
-                       resourceName="UserDatabase"/>
+                        resourceName="UserDatabase"/>
                 <Host name="localhost" appBase="webapps"
                       unpackWARs="true" autoDeploy="true">
                     <Valve className="org.apache.catalina.valves.RemoteIpValve"/>
+                    <Valve className="org.apache.catalina.valves.AccessLogValve"
+                            directory="logs"
+                            prefix="access_log"
+                            suffix=".log"
+                            pattern="%h %l %u %t %m %U %q %s %b %D"
+                            resolveHosts="false"/>
                 </Host>
             </Engine>
         </Service>
@@ -57,7 +63,7 @@ data:
     <configuration>
         <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
             </encoder>
         </appender>
         <root level="INFO">
@@ -74,8 +80,5 @@ data:
         </logger>
         <logger name="org.apache.solr" level="DEBUG" additivity="false">
             <appender-ref ref="STDOUT"/>
-        </logger>
-        <logger name="org.apache.http" level="DEBUG" additivity="false">
-            <appender-ref ref="STDOUT"/>
-        </logger>
+        </logger>          
     </configuration>
