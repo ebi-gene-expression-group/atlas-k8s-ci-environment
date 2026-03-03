@@ -208,18 +208,6 @@ NFS volume mounts, used in deployments and jobs
     readOnly: true
 {{- end }}
 
-
-{{- define "app.bulkAnalyticsJsonlVolume" -}}
-- name: bulk-analytics-jsonl-vol
-  persistentVolumeClaim:
-    claimName: bulk-analytics-jsonl-rwm
-{{- end }}
-
-{{- define "app.bioentitiesJsonlVolume" -}}
-- name: bioentities-jsonl-vol
-  persistentVolumeClaim:
-    claimName: bioentities-jsonl-rwo
-{{- end }}
 {{/*
 Secrets volume mount
 */}}

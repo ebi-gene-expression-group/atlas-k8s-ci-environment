@@ -14,8 +14,8 @@ spec:
       {{- include "app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
       annotations:
-        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
@@ -35,11 +35,11 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "tomcat:8-jdk11" }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.tomcat.debug.enabled }}
-          command: ["catalina.sh"]
-          args: ["jpda", "run"]
+          command: [ "catalina.sh" ]
+          args: [ "jpda", "run" ]
           {{- end }}
           ports:
             - name: http
@@ -50,22 +50,27 @@ spec:
               containerPort: {{ .Values.tomcat.debug.port }}
               protocol: TCP
             {{- end }}
+          # startupProbe:
+          #   httpGet:
+          #     path: /gxa/json/experiments
+          #     port: http
+          #   initialDelaySeconds: 25
+          #   periodSeconds: 5
+          #   failureThreshold: 7
           # livenessProbe:
           #   httpGet:
-          #     path: /
+          #     path: /gxa/json/health
           #     port: http
-          #   initialDelaySeconds: 30
           #   periodSeconds: 30
           #   timeoutSeconds: 10
-          #   failureThreshold: 20
+          #   failureThreshold: 3
           # readinessProbe:
           #   httpGet:
-          #     path: /
+          #     path: /gxa/json/experiments
           #     port: http
-          #   initialDelaySeconds: 30
-          #   periodSeconds: 30
-          #   timeoutSeconds: 10
-          #   failureThreshold: 20
+          #   periodSeconds: 120
+          #   timeoutSeconds: 30
+          #   failureThreshold: 3
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -112,7 +117,7 @@ spec:
               readOnly: true
             - name: services-volume
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
-              subPath: fg/atlas/bioentity_properties
+              subPath: fg/atlas/bioentity_properties/gxa
               readOnly: true
             - name: expdesign-volume
               mountPath: {{ include "app.expdesignDir" . }}
@@ -121,6 +126,9 @@ spec:
             - name: services-volume
               mountPath: {{ include "app.dataDir" . }}/ontology
               subPath: fg/atlas/ontology
+              readOnly: true
+            - name: services-volume
+              mountPath: /nfs/public/services
               readOnly: true
             {{- /* webapp properties mounts */}}
             - name: configuration-properties
