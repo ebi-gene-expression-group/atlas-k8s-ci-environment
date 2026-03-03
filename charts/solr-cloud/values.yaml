@@ -7,10 +7,10 @@ solr:
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
   resources:
     limits:
-      memory: 5Gi
+      memory: 5.5Gi
       cpu: "2000m"
     requests:
-      memory: 3.5Gi
+      memory: 4.5Gi
       cpu: "1500m"
   storage:
     className: standard-nfs-production
