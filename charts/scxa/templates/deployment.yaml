@@ -111,7 +111,7 @@ spec:
               readOnly: true
             - name: services-volume
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
-              subPath: fg/atlas/bioentity_properties
+              subPath: fg/atlas/bioentity_properties/sc
               readOnly: true
             - name: experiments-volume
               mountPath: {{ include "app.expdesignDir" . }}

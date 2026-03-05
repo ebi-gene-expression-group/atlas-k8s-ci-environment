@@ -69,3 +69,10 @@ source:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/services
 {{- end }}
+
+{{- define "solr.backup.volume.source" -}}
+source:
+  nfs:
+    server: {{ .Values.nfs.server }}
+    path: /ifs/public/rw/fg/atlas/solrBackups
+{{- end }}
