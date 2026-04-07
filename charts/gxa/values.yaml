@@ -71,6 +71,40 @@ tolerations: []
 
 affinity: {}
 
+# Nginx reverse proxy sidecar (gradual rollout - disabled by default)
+nginx:
+  enabled: false
+  # App context path (e.g. /gxa for GXA) - used for cache bypass paths
+  contextPath: /gxa
+  image:
+    repository: nginx
+    tag: alpine
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 128Mi
+      cpu: 200m
+  # Proxy timeouts (for slow upstream requests)
+  proxyReadTimeout: 600s
+  proxySendTimeout: 600s
+  proxyConnectTimeout: 10s
+  # Max request body size (for Tomcat Manager WAR uploads; default 1m is too small)
+  clientMaxBodySize: 140m
+  # Proxy cache settings (when enabled)
+  cache:
+    enabled: true
+    zoneSize: 10m
+    maxSize: 1g
+    inactive: 7d
+    valid200: 60d
+    # Persistent cache across pod restarts
+    storageSize: 2Gi
+    storageClassName: standard-nfs-production
+    accessMode: ReadWriteMany
+
 tomcat:
   httpPort: 8080
   # deployerPassword: set-in-commandline

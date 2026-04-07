@@ -53,6 +53,61 @@ data:
     experiment.design.location= {{ include "app.expdesignDir" . }}
 
 
+  {{- if .Values.nginx.enabled }}
+  nginx.conf: |
+    worker_processes 1;
+    error_log /dev/stderr warn;
+    pid /tmp/nginx.pid;
+    events { worker_connections 1024; }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      log_format main '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent $request_time $upstream_cache_status "$http_referer" "$http_user_agent"';
+      access_log /dev/stdout main;
+      sendfile on;
+      keepalive_timeout 65;
+      {{- if .Values.nginx.cache.enabled }}
+      proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=atlas:{{ .Values.nginx.cache.zoneSize }} max_size={{ .Values.nginx.cache.maxSize }} inactive={{ .Values.nginx.cache.inactive }};
+      {{- end }}
+      server {
+        listen 8081;
+        client_max_body_size {{ .Values.nginx.clientMaxBodySize | default "1m" }};
+        location = {{ .Values.nginx.contextPath }}/json/health {
+          proxy_pass http://127.0.0.1:{{ .Values.tomcat.httpPort }};
+          proxy_http_version 1.1;
+          proxy_connect_timeout {{ .Values.nginx.proxyConnectTimeout }};
+          proxy_send_timeout {{ .Values.nginx.proxySendTimeout }};
+          proxy_read_timeout {{ .Values.nginx.proxyReadTimeout }};
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_cache off;
+          proxy_no_cache 1;
+          add_header X-Cache-Status $upstream_cache_status;
+        }
+        location / {
+          proxy_pass http://127.0.0.1:{{ .Values.tomcat.httpPort }};
+          proxy_http_version 1.1;
+          proxy_connect_timeout {{ .Values.nginx.proxyConnectTimeout }};
+          proxy_send_timeout {{ .Values.nginx.proxySendTimeout }};
+          proxy_read_timeout {{ .Values.nginx.proxyReadTimeout }};
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          {{- if .Values.nginx.cache.enabled }}
+          proxy_cache atlas;
+          proxy_cache_valid 200 {{ .Values.nginx.cache.valid200 }};
+          proxy_cache_use_stale error timeout updating;
+          proxy_cache_methods GET HEAD;
+          add_header X-Cache-Status $upstream_cache_status;
+          {{- end }}
+        }
+      }
+    }
+  {{- end }}
+
   logback.xml: |
     <configuration>
       <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">

@@ -99,13 +99,13 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             {{- /* app data mounts */}}
-            - name: codon-volume
-              mountPath: {{ include "app.dataDir" . }}/gxa_codon
+            - name: experiments-snapshot
+              mountPath: {{ include "app.experimentsDir" . }}/magetab
               readOnly: true
             - name: admin-volume
               mountPath: {{ include "app.experimentsDir" . }}/admin
-            - name: experiments-snapshot
-              mountPath: {{ include "app.experimentsDir" . }}/magetab
+            - name: codon-volume
+              mountPath: {{ include "app.dataDir" . }}/gxa_codon
               readOnly: true
             - name: codon-volume
               mountPath: {{ include "app.experimentsDir" . }}/release-metadata.json
@@ -163,6 +163,23 @@ spec:
               subPath: server.xml
             - name: tomcat-config
               mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
+        {{- if .Values.nginx.enabled }}
+        - name: nginx
+          image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.nginx.image.pullPolicy }}
+          ports:
+            - name: nginx
+              containerPort: 8081
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+          resources:
+            {{- toYaml .Values.nginx.resources | nindent 12 }}
+        {{- end }}
       volumes:
         {{- include "app.gxaCodonVolume" . | nindent 8 }}
         {{- include "app.servicesVolume" . | nindent 8 }}
@@ -203,6 +220,17 @@ spec:
             claimName: tomcat-webapps
         - name: tomcat-config
           emptyDir: {}
+        {{- if .Values.nginx.enabled }}
+        - name: nginx-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: nginx-cache
+          persistentVolumeClaim:
+            claimName: nginx-cache
+        {{- end }}
       initContainers:
         - name: "init-experiments-snapshot"
           {{- with .Values.securityContext }}
