@@ -1,24 +1,28 @@
+# scxa-staging-solrcloud-values.yaml
 solr:
   replicas: 4
   image:
     tag: 8.7.0
-  javaMem: "-Xms4000m -Xmx5000m"
-  opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983"
+  javaMem: "-Xms2000m -Xmx3000m"
+  opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983 -Dsolr.max.booleanClauses=100000000 -Dsolr.allowPaths=/var/solr/backup"
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
   resources:
     limits:
       memory: 6Gi
-      cpu: "2500m"
+      cpu: 1
     requests:
-      memory: 5.5Gi
-      cpu: "2000m"
+      memory: 4.5Gi
+      cpu: 1
   storage:
     className: standard-nfs-production
     size: 20Gi
     reclaimPolicy: Retain
   secret:
+    enabled: false
     name: solrcloud-package-store-keys
     mountPath: /keys
+  bioSolr:
+    enabled: true
 
 zookeeper:
   replicas: 3
@@ -35,6 +39,3 @@ zookeeper:
 
 service:
    nodePort: null   # Assign a port (30000–32767)
-
-nfs:
-  server: hh-isi-srv-vlan1496.ebi.ac.uk

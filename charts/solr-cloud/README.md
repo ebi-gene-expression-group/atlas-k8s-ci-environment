@@ -28,24 +28,24 @@
    1. Pre-requisites
 
    ```bash
+   ENV=staging
+   RELEASE=scxa
    # Create a key pair for the SolrCloud package store
-   openssl genrsa -out /tmp/gxa-solrcloud.pem 512
-   openssl rsa -in /tmp/gxa-solrcloud.pem -pubout -outform DER -out /tmp/gxa-solrcloud.der
+   openssl genrsa -out /tmp/${RELEASE}-${ENV}-solrcloud.pem 512
+   openssl rsa -in /tmp/${RELEASE}-${ENV}-solrcloud.pem -pubout -outform DER -out /tmp/${RELEASE}-${ENV}-solrcloud.der
 
    # Creat a namespace for the resource deployment (if it doesn't exists already)
-   ENV=staging
-   RELEASE=gxa
    kubectl create namespace ${RELEASE}-${ENV}-solrcloud
 
    # Create the secret from the files
-   kubectl -n ${RELEASE}-${ENV}-solrcloud create secret generic "${RELEASE}-solrcloud-package-store-keys" "--from-file=/tmp/${RELEASE}-solrcloud.pem" "--from-file=/tmp/${RELEASE}-solrcloud.der"
+   kubectl -n ${RELEASE}-${ENV}-solrcloud create secret generic "solrcloud-package-store-keys" "--from-file=/tmp/${RELEASE}-${ENV}-solrcloud.pem" "--from-file=/tmp/${RELEASE}-${ENV}-solrcloud.der"
    ```
 
    1. Install solrCloud with helm
 
    ```bash
    # Install the solrCloud resource in the namespace '${RELEASE}-${ENV}-solrcloud'
-   helm install ${RELEASE}-${ENV} charts/solr-cloud \
+   helm upgrade --install ${RELEASE}-${ENV} charts/solr-cloud \
          --namespace ${RELEASE}-${ENV}-solrcloud \
          --values charts/solr-cloud/env/${ENV}/${RELEASE}-${ENV}-solrcloud-values.yaml \
          --create-namespace=false

@@ -4,7 +4,8 @@ metadata:
   name: {{ .Release.Name }}-solrcloud-nodeport
   namespace: {{ .Release.Namespace }}
   labels:
-    app: solr-cloud
+    app.kubernetes.io/component: solr-cloud
+    {{- include "solr-cloud.labels" . | nindent 4 }}
 spec:
   type: NodePort
   selector:

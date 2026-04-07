@@ -1,3 +1,4 @@
+# scxa-test
 solr:
   replicas: 4
   image:

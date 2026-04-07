@@ -1,0 +1,109 @@
+{{- $solr := (.Values.solr | default dict) -}}
+{{- $packages := ($solr.packages | default dict) -}}
+{{- $hj := ($packages.hookJob | default dict) -}}
+{{- if ($hj.enabled | default false) }}
+{{- $upload := ($hj.upload | default dict) -}}
+{{- $uploadNfs := ($upload.nfs | default dict) -}}
+{{- $pkgName := ($hj.packageName | default "") -}}
+{{- $pkgVer := ($hj.packageVersion | default "") -}}
+{{- $dest := ($upload.destFilestorePath | default "") -}}
+{{- $wait := ($hj.wait | default dict) -}}
+{{- if or (eq $pkgName "") (eq $pkgVer "") (eq $dest "") -}}
+{{- fail "solr.packages.hookJob requires packageName, packageVersion, and upload.destFilestorePath" -}}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-solr-package-hook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: solr-cloud
+    {{- include "solr-cloud.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ $hj.backoffLimit | default 2 }}
+  ttlSecondsAfterFinished: {{ $hj.ttlSecondsAfterFinished | default 300 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: solr-cloud
+        {{- include "solr-cloud.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      {{- if and ($upload.enabled | default false) ($uploadNfs.enabled | default false) }}
+      volumes:
+        - name: package-jar
+          nfs:
+            server: {{ ($uploadNfs.server | default .Values.nfs.server) | quote }}
+            path: {{ ($uploadNfs.path | default "/ifs/public/services") | quote }}
+      {{- end }}
+      containers:
+        - name: solr-package
+          image: {{ $hj.curlImage | default "curlimages/curl:8.7.1" | quote }}
+          imagePullPolicy: IfNotPresent
+          {{- if and ($upload.enabled | default false) ($uploadNfs.enabled | default false) }}
+          volumeMounts:
+            - name: package-jar
+              mountPath: {{ ($upload.localJarPath | default "/input/biosolr.jar") | quote }}
+              subPath: {{ ($uploadNfs.subPath | default "") | quote }}
+          {{- end }}
+          env:
+            - name: SOLR_BASE_URL
+              value: {{ ($hj.solrBaseUrl | default (printf "http://%s-solrcloud-common.%s.svc" .Release.Name .Release.Namespace)) | quote }}
+            - name: SOLR_ADMIN_USER
+              value: {{ ($hj.adminUser | default "admin") | quote }}
+            - name: SOLR_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $hj.adminPasswordSecretName | default (printf "%s-solrcloud-security-bootstrap" .Release.Name) | quote }}
+                  key: {{ ($hj.adminPasswordSecretKey | default "admin") | quote }}
+            - name: PACKAGE_NAME
+              value: {{ $pkgName | quote }}
+            - name: PACKAGE_VERSION
+              value: {{ $pkgVer | quote }}
+            - name: FILESTORE_PATH
+              value: {{ $dest | quote }}
+            - name: UPLOAD_ENABLED
+              value: {{ ($upload.enabled | default false) | quote }}
+            - name: UPLOAD_LOCAL_JAR_PATH
+              value: {{ ($upload.localJarPath | default "/input/biosolr.jar") | quote }}
+            - name: UPLOAD_SIG
+              value: {{ ($upload.sig | default "") | quote }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              set -u
+              wait_end=$(( $(date +%s) + {{ $wait.timeoutSeconds | default 300 }} ))
+              while ! curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${SOLR_BASE_URL}/solr/admin/info/system" >/dev/null; do
+                [ "$(date +%s)" -ge "${wait_end}" ] && echo "Timed out waiting for Solr" && exit 1
+                sleep {{ $wait.sleepSeconds | default 3 }}
+              done
+
+              meta_url="${SOLR_BASE_URL}/api/node/files${FILESTORE_PATH}?meta=true"
+
+              if [ "${UPLOAD_ENABLED}" = "true" ]; then
+                [ -f "${UPLOAD_LOCAL_JAR_PATH}" ] || (echo "Jar not found in Job pod: ${UPLOAD_LOCAL_JAR_PATH}" && exit 1)
+                if ! curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${meta_url}" >/dev/null; then
+                  put_url="${SOLR_BASE_URL}/api/cluster/files${FILESTORE_PATH}"
+                  [ -n "${UPLOAD_SIG}" ] && put_url="${put_url}?sig=${UPLOAD_SIG}"
+                  curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" --data-binary @"${UPLOAD_LOCAL_JAR_PATH}" -X PUT "${put_url}" >/dev/null
+                fi
+              fi
+
+              # The package manager requires a valid filestore entry (metadata must exist).
+              curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${meta_url}" >/dev/null
+
+              existing="$(curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${SOLR_BASE_URL}/api/cluster/package" || true)"
+              if echo "${existing}" | grep -F "\"${PACKAGE_NAME}\"" >/dev/null 2>&1 && echo "${existing}" | grep -F "\"${PACKAGE_VERSION}\"" >/dev/null 2>&1; then
+                echo "Package already present: ${PACKAGE_NAME}:${PACKAGE_VERSION}"
+                exit 0
+              fi
+
+              curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" \
+                -H "Content-Type: application/json" \
+                -X POST "${SOLR_BASE_URL}/api/cluster/package" \
+                -d "{\"add\":{\"package\":\"${PACKAGE_NAME}\",\"version\":\"${PACKAGE_VERSION}\",\"files\":[\"${FILESTORE_PATH}\"]}}"
+{{- end }}
+

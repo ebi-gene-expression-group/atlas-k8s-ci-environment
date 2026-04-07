@@ -30,28 +30,24 @@ spec:
         requests:
           memory: {{ .Values.solr.resources.requests.memory }}
           cpu: {{ .Values.solr.resources.requests.cpu }}
+      {{- $secret := .Values.solr.secret | default dict }}
+      {{- $bioSolr := .Values.solr.bioSolr | default dict }}
       volumes:
           - name: backup-volume
             {{- include "solr.backup.volume.source" . | nindent 12 }}
             defaultContainerMount:
               name: backup-volume
               mountPath: /var/solr/backup
-        {{- if .Values.solr.secret.enabled }}
+        {{- if ($secret.enabled | default false) }}
           - name: keys-secret
             source:
               secret:
-                secretName: {{ .Values.solr.secret.name }}
+                secretName: {{ $secret.name }}
             defaultContainerMount:
               name: keys-secret
-              mountPath: {{ .Values.solr.secret.mountPath }}
+              mountPath: {{ $secret.mountPath }}
         {{- end }}
-        {{- if .Values.solr.bioSolr.enabled }}
-          - name: bio-solr-volume
-            {{- include "bioSolr.volume.source" . | nindent 12 }}
-            defaultContainerMount:
-              name: bio-solr-volume
-              mountPath: /var/solr/data/filestore/biosolr/2.0.0/biosolr.jar
-              subPath: fg/atlas/biosolr/solr-ontology-update-processor-2.0.0.jar
+        {{- if ($bioSolr.enabled | default false) }}
           - name: scatlas-owl-volume
             {{- include "bioSolr.volume.source" . | nindent 12 }}
             defaultContainerMount:
