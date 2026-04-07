@@ -1,4 +1,5 @@
 {
+    "search.useIgnoreFiles": false,
     "makefile.configureOnOpen": false,
     "java.configuration.runtimes": [
         {

@@ -56,6 +56,18 @@
 				}
 			}
 		},
+		{
+			"label": "webapp",
+			"type": "shell",
+			"command": "make webapp",
+			"problemMatcher": [],
+			"options": {
+				"env": {
+					"RELEASE": "${input:release}",
+					"ENV": "${input:env}",
+				}
+			}
+		}
 	],
 	"inputs": [
 
@@ -76,6 +88,7 @@
 					"options": [
 						"test",
 						"dev",
+						"staging",
 						"prod"
 					],
 					"default": "test"

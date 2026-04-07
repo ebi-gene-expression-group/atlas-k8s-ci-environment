@@ -27,21 +27,20 @@ fi
 
 if [[ -f "${TARGET_FILE}" ]]; then
   echo "ERROR: Target values file already exists: ${TARGET_FILE}" >&2
-  exit 1
-fi
-
-cp "${TEMPLATE_FILE}" "${TARGET_FILE}"
-
-# Update common fields to match the new environment
-if grep -qE '^environment:' "${TARGET_FILE}"; then
-  sed -i '' -E "s/^environment:.*/environment: ${ENV_NAME}/" "${TARGET_FILE}"
 else
-  printf '\n%s\n' "environment: ${ENV_NAME}" >> "${TARGET_FILE}"
+  echo "Creating ${TARGET_FILE}"
+  cp "${TEMPLATE_FILE}" "${TARGET_FILE}"
+  # Update common fields to match the new environment
+  if grep -qE '^environment:' "${TARGET_FILE}"; then
+    sed -i '' -E "s/^environment:.*/environment: ${ENV_NAME}/" "${TARGET_FILE}"
+  else
+    printf '\n%s\n' "environment: ${ENV_NAME}" >> "${TARGET_FILE}"
+  fi
 fi
 
-if grep -qE '^\s*snapshotComponent:' "${TARGET_FILE}"; then
-  sed -i '' -E "s/^\s*snapshotComponent:.*/  snapshotComponent: experiments_${ENV_NAME}/" "${TARGET_FILE}"
-fi
+
+
+
 
 cat <<EOF
 Created ${TARGET_FILE}

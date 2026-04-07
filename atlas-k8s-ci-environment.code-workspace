@@ -8,7 +8,9 @@
 			"name": "atlas-web-bulk",
 			"path": "../atlas-web-bulk",
 			"settings": {
-				"java.import.exclusions": ["**"]
+				"java.import.exclusions": [
+					"**"
+				]
 			}
 		},
 		{
@@ -17,6 +19,21 @@
 		},
 		{
 			"path": "../atlas-web-single-cell"
+		},
+		{
+			"path": "../vtm-terraform-config"
+		},
+		{
+			"name": "atlas-containers",
+			"path": "../atlas-containers"
+		},
+		{
+			"name": "atlas-conda",
+			"path": "../atlas-conda"
+		},
+		{
+			"name": "wf-bulk-indexing",
+			"path": "../wf-bulk-indexing"
 		}
 	],
 	"settings": {

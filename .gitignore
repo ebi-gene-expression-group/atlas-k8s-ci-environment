@@ -1,6 +1,7 @@
 *.curlrc
 .env
 .dockerconfig.json
+**/.secrets-*.yaml
 
 .idea
 /tmp/**
@@ -8,3 +9,4 @@
 **/charts/*.tgz
 .helm_ls_cache/
 .DS_Store
+overrides/

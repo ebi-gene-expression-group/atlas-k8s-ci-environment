@@ -4,7 +4,6 @@ metadata:
   name: {{ include "app.fullname" . }}
   labels:
     {{- include "app.labels" . | nindent 4 }}
-    app.kubernetes.io/component: webapp
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -50,28 +49,28 @@ spec:
               containerPort: {{ .Values.tomcat.debug.port }}
               protocol: TCP
             {{- end }}
-          startupProbe:
-            httpGet:
-              path: /gxa/sc/json/experiments
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 30
-            timeoutSeconds: 30
-            failureThreshold: 10
-          livenessProbe:
-            httpGet:
-              path: /gxa/sc/json/health
-              port: http
-            periodSeconds: 30
-            timeoutSeconds: 10
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /gxa/sc/json/experiments
-              port: http
-            periodSeconds: 120
-            timeoutSeconds: 30
-            failureThreshold: 3
+          # startupProbe:
+          #   httpGet:
+          #     path: /gxa/sc/json/experiments
+          #     port: http
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 30
+          #   timeoutSeconds: 30
+          #   failureThreshold: 10
+          # livenessProbe:
+          #   httpGet:
+          #     path: /gxa/sc/json/health
+          #     port: http
+          #   periodSeconds: 30
+          #   timeoutSeconds: 10
+          #   failureThreshold: 3
+          # readinessProbe:
+          #   httpGet:
+          #     path: /gxa/sc/json/experiments
+          #     port: http
+          #   periodSeconds: 120
+          #   timeoutSeconds: 30
+          #   failureThreshold: 3
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -85,7 +84,7 @@ spec:
                   name: {{ include "app.fullname" . }}-secrets
                   key: SOLR_PASS
             - name: JAVA_TOOL_OPTIONS
-              value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
+              value: "-Dfile.encoding=UTF8 -Xmx{{ .Values.tomcat.heapSize.max }} -Xms{{ .Values.tomcat.heapSize.start }} -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
             {{- if .Values.tomcat.debug.enabled }}
             - name: JPDA_ADDRESS
               value: {{ .Values.tomcat.debug.address | quote }}
@@ -152,6 +151,23 @@ spec:
               subPath: server.xml
             - name: tomcat-config
               mountPath: {{ include "app.tomcatDir" . }}/conf/Catalina
+        {{- if .Values.nginx.enabled }}
+        - name: nginx
+          image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.nginx.image.pullPolicy }}
+          ports:
+            - name: nginx
+              containerPort: 8081
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+          resources:
+            {{- toYaml .Values.nginx.resources | nindent 12 }}
+        {{- end }}
       volumes:
         {{- include "app.scxaExperimentsVolume" . | nindent 8 }}
         {{- include "app.servicesVolume" . | nindent 8 }}
@@ -189,6 +205,17 @@ spec:
             claimName: tomcat-webapps
         - name: tomcat-config
           emptyDir: {}
+        {{- if .Values.nginx.enabled }}
+        - name: nginx-config
+          configMap:
+            name: {{ include "app.fullname" . }}-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: nginx-cache
+          persistentVolumeClaim:
+            claimName: nginx-cache
+        {{- end }}
       initContainers:
       - name: init-tomcat-manager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag  }}"

@@ -22,4 +22,4 @@ solr:
 
 nfs:
   snapshotComponent: experiments_test
-  scxaExpVolPath: "sc_experiments_test"
+  experimentsPath: "/ifs/public/services/fg/atlas/sc_experiments_test"
