@@ -1,9 +1,0 @@
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshot
-metadata:
-  name: gradle-7.0-ro-dep-cache-rwo-snapshot
-  namespace: jenkins-gene-expression
-spec:
-  volumeSnapshotClassName: snapshot-class
-  source:
-    persistentVolumeClaimName: gradle-7.0-ro-dep-cache-rwo
