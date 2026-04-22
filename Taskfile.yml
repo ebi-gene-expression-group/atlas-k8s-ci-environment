@@ -1,0 +1,459 @@
+# https://taskfile.dev
+# Install: https://taskfile.dev/installation/
+# Usage: `task` lists tasks; `task deploy RELEASE=scxa ENV=test`
+
+version: "3"
+
+dotenv:
+  - .env
+
+vars:
+  RELEASE: scxa
+  ENV: test
+  SUPPORTED_ENVS: test staging
+  APP_VERSION: 37.6.0
+  NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
+  ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
+  CHART_PATH: charts/{{.RELEASE}}
+  WAR_FILE_DIR: charts/{{.RELEASE}}/war
+  WAR_FILE_NAME: "{{.RELEASE}}.war"
+  CURL_DEBUG_OPTS: "--progress-bar"
+
+tasks:
+  default:
+    desc: List all tasks with descriptions (same as task --list)
+    silent: true
+    cmds:
+      - task --list
+
+  init-k8s:
+    desc: Switch kubectl context (K8S_CONTEXT from env or .env) and default namespace for this RELEASE/ENV
+    cmds:
+      - kubectx "${K8S_CONTEXT}"
+      - kubectl config set-context --current --namespace={{.NAMESPACE}}
+
+  deploy:
+    desc: Deploy the Atlas web app Helm chart (gxa or scxa) via helm upgrade --install
+    deps: [init-k8s]
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        SUPPORTED="{{.SUPPORTED_ENVS}}"
+        ENV_VALUES="{{.ENV_VALUES}}"
+        if ! echo " $SUPPORTED " | grep -q " $ENV "; then
+          if [ ! -f "$ENV_VALUES" ]; then
+            echo "Error: unknown ENV '$ENV'. Use one of: $SUPPORTED, or add $ENV_VALUES"
+            exit 1
+          fi
+        fi
+        HELM_SET_ARGS=(--set "appVersion={{.APP_VERSION}}")
+        if [ -n "${DOCKER_CONFIG_JSON:-}" ]; then
+          DOCKER_CONFIG_JSON="${DOCKER_CONFIG_JSON//\"/}"
+          HELM_SET_ARGS+=(--set-file "registrySecret.dockerconfigjson=${DOCKER_CONFIG_JSON}")
+        fi
+        SECRETS_FILE="charts/${RELEASE}/.secrets-${ENV}.yaml"
+        if [ -f "$SECRETS_FILE" ]; then
+          echo "Using secrets file: $SECRETS_FILE"
+          HELM_SET_ARGS+=(-f "$SECRETS_FILE")
+        fi
+        HELM_DEBUG_FLAGS=()
+        case "${DEBUG:-}" in
+          1|true|yes)
+            echo "Running Helm in DEBUG dry-run mode (DEBUG=${DEBUG:-})"
+            HELM_DEBUG_FLAGS=(--debug --dry-run)
+            ;;
+        esac
+        helm upgrade --install \
+          "$RELEASE" \
+          "charts/${RELEASE}" \
+          --namespace "{{.NAMESPACE}}" \
+          --create-namespace \
+          -f "$ENV_VALUES" \
+          "${HELM_SET_ARGS[@]}" \
+          "${HELM_DEBUG_FLAGS[@]}"
+
+  deploy-test:
+    desc: Deploy to TEST (same as deploy with ENV=test)
+    cmds:
+      - task: deploy
+        vars:
+          ENV: test
+
+  uninstall:
+    desc: Remove the Atlas web app Helm release from the namespace
+    cmds:
+      - helm uninstall "{{.RELEASE}}" --namespace "{{.NAMESPACE}}"
+
+  workflow:
+    desc: Standard workflow — deploy then print completion (uses current RELEASE/ENV)
+    deps: [deploy]
+    cmds:
+      - echo "Workflow completed — deployed to {{.ENV}} (RELEASE={{.RELEASE}})."
+
+  deploy-war:
+    desc: Upload WAR via Tomcat manager API, restart deployment, smoke-check URLs (needs init-k8s context)
+    deps: [init-k8s]
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        NAMESPACE="{{.NAMESPACE}}"
+        WAR_FILE_DIR="{{.WAR_FILE_DIR}}"
+        WAR_FILE_NAME="{{.WAR_FILE_NAME}}"
+        CURL_DEBUG_OPTS="{{.CURL_DEBUG_OPTS}}"
+        case "$RELEASE" in
+          gxa) DEPLOY_CTX_PATH="/gxa" ;;
+          scxa) DEPLOY_CTX_PATH="/gxa/sc" ;;
+          *)
+            echo "Error: unknown RELEASE '$RELEASE'. Use gxa or scxa."
+            exit 1
+            ;;
+        esac
+        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+        TOMCAT_PORT="$(kubectl get service "$RELEASE" --namespace "$NAMESPACE" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)"
+        TOMCAT_SERVER_URL="http://${NODE_HOSTNAME}:${TOMCAT_PORT}"
+        echo "Deploying WAR using deploy context path: $DEPLOY_CTX_PATH"
+        DEPLOYER_PASSWORD="$(kubectl get secret "${RELEASE}-secrets" --namespace "$NAMESPACE" \
+          -o jsonpath='{.data.tomcat-users\.xml}' \
+          | base64 -d \
+          | yq -p=xml '.tomcat-users.user[] | select(.["+@username"] == "deployer") | .["+@password"]')"
+        if [ -z "$DEPLOYER_PASSWORD" ]; then
+          echo "ERROR: Failed to get deployer password"
+          exit 1
+        fi
+        echo "Deploying WAR to ${TOMCAT_SERVER_URL}..."
+        curl --verbose -u "deployer:${DEPLOYER_PASSWORD}" \
+          --fail \
+          --include \
+          $CURL_DEBUG_OPTS \
+          "${TOMCAT_SERVER_URL}/manager/text/deploy?path=${DEPLOY_CTX_PATH}&update=true" \
+          --upload-file "${WAR_FILE_DIR}/${WAR_FILE_NAME}"
+        echo "Restarting deployment on k8s..."
+        kubectl rollout restart deployment "$RELEASE" --namespace "$NAMESPACE"
+        echo "Listing deployed applications..."
+        curl -u "deployer:${DEPLOYER_PASSWORD}" \
+          --fail \
+          $CURL_DEBUG_OPTS \
+          "${TOMCAT_SERVER_URL}/manager/text/list"
+        echo "Checking application homepage..."
+        curl --fail \
+          "${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}" \
+          --location \
+          -O
+        echo "Checking app health check endpoint..."
+        curl --fail \
+          "${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}/json/health" \
+          --location
+        echo "Checking experiments page..."
+        curl --fail \
+          "${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}/json/experiments" \
+          --location \
+          -O
+
+  print-env:
+    desc: Print current RELEASE and ENV (and related paths)
+    cmds:
+      - echo "ENV={{.ENV}} RELEASE={{.RELEASE}} NAMESPACE={{.NAMESPACE}} VALUES={{.ENV_VALUES}}"
+
+  open-monitoring:
+    desc: Open Grafana namespace pods dashboard for this namespace (EBI internal URL)
+    cmds:
+      - |
+        open "https://grafana-hh-webadmin-35.wp-k8s.ebi.ac.uk/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&var-datasource=default&var-cluster=&var-namespace={{.NAMESPACE}}"
+
+  open-webapp:
+    desc: Open the Tomcat app in a browser (NodePort URL for current context)
+    deps: [init-k8s]
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        NAMESPACE="{{.NAMESPACE}}"
+        case "$RELEASE" in
+          gxa) DEPLOY_CTX_PATH="/gxa" ;;
+          scxa) DEPLOY_CTX_PATH="/gxa/sc" ;;
+          *) echo "Error: unknown RELEASE"; exit 1 ;;
+        esac
+        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+        TOMCAT_PORT="$(kubectl get service "$RELEASE" --namespace "$NAMESPACE" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)"
+        TOMCAT_SERVER_URL="http://${NODE_HOSTNAME}:${TOMCAT_PORT}"
+        echo "Opening ${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}"
+        open "${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}"
+
+  open-solr:
+    desc: Open Solr admin UI (NodePort on same node as cluster’s first node)
+    deps: [init-k8s]
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+        SOLR_PORT="$(kubectl get service "${RELEASE}-${ENV}-solrcloud-nodeport" --namespace "${RELEASE}-${ENV}-solrcloud" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)"
+        SOLR_SERVER_URL="http://${NODE_HOSTNAME}:${SOLR_PORT}/solr/#/"
+        echo "NODE_HOSTNAME=$NODE_HOSTNAME SOLR_PORT=$SOLR_PORT"
+        echo "Opening $SOLR_SERVER_URL"
+        open "$SOLR_SERVER_URL"
+
+  mongodb-solr-export:
+    desc: |
+      Trigger a Solr→MongoDB export Job for one profile (or scxa-pair for gene2experiment + analytics together).
+      EXPORT_JOB    bioentities | gene2experiment | analytics | scxa-pair
+      SOLR_NAMESPACE  Kubernetes namespace of the source SolrCloud (e.g. scxa-dev-solrcloud)
+      Example: task mongodb-solr-export RELEASE=scxa ENV=test EXPORT_JOB=analytics SOLR_NAMESPACE=scxa-dev-solrcloud
+    vars:
+      EXPORT_JOB: '{{.EXPORT_JOB | default "bioentities"}}'
+      SOLR_NAMESPACE: '{{.SOLR_NAMESPACE | default ""}}'
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        EXPORT_JOB="{{.EXPORT_JOB}}"
+        SOLR_NAMESPACE="{{.SOLR_NAMESPACE}}"
+        if [ -z "${SOLR_NAMESPACE}" ]; then
+          echo "ERROR: SOLR_NAMESPACE is required, e.g. SOLR_NAMESPACE=scxa-dev-solrcloud"
+          exit 1
+        fi
+        CHART_DIR="charts/mongodb"
+        REL_NAME="mongodb-${RELEASE}-${ENV}"
+        NS="${RELEASE}-${ENV}-mongodb"
+        VALUES_BASE="${CHART_DIR}/values.yaml"
+        VALUES_ENV="${CHART_DIR}/values-${ENV}.yaml"
+        SECRETS_FILE="${CHART_DIR}/.secrets-${ENV}.yaml"
+
+        # ── Map profile name → values key ─────────────────────────────────────
+        case "$EXPORT_JOB" in
+          bioentities)     JOB_KEY="solrExportJobBioentities" ;;
+          gene2experiment) JOB_KEY="solrExportJobGene2experiment" ;;
+          analytics)       JOB_KEY="solrExportJobAnalytics" ;;
+          scxa-pair)       JOB_KEY="solrExportJobScxaPair" ;;
+          *)
+            echo "ERROR: unknown EXPORT_JOB '${EXPORT_JOB}'. Use: bioentities, gene2experiment, analytics, scxa-pair"
+            exit 1
+            ;;
+        esac
+
+        # ── Discover SolrCloud from the source namespace ───────────────────────
+        echo "Looking up SolrCloud in namespace '${SOLR_NAMESPACE}'..."
+        SOLRCLOUD_NAME=$(kubectl get solrcloud -n "$SOLR_NAMESPACE" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        if [ -z "$SOLRCLOUD_NAME" ]; then
+          echo "ERROR: no SolrCloud resource found in namespace '${SOLR_NAMESPACE}'"
+          exit 1
+        fi
+        echo "  SolrCloud resource : ${SOLRCLOUD_NAME}"
+
+        # The Solr Operator creates a common service: {name}-solrcloud-common
+        SOLR_HOST="${SOLRCLOUD_NAME}-solrcloud-common.${SOLR_NAMESPACE}.svc.cluster.local:80"
+        echo "  Solr service       : ${SOLR_HOST}"
+
+        # The Solr Operator creates *-solrcloud-security-bootstrap with keys per user (e.g. admin, solr).
+        # This chart uses **admin** + key admin for export jobs; the **solr** user is for SolrCloud internals.
+        SOLR_SRC_SECRET="${SOLRCLOUD_NAME}-solrcloud-security-bootstrap"
+        SOLR_COPIED_SECRET="${REL_NAME}-solr-creds"
+
+        # ── Copy the Solr secret into the MongoDB namespace ────────────────────
+        # Pods can only reference secrets in their own namespace, so we mirror it.
+        echo "Copying secret '${SOLR_SRC_SECRET}' from '${SOLR_NAMESPACE}' → '${NS}'..."
+        kubectl get secret "$SOLR_SRC_SECRET" -n "$SOLR_NAMESPACE" -o json \
+          | jq --arg name "$SOLR_COPIED_SECRET" --arg ns "$NS" \
+               'del(.metadata.resourceVersion, .metadata.uid,
+                    .metadata.creationTimestamp, .metadata.ownerReferences,
+                    .metadata.annotations)
+                | .metadata.name      = $name
+                | .metadata.namespace = $ns' \
+          | kubectl apply -f -
+        echo "  Secret ready as '${SOLR_COPIED_SECRET}' in '${NS}'."
+
+        # ── Deploy the Job ─────────────────────────────────────────────────────
+        kubectl delete job "${REL_NAME}-solr-export" --namespace "$NS" --ignore-not-found
+
+        # Extract the chosen profile, enable it, and inject the Solr connection
+        # details discovered above (host + copied secret name).
+        PROFILE_JSON=$(yq -o=json ".${JOB_KEY}" "$VALUES_ENV" | python3 -c \
+          "import json,sys; d=json.load(sys.stdin); d['enabled']=True; d.setdefault('solr',{})['host']='${SOLR_HOST}'; d.setdefault('solr',{})['secretName']='${SOLR_COPIED_SECRET}'; print(json.dumps(d))")
+
+        # Merge solrExportJob without --set-json (requires Helm 3.10+); JSON values file works on older Helm.
+        SOLR_EXPORT_OVERRIDE=$(mktemp)
+        trap 'rm -f "${SOLR_EXPORT_OVERRIDE}"' EXIT
+        jq -n --argjson job "${PROFILE_JSON}" '{solrExportJob: $job}' > "${SOLR_EXPORT_OVERRIDE}"
+
+        HELM_ARGS=(
+          upgrade --install "$REL_NAME" "$CHART_DIR"
+          --namespace "$NS"
+          --create-namespace
+          --values "$VALUES_BASE"
+          --values "$VALUES_ENV"
+          -f "${SOLR_EXPORT_OVERRIDE}"
+        )
+        if [ -f "$SECRETS_FILE" ]; then
+          echo "Using secrets file: $SECRETS_FILE"
+          HELM_ARGS+=(-f "$SECRETS_FILE")
+        fi
+
+        helm "${HELM_ARGS[@]}"
+        echo ""
+        echo "Job created. Watch logs with stern:"
+        echo "  task mongodb-solr-export-logs RELEASE=${RELEASE} ENV=${ENV}"
+
+  mongodb-solr-secret-check:
+    desc: |
+      Compare Solr *-solrcloud-security-bootstrap (Solr NS) with the Job copy in MongoDB NS.
+      Verifies the mirror is not corrupt or drifted; does not print passwords (length + SHA-256 + match).
+      Example: task mongodb-solr-secret-check RELEASE=scxa ENV=test SOLR_NAMESPACE=scxa-dev-solrcloud
+    vars:
+      SOLR_NAMESPACE: '{{.SOLR_NAMESPACE | default ""}}'
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        SOLR_NAMESPACE="{{.SOLR_NAMESPACE}}"
+        if [ -z "${SOLR_NAMESPACE}" ]; then
+          echo "ERROR: SOLR_NAMESPACE is required, e.g. SOLR_NAMESPACE=scxa-dev-solrcloud"
+          exit 1
+        fi
+        REL_NAME="mongodb-${RELEASE}-${ENV}"
+        NS="${RELEASE}-${ENV}-mongodb"
+        echo "Looking up SolrCloud in namespace '${SOLR_NAMESPACE}'..."
+        SOLRCLOUD_NAME=$(kubectl get solrcloud -n "$SOLR_NAMESPACE" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+        if [ -z "${SOLRCLOUD_NAME}" ]; then
+          echo "ERROR: no SolrCloud in '${SOLR_NAMESPACE}'"
+          exit 1
+        fi
+        SRC="${SOLRCLOUD_NAME}-solrcloud-security-bootstrap"
+        DST="${REL_NAME}-solr-creds"
+        echo "Source secret : ${SRC} (ns=${SOLR_NAMESPACE})"
+        echo "Mirrored secret: ${DST} (ns=${NS})"
+        echo ""
+
+        if ! kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" >/dev/null 2>&1; then
+          echo "ERROR: source secret not found"
+          exit 1
+        fi
+        if ! kubectl get secret "$DST" -n "$NS" >/dev/null 2>&1; then
+          echo "ERROR: mirrored secret not found (run task mongodb-solr-export once to create it)"
+          exit 1
+        fi
+
+        diff_key() {
+          key="$1"
+          if ! kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" -o "jsonpath={.data.$key}" | grep -q '^.'; then
+            echo "KEY ${key}: MISSING in source"
+            return 1
+          fi
+          if ! kubectl get secret "$DST" -n "$NS" -o "jsonpath={.data.$key}" | grep -q '^.'; then
+            echo "KEY ${key}: MISSING in mirror"
+            return 1
+          fi
+          a=$(kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" -o "jsonpath={.data.$key}" | base64 -d | wc -c | tr -d ' ')
+          b=$(kubectl get secret "$DST" -n "$NS" -o "jsonpath={.data.$key}" | base64 -d | wc -c | tr -d ' ')
+          ha=$(kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" -o "jsonpath={.data.$key}" | base64 -d | sha256sum | awk '{print $1}')
+          hb=$(kubectl get secret "$DST" -n "$NS" -o "jsonpath={.data.$key}" | base64 -d | sha256sum | awk '{print $1}')
+          echo "--- key: ${key} ---"
+          echo "  source: ${a} bytes  sha256=${ha}"
+          echo "  mirror: ${b} bytes  sha256=${hb}"
+          if [ "$a" -eq 0 ] || [ "$b" -eq 0 ]; then
+            echo "  RESULT: FAIL (empty decoded value — likely corrupt base64 or missing data)"
+            return 1
+          fi
+          if [ "$ha" = "$hb" ]; then
+            echo "  RESULT: OK (source and mirror identical)"
+            raw=$(kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" -o "jsonpath={.data.$key}" | base64 -d)
+            # A literal newline in the Secret value breaks urllib Basic auth (still a valid cluster symptom)
+            if printf '%s' "$raw" | python3 -c "import sys; d=sys.stdin.buffer.read(); sys.exit(0 if (d and d[-1] in (10, 13)) else 1)"; then
+              echo "  NOTE: decoded value ends with CR/LF — strip in Solr operator source secret or rotate if auth fails"
+            fi
+          else
+            echo "  RESULT: MISMATCH — mirror is not a byte-for-byte copy; re-copy or fix encoding."
+            return 1
+          fi
+        }
+
+        failed=0
+        for k in admin solr; do
+          diff_key "$k" || failed=1
+          echo ""
+        done
+
+        sk=$(kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" -o json | jq -r '(.data // {}) | has("security.json")')
+        if [ "$sk" = "true" ]; then
+          sz=$(kubectl get secret "$SRC" -n "$SOLR_NAMESPACE" -o jsonpath='{.data.security\.json}' | base64 -d | wc -c | tr -d ' ')
+          echo "security.json in source: ${sz} bytes (not compared — large blob)"
+        fi
+
+        if [ "$failed" -ne 0 ]; then
+          echo "Fix: kubectl delete secret '${DST}' -n '${NS}' && task mongodb-solr-export RELEASE=${RELEASE} ENV=${ENV} EXPORT_JOB=bioentities SOLR_NAMESPACE=${SOLR_NAMESPACE}"
+          exit 1
+        fi
+        echo "All compared keys match — secret mirror looks healthy (if Solr still returns 401 as admin, check security.json roles, not this copy)."
+
+  mongodb-solr-export-logs:
+    desc: |
+      Tail Solr→MongoDB export Job logs with stern (solr-export + mongoimport).
+      Optional CONTAINER=solr-export|mongoimport for one stream only.
+      Requires: stern (https://github.com/stern/stern)
+    vars:
+      CONTAINER: '{{.CONTAINER | default ""}}'
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        NS="${RELEASE}-${ENV}-mongodb"
+        CONTAINER="{{.CONTAINER}}"
+        if ! command -v stern >/dev/null 2>&1; then
+          echo "stern not found. Install: brew install stern  (see https://github.com/stern/stern)" >&2
+          exit 1
+        fi
+        # With --selector, stern defaults pod query to ".*" (all matching pods).
+        STERN=(
+          stern
+          --selector "app.kubernetes.io/component=solr-export"
+          --namespace "$NS"
+          --tail 50
+          --timestamps
+        )
+        if [ -n "${CONTAINER}" ]; then
+          STERN+=(--container "^${CONTAINER}$")
+        fi
+        echo "stern namespace=${NS} selector=app.kubernetes.io/component=solr-export${CONTAINER:+ container=${CONTAINER}} timestamps=true"
+        "${STERN[@]}"
+
+  mongodb-install:
+    desc: Install or upgrade the MongoDB Helm chart (optional env values and .secrets-<ENV>.yaml)
+    cmds:
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        CHART_DIR="charts/mongodb"
+        REL_NAME="mongodb-${RELEASE}-${ENV}"
+        NS="${RELEASE}-${ENV}-mongodb"
+        VALUES_BASE="${CHART_DIR}/values.yaml"
+        VALUES_ENV="${CHART_DIR}/values-${ENV}.yaml"
+        SECRETS_FILE="${CHART_DIR}/.secrets-${ENV}.yaml"
+        # Jobs and Deployment selectors are immutable — delete them so helm can recreate
+        kubectl delete job "${REL_NAME}-import-jsonl" --namespace "$NS" --ignore-not-found
+        kubectl delete deployment "${REL_NAME}-mongodb" --namespace "$NS" --ignore-not-found
+        HELM_ARGS=(
+          upgrade --install "$REL_NAME" "$CHART_DIR"
+          --namespace "$NS"
+          --create-namespace
+          --values "$VALUES_BASE"
+        )
+        if [ -f "$VALUES_ENV" ]; then
+          HELM_ARGS+=(--values "$VALUES_ENV")
+        else
+          echo "Note: no $VALUES_ENV — using base values only."
+        fi
+        if [ -f "$SECRETS_FILE" ]; then
+          echo "Using secrets file: $SECRETS_FILE"
+          HELM_ARGS+=(-f "$SECRETS_FILE")
+        fi
+        helm "${HELM_ARGS[@]}"

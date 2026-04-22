@@ -10,3 +10,5 @@
 .helm_ls_cache/
 .DS_Store
 overrides/
+k8s_staging.sh
+__pycache__/
