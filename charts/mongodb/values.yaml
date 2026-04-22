@@ -1,0 +1,190 @@
+# Default values for mongodb.
+# All values under "mongodb:" are passed to the Bitnami sub-chart.
+# See https://artifacthub.io/packages/helm/bitnami/mongodb for full documentation.
+
+mongodb:
+  # Use the bitnamilegacy Docker Hub namespace, which mirrors Bitnami images
+  # after Bitnami moved off docker.io to registry.bitnami.com.
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mongodb
+    tag: 8.0.13-debian-12-r0
+
+  global:
+    security:
+      allowInsecureImages: true
+
+  architecture: standalone
+
+  auth:
+    enabled: true
+    rootUser: root
+    # Provide passwords at deploy time via .secrets-<env>.yaml
+    rootPassword: ""
+    databases:
+      - atlas
+      - atlas
+    usernames:
+      - atlas
+      - atlas_reader
+    passwords:
+      - ""
+      - ""
+
+  persistence:
+    enabled: true
+    storageClass: standard-nfs-production
+    size: 10Gi
+
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+
+  service:
+    type: ClusterIP
+    port: 27017
+
+  metrics:
+    enabled: false
+
+importJob:
+  enabled: false
+
+  species:
+    - homo_sapiens
+    - drosophila_melanogaster
+    - gallus_gallus
+    - danio_rerio
+
+  parallelism: 4
+
+  collection: bioentities
+
+  mongo:
+    host: ""
+    port: 27017
+    database: atlas
+    username: root
+    secretName: ""
+    secretKey: mongodb-root-password
+
+  nfs:
+    server: hh-isi-srv-vlan1496.ebi.ac.uk
+    path: /ifs/public/services/fg/atlas/JSONL/bioentities
+
+  image: ""
+
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 250m
+
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+
+# Export one or more Solr collections into MongoDB.
+# Each collection is handled by one indexed Job completion.
+# The Solr admin password is read from a Secret; supply it at deploy time
+# via .secrets-<env>.yaml (same pattern as importJob).
+solrExportJob:
+  enabled: false
+
+  # Solr path segment for `/solr/<name>/select` — prefer the **collection alias** (stable,
+  # no `-vN` suffix). Physical collection names work too. One Job completion per list entry.
+  # MongoDB collection name matches this string unless mongoCollectionName / stripVersionSuffix is set.
+  collections: []
+
+  parallelism: 2
+
+  # Solr connection — required when enabled.
+  solr:
+    # Common service URL created by the Solr Operator:
+    #   <release>-solrcloud-common.<namespace>.svc.cluster.local:80
+    host: ""
+    # Use the **admin** account for these export scripts (and other app-facing Solr HTTP calls).
+    # Password comes from the matching key in *-solrcloud-security-bootstrap (typically "admin").
+    # The **solr** user in that same secret is intended for SolrCloud internal use, not for chart jobs.
+    user: "admin"
+    secretName: ""
+    secretKey: "admin"
+
+  # MongoDB target — defaults mirror importJob for consistency.
+  mongo:
+    host: ""        # defaults to <release>-mongodb.<namespace>.svc.cluster.local
+    port: 27017
+    database: atlas
+    username: root
+    secretName: ""  # defaults to the chart's own MongoDB secret
+    secretKey: mongodb-root-password
+
+  # Solr query — export a subset of each collection (default: all docs).
+  query: "*:*"
+
+  # Comma-separated Solr internal fields to strip before importing to MongoDB.
+  stripFields: "_version_"
+
+  # Override the MongoDB target collection name for all completions.
+  # Useful when Solr collection names are versioned (e.g. scxa-analytics-v8)
+  # but you want a stable name in MongoDB (e.g. scxa-analytics).
+  # Leave empty to derive the name from the Solr collection name.
+  mongoCollectionName: ""
+
+  # Automatically strip trailing -v<N> version suffix from Solr collection names
+  # when deriving the MongoDB collection name (e.g. scxa-analytics-v8 → scxa-analytics).
+  # Only used when mongoCollectionName is not set.
+  stripVersionSuffix: false
+
+  # mongoimport mode: "insert" | "upsert" | "merge"
+  importMode: insert
+  # Fields used as the upsert key when importMode is "upsert" or "merge".
+  upsertFields: "id"
+  # Parallel mongoimport write workers. Ignored for upsert/merge mode.
+  # Increase up to the number of MongoDB CPU cores for bulk loads.
+  numInsertionWorkers: 4
+
+  # Extra mongoimport logging (batch progress and counts on stderr).
+  mongoimportVerbose: true
+
+  # Set to true to drop the MongoDB collection before importing (clean re-load).
+  dropCollection: false
+
+  # When set, the Python exporter queries Solr for all distinct values of this
+  # field (via facets) and exports each value's documents concurrently using
+  # MAX_WORKERS threads.  Recommended for large collections partitioned by a
+  # known field (e.g. experiment_accession for analytics / gene2experiment).
+  # Leave empty for a simple single-stream cursor export.
+  partitionField: ""
+  maxWorkers: 8
+
+  # Docs fetched per Solr request (tune for memory vs. speed).
+  batchSize: 50000
+  # Seconds per Solr HTTP call (large pages + slow cluster need more than default 600).
+  solrHttpTimeout: 600
+
+  mongoImage: ""  # defaults to mongo:<chart appVersion>
+
+  exportResources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 250m
+
+  importResources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 250m
+
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600

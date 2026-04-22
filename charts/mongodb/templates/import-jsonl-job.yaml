@@ -1,0 +1,121 @@
+{{- $job := .Values.importJob | default dict -}}
+{{- if $job.enabled | default false }}
+{{- $species := $job.species | default list -}}
+{{- if eq (len $species) 0 -}}
+{{- fail "importJob.species must be a non-empty list" -}}
+{{- end }}
+{{- $mongo      := $job.mongo | default dict -}}
+{{- $nfs        := $job.nfs   | default dict -}}
+{{- $mongoHost  := $mongo.host | default (printf "%s-mongodb.%s.svc.cluster.local" .Release.Name .Release.Namespace) -}}
+{{- $secretName := $mongo.secretName | default (include "mongodb.fullname" .) -}}
+{{- $secretKey  := $mongo.secretKey  | default "mongodb-root-password" -}}
+{{- $count      := len $species -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-import-jsonl
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: import-jsonl
+    {{- include "mongodb.labels" . | nindent 4 }}
+  annotations: {}
+spec:
+  completions: {{ $count }}
+  parallelism: {{ $job.parallelism | default $count }}
+  completionMode: Indexed
+  backoffLimit: {{ $job.backoffLimit | default 2 }}
+  ttlSecondsAfterFinished: {{ $job.ttlSecondsAfterFinished | default 600 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: import-jsonl
+        {{- include "mongodb.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: jsonl-data
+          nfs:
+            server: {{ required "importJob.nfs.server is required" $nfs.server | quote }}
+            path: {{ $nfs.path | default "/hps/nobackup/irene/ma/fg_atlas/index-bioentities-wd-prod" | quote }}
+            readOnly: true
+        - name: shared
+          emptyDir: {}
+      initContainers:
+        - name: resolve-species
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+          env:
+            - name: SPECIES_LIST
+              value: {{ join "," $species | quote }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              SPECIES=$(echo "$SPECIES_LIST" | tr ',' '\n' | sed -n "$((JOB_COMPLETION_INDEX + 1))p")
+              if [ -z "$SPECIES" ]; then
+                echo "ERROR: no species at index ${JOB_COMPLETION_INDEX} in list: ${SPECIES_LIST}"
+                exit 1
+              fi
+              echo "Index ${JOB_COMPLETION_INDEX} → ${SPECIES}"
+              echo -n "$SPECIES" > /shared/species
+      containers:
+        - name: mongoimport
+          image: {{ $job.image | default (printf "mongo:%s" .Chart.AppVersion) | quote }}
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: jsonl-data
+              mountPath: /jsonl-data
+              readOnly: true
+            - name: shared
+              mountPath: /shared
+              readOnly: true
+          env:
+            - name: COLLECTION
+              value: {{ $job.collection | default "bioentities" | quote }}
+            - name: MONGO_HOST
+              value: {{ $mongoHost | quote }}
+            - name: MONGO_PORT
+              value: {{ $mongo.port | default 27017 | quote }}
+            - name: MONGO_DB
+              value: {{ $mongo.database | default "atlas" | quote }}
+            - name: MONGO_USER
+              value: {{ $mongo.username | default "root" | quote }}
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName | quote }}
+                  key: {{ $secretKey | quote }}
+          resources:
+            {{- toYaml ($job.resources | default dict) | nindent 12 }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              SPECIES=$(cat /shared/species)
+
+              JSONL_DIR="/jsonl-data/${SPECIES}"
+              echo "Importing species '${SPECIES}' from ${JSONL_DIR} ..."
+              FILES=$(ls "${JSONL_DIR}/${SPECIES}".*.jsonl 2>/dev/null || true)
+              if [ -z "$FILES" ]; then
+                echo "ERROR: no JSONL files found matching ${JSONL_DIR}/${SPECIES}.*.jsonl"
+                exit 1
+              fi
+
+              for f in $FILES; do
+                echo "Importing $f into collection '${COLLECTION}' ..."
+                mongoimport \
+                  --host "$MONGO_HOST" \
+                  --port "$MONGO_PORT" \
+                  --db "$MONGO_DB" \
+                  --username "$MONGO_USER" \
+                  --password "$MONGO_PASSWORD" \
+                  --authenticationDatabase admin \
+                  --collection "$COLLECTION" \
+                  --type json \
+                  --file "$f"
+                echo "Done: $f"
+              done
+
+              echo "All JSONL files for ${SPECIES} imported successfully."
+{{- end }}

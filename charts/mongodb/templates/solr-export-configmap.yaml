@@ -1,0 +1,198 @@
+{{- if .Values.solrExportJob.enabled | default false }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-solr-export-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: solr-export
+    {{- include "mongodb.labels" . | nindent 4 }}
+data:
+  export.py: |
+    #!/usr/bin/env python3
+    """
+    Export from Solr to /shared/export.fifo for mongoimport.
+
+    SOLR_COLLECTION is the path segment after /solr/ — use the collection **alias**
+    (recommended; stable name without -vN) or a physical collection name.
+
+    Simple mode   (PARTITION_FIELD unset): single-threaded cursor pagination.
+    Partitioned mode (PARTITION_FIELD set): discovers all partition values via
+      Solr facets then exports each partition concurrently using a thread pool.
+      A single writer thread serialises all JSONL lines to the FIFO so
+      mongoimport sees a clean stream regardless of how many threads are running.
+    """
+    import json, os, queue, threading, urllib.parse, urllib.request
+    from base64 import b64encode
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    SOLR_HOST       = os.environ["SOLR_HOST"]
+    SOLR_COLLECTION = os.environ["SOLR_COLLECTION"]
+    SOLR_USER       = os.environ.get("SOLR_USER", "admin")
+    SOLR_PASS       = os.environ.get("SOLR_PASS", "SolrRocks")
+    SOLR_HTTP_TIMEOUT = int(os.environ.get("SOLR_HTTP_TIMEOUT", "600"))
+    BATCH_SIZE      = int(os.environ.get("BATCH_SIZE", "50000"))
+    SOLR_QUERY      = os.environ.get("SOLR_QUERY", "*:*")
+    STRIP_FIELDS    = set(
+        f.strip()
+        for f in os.environ.get("STRIP_FIELDS", "_version_").split(",")
+        if f.strip()
+    )
+    PARTITION_FIELD = os.environ.get("PARTITION_FIELD", "").strip()
+    MAX_WORKERS     = int(os.environ.get("MAX_WORKERS", "8"))
+    FIFO            = "/shared/export.fifo"
+
+    base_url    = f"http://{SOLR_HOST}/solr/{SOLR_COLLECTION}/select"  # alias or collection
+    auth_header = {"Authorization": "Basic " + b64encode(f"{SOLR_USER}:{SOLR_PASS}".encode()).decode()}
+
+    def solr_get(params):
+        url = base_url + "?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(url, headers=auth_header)
+        with urllib.request.urlopen(req, timeout=SOLR_HTTP_TIMEOUT) as resp:
+            return json.loads(resp.read())
+
+    _SENTINEL = object()
+    # Set when mongoimport closes the FIFO read end (crash, OOM, DB error, etc.)
+    IMPORTER_GONE = threading.Event()
+
+    def run_writer(doc_queue, gone):
+        """Drain the queue and write JSONL lines to the FIFO (line-buffered)."""
+        fh = open(FIFO, "w", buffering=1)
+        try:
+            while True:
+                item = doc_queue.get()
+                if item is _SENTINEL:
+                    break
+                try:
+                    fh.write(item)
+                except BrokenPipeError:
+                    print(
+                        "[export] ERROR: FIFO broken pipe — mongoimport stopped reading "
+                        "(exit/OOM/DB error). Check logs: kubectl logs … -c mongoimport",
+                        flush=True,
+                    )
+                    gone.set()
+                    return
+        except BrokenPipeError:
+            print(
+                "[export] ERROR: FIFO broken pipe — mongoimport stopped reading. Check -c mongoimport logs.",
+                flush=True,
+            )
+            gone.set()
+        finally:
+            try:
+                fh.close()
+            except BrokenPipeError:
+                pass
+
+    def enqueue_line(doc_queue, gone, line):
+        """Block on queue with timeout so we notice IMPORTER_GONE without hanging forever."""
+        while not gone.is_set():
+            try:
+                doc_queue.put(line, timeout=1.0)
+                return
+            except queue.Full:
+                continue
+        raise SystemExit(1)
+
+    def export_docs(query, doc_queue, gone, total_hint=None):
+        """Cursor-paginate a Solr query, push JSONL lines onto doc_queue.
+        Logs progress after each batch. total_hint = Solr numFound (simple mode only)."""
+        cursor = "*"
+        count = 0
+        batch_idx = 0
+        # Partitioned mode uses total_hint=None; cursor responses sometimes omit numFound — seed denominator once.
+        precount = None
+        if total_hint is None:
+            z = solr_get({"q": query, "rows": 0, "wt": "json"})
+            precount = int(z["response"].get("numFound") or 0)
+        while True:
+            if gone.is_set():
+                raise SystemExit(1)
+            batch_idx += 1
+            cur_show = "*" if cursor == "*" else (cursor[:32] + "…" if len(cursor) > 32 else cursor)
+            print(f"[export] batch {batch_idx}: Solr request (rows≤{BATCH_SIZE} cursor={cur_show})", flush=True)
+            data = solr_get({"q": query, "cursorMark": cursor,
+                             "sort": "id asc", "rows": BATCH_SIZE, "wt": "json"})
+            docs = data["response"]["docs"]
+            next_cursor = data["nextCursorMark"]
+            num_found = int(data["response"].get("numFound") or 0)
+            if total_hint is not None:
+                hint = int(total_hint)
+            else:
+                hint = num_found or (precount or 0)
+            qtag = (query[:48] + "…") if len(query) > 48 else query
+            print(f"[export] batch {batch_idx}: Solr returned {len(docs)} docs — enqueueing (may block if import lags)…", flush=True)
+            for doc in docs:
+                for f in STRIP_FIELDS:
+                    doc.pop(f, None)
+                enqueue_line(doc_queue, gone, json.dumps(doc) + "\n")
+            count += len(docs)
+            if hint > 0:
+                pct = min(100, (100 * count) // hint)
+                print(f"[export] batch {batch_idx}: {count}/{hint} docs ({pct}%)  [{qtag}]", flush=True)
+            else:
+                print(f"[export] batch {batch_idx}: {count} docs (running)  [{qtag}]", flush=True)
+            if next_cursor == cursor or not docs:
+                break
+            cursor = next_cursor
+        return count
+
+    if PARTITION_FIELD:
+        # ── Partitioned mode ──────────────────────────────────────────────────
+        print(f"Fetching partitions on '{PARTITION_FIELD}' for '{SOLR_COLLECTION}'...", flush=True)
+        raw  = solr_get({"q": SOLR_QUERY, "rows": 0, "wt": "json",
+                         "facet": "true", f"facet.field": PARTITION_FIELD,
+                         "facet.limit": 100000, "facet.mincount": 1})
+        vals       = raw["facet_counts"]["facet_fields"][PARTITION_FIELD]
+        partitions = vals[::2]   # Solr returns alternating [key, count, key, count, ...]
+        print(f"Found {len(partitions)} partitions — using {MAX_WORKERS} threads.", flush=True)
+
+        # Queue size limits in-flight memory: MAX_WORKERS batches of BATCH_SIZE docs
+        doc_queue = queue.Queue(maxsize=MAX_WORKERS * BATCH_SIZE)
+        writer    = threading.Thread(target=run_writer, args=(doc_queue, IMPORTER_GONE), daemon=True)
+        writer.start()
+
+        total  = 0
+        done   = 0
+        errors = []
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            futures = {
+                pool.submit(export_docs, f"{PARTITION_FIELD}:{p}", doc_queue, IMPORTER_GONE, None): p
+                for p in partitions
+            }
+            for fut in as_completed(futures):
+                part = futures[fut]
+                try:
+                    n      = fut.result()
+                    total += n
+                    done  += 1
+                    print(f"[{done}/{len(partitions)}] {part}: {n} docs  (total so far: {total})", flush=True)
+                except Exception as exc:
+                    errors.append((part, exc))
+                    print(f"ERROR exporting partition '{part}': {exc}", flush=True)
+
+        doc_queue.put(_SENTINEL)
+        writer.join()
+
+        if errors:
+            print(f"FAILED partitions ({len(errors)}): {[p for p, _ in errors]}", flush=True)
+            raise SystemExit(1)
+        print(f"Export complete: {total} docs.", flush=True)
+
+    else:
+        # ── Simple single-stream mode (no partitionField) ────────────────────
+        info  = solr_get({"q": SOLR_QUERY, "rows": 0, "wt": "json"})
+        total = info["response"]["numFound"]
+        print(f"[export] Solr reports numFound={total} for query q={SOLR_QUERY!r}", flush=True)
+        print(f"[export] streaming batches of up to {BATCH_SIZE} docs → FIFO …", flush=True)
+        # Two batches max in queue: back-pressures Solr if mongoimport is slower (stops silent “stuck at 4×batch” confusion)
+        doc_queue = queue.Queue(maxsize=max(BATCH_SIZE * 2, 10000))
+        writer    = threading.Thread(target=run_writer, args=(doc_queue, IMPORTER_GONE), daemon=True)
+        writer.start()
+
+        count = export_docs(SOLR_QUERY, doc_queue, IMPORTER_GONE, total_hint=total)
+        doc_queue.put(_SENTINEL)
+        writer.join()
+        print(f"[export] complete: {count} docs written to FIFO.", flush=True)
+{{- end }}
