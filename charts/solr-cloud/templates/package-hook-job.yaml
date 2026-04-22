@@ -8,8 +8,15 @@
 {{- $pkgVer := ($hj.packageVersion | default "") -}}
 {{- $dest := ($upload.destFilestorePath | default "") -}}
 {{- $wait := ($hj.wait | default dict) -}}
+{{- $sigSecret := ($hj.signingKeySecretName | default "solrcloud-package-store-keys") -}}
+{{- $sigPrivKey := ($hj.signingPrivateKeyFile | default (printf "%s-solrcloud.pem" .Release.Name) ) -}}
+{{- $sigPubKey := ($hj.signingPublicKeyFile | default (printf "%s-solrcloud.der" .Release.Name) ) -}}
 {{- if or (eq $pkgName "") (eq $pkgVer "") (eq $dest "") -}}
 {{- fail "solr.packages.hookJob requires packageName, packageVersion, and upload.destFilestorePath" -}}
+{{- end }}
+{{- if or (eq ($uploadNfs.subPath | default "") "") (not (hasKey .Values "nfs")) -}}
+{{- /* For the implicit mode, we assume the jar is mounted from NFS into the Job pod. */ -}}
+{{- fail "solr.packages.hookJob implicit upload requires upload.nfs.subPath (and .Values.nfs.server)" -}}
 {{- end }}
 apiVersion: batch/v1
 kind: Job
@@ -21,7 +28,7 @@ metadata:
     {{- include "solr-cloud.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   backoffLimit: {{ $hj.backoffLimit | default 2 }}
   ttlSecondsAfterFinished: {{ $hj.ttlSecondsAfterFinished | default 300 }}
@@ -32,78 +39,147 @@ spec:
         {{- include "solr-cloud.labels" . | nindent 8 }}
     spec:
       restartPolicy: Never
-      {{- if and ($upload.enabled | default false) ($uploadNfs.enabled | default false) }}
       volumes:
         - name: package-jar
           nfs:
             server: {{ ($uploadNfs.server | default .Values.nfs.server) | quote }}
             path: {{ ($uploadNfs.path | default "/ifs/public/services") | quote }}
-      {{- end }}
+        {{- if ne $sigSecret "" }}
+        - name: signing-keys
+          secret:
+            secretName: {{ $sigSecret | quote }}
+        {{- end }}
       containers:
         - name: solr-package
-          image: {{ $hj.curlImage | default "curlimages/curl:8.7.1" | quote }}
+          # solr image has both curl and openssl, needed for JAR signing
+          image: {{ printf "solr:%s" (.Values.solr.image.tag | default "8.7.0") | quote }}
           imagePullPolicy: IfNotPresent
-          {{- if and ($upload.enabled | default false) ($uploadNfs.enabled | default false) }}
           volumeMounts:
             - name: package-jar
               mountPath: {{ ($upload.localJarPath | default "/input/biosolr.jar") | quote }}
               subPath: {{ ($uploadNfs.subPath | default "") | quote }}
-          {{- end }}
+            {{- if ne $sigSecret "" }}
+            - name: signing-keys
+              mountPath: /keys
+              readOnly: true
+            {{- end }}
           env:
-            - name: SOLR_BASE_URL
-              value: {{ ($hj.solrBaseUrl | default (printf "http://%s-solrcloud-common.%s.svc" .Release.Name .Release.Namespace)) | quote }}
-            - name: SOLR_ADMIN_USER
+            - name: SOLR_HOST
+              value: {{ ($hj.solrBaseUrl | default (printf "%s-solrcloud-common.%s" .Release.Name .Release.Namespace)) | quote }}
+            - name: SOLR_USER
               value: {{ ($hj.adminUser | default "admin") | quote }}
-            - name: SOLR_ADMIN_PASSWORD
+            - name: SOLR_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ $hj.adminPasswordSecretName | default (printf "%s-solrcloud-security-bootstrap" .Release.Name) | quote }}
                   key: {{ ($hj.adminPasswordSecretKey | default "admin") | quote }}
             - name: PACKAGE_NAME
-              value: {{ $pkgName | quote }}
-            - name: PACKAGE_VERSION
+              value: {{ $hj.packageName | default "biosolr" | quote }}
+            - name: BIOSOLR_VERSION
               value: {{ $pkgVer | quote }}
-            - name: FILESTORE_PATH
-              value: {{ $dest | quote }}
-            - name: UPLOAD_ENABLED
-              value: {{ ($upload.enabled | default false) | quote }}
-            - name: UPLOAD_LOCAL_JAR_PATH
+            - name: BIOSOLR_JAR_PATH
               value: {{ ($upload.localJarPath | default "/input/biosolr.jar") | quote }}
-            - name: UPLOAD_SIG
-              value: {{ ($upload.sig | default "") | quote }}
+            {{- if ne $sigSecret "" }}
+            - name: SIGNING_PRIVATE_KEY
+              value: {{ printf "/keys/%s" $sigPrivKey | quote }}
+            - name: SIGNING_PUBLIC_KEY
+              value: {{ printf "/keys/%s" $sigPubKey | quote }}
+            {{- end }}
           command: ["/bin/sh", "-ec"]
           args:
             - |
-              set -u
-              wait_end=$(( $(date +%s) + {{ $wait.timeoutSeconds | default 300 }} ))
-              while ! curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${SOLR_BASE_URL}/solr/admin/info/system" >/dev/null; do
-                [ "$(date +%s)" -ge "${wait_end}" ] && echo "Timed out waiting for Solr" && exit 1
-                sleep {{ $wait.sleepSeconds | default 3 }}
-              done
+              HOST=${SOLR_HOST:-"localhost:8983"}
+              SOLR_USER=${SOLR_USER:-"solr"}
+              SOLR_PASS=${SOLR_PASS:-"SolrRocks"}
+              SOLR_AUTH="-u $SOLR_USER:$SOLR_PASS"
+              CURL_OUT=/tmp/curl_out.txt
 
-              meta_url="${SOLR_BASE_URL}/api/node/files${FILESTORE_PATH}?meta=true"
+              [ -z "${BIOSOLR_JAR_PATH}" ] && echo "BIOSOLR_JAR_PATH env var is needed." && exit 1
+              [ -z "${BIOSOLR_VERSION}" ] && echo "BIOSOLR_VERSION env var is needed." && exit 1
 
-              if [ "${UPLOAD_ENABLED}" = "true" ]; then
-                [ -f "${UPLOAD_LOCAL_JAR_PATH}" ] || (echo "Jar not found in Job pod: ${UPLOAD_LOCAL_JAR_PATH}" && exit 1)
-                if ! curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${meta_url}" >/dev/null; then
-                  put_url="${SOLR_BASE_URL}/api/cluster/files${FILESTORE_PATH}"
-                  [ -n "${UPLOAD_SIG}" ] && put_url="${put_url}?sig=${UPLOAD_SIG}"
-                  curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" --data-binary @"${UPLOAD_LOCAL_JAR_PATH}" -X PUT "${put_url}" >/dev/null
-                fi
-              fi
+              curl_check() {
+                echo "curl_check: $@"
+                HTTP_STATUS=$(curl $SOLR_AUTH -s -w "%{http_code}" -o "$CURL_OUT" "$@")
+                cat "$CURL_OUT"
+                echo ""
+              }
 
-              # The package manager requires a valid filestore entry (metadata must exist).
-              curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${meta_url}" >/dev/null
-
-              existing="$(curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" "${SOLR_BASE_URL}/api/cluster/package" || true)"
-              if echo "${existing}" | grep -F "\"${PACKAGE_NAME}\"" >/dev/null 2>&1 && echo "${existing}" | grep -F "\"${PACKAGE_VERSION}\"" >/dev/null 2>&1; then
-                echo "Package already present: ${PACKAGE_NAME}:${PACKAGE_VERSION}"
+              echo "Checking if BioSolr package is already registered"
+              curl_check "http://$HOST/api/cluster/package?omitHeader=true"
+              if grep -q "${PACKAGE_NAME}" "$CURL_OUT"; then
+                echo "BioSolr package is already registered."
+                cat $CURL_OUT
                 exit 0
               fi
 
-              curl -fsS -u "${SOLR_ADMIN_USER}:${SOLR_ADMIN_PASSWORD}" \
-                -H "Content-Type: application/json" \
-                -X POST "${SOLR_BASE_URL}/api/cluster/package" \
-                -d "{\"add\":{\"package\":\"${PACKAGE_NAME}\",\"version\":\"${PACKAGE_VERSION}\",\"files\":[\"${FILESTORE_PATH}\"]}}"
-{{- end }}
+              REMOTE_BIOSOLR_PATH=/biosolr/$BIOSOLR_VERSION/biosolr.jar
+              echo "BIOSOLR_JAR_PATH: $BIOSOLR_JAR_PATH"
+              if [ ! -s "$BIOSOLR_JAR_PATH" ]; then
+                echo "BioSolr JAR does not exist or is empty at $BIOSOLR_JAR_PATH"
+                exit 1
+              fi
 
+              # Upload public key to trusted store if signing key is available and key not yet present
+              if [ -n "${SIGNING_PUBLIC_KEY}" ] && [ -f "${SIGNING_PUBLIC_KEY}" ]; then
+                echo "Checking trusted key store..."
+                curl_check "http://$HOST/api/node/files/_trusted_/keys?omitHeader=true"
+                if ! grep -q '"name"' "$CURL_OUT"; then
+                  echo "Uploading public key to trusted store..."
+                  curl_check $SOLR_AUTH -X PUT \
+                    --data-binary @"$SIGNING_PUBLIC_KEY" \
+                    "http://$HOST/api/cluster/files/_trusted_/keys/package-store-key.der"
+                  case "$HTTP_STATUS" in 2*) echo "Public key uploaded." ;;
+                    *) echo "Failed to upload public key (HTTP $HTTP_STATUS) - continuing anyway" ;;
+                  esac
+                else
+                  echo "Trusted keys already present."
+                fi
+              fi
+
+              # Sign the JAR if a private key is available
+              echo "SIGNING_PRIVATE_KEY: $SIGNING_PRIVATE_KEY"
+              echo "SIGNING_PUBLIC_KEY: $SIGNING_PUBLIC_KEY"
+              if [ -n "${SIGNING_PRIVATE_KEY}" ] && [ -f "${SIGNING_PRIVATE_KEY}" ]; then
+                echo "Signing JAR..."
+                SIGNATURE=$(openssl dgst -sha1 -sign "$SIGNING_PRIVATE_KEY" "$BIOSOLR_JAR_PATH" \
+                  | openssl enc -base64 | sed 's/+/%2B/g' | tr -d '\n')
+                echo "JAR signed."
+                SIG_PARAM="?sig=$SIGNATURE"
+              else
+                echo "No signing key found, uploading without signature."
+                SIG_PARAM=""
+              fi
+
+              echo "Uploading BioSolr JAR..."
+              curl_check --data-binary @$BIOSOLR_JAR_PATH -X PUT \
+                "http://$HOST/api/cluster/files${REMOTE_BIOSOLR_PATH}${SIG_PARAM}"
+              case "$HTTP_STATUS" in 2*) ;; *)
+                echo "Failed to upload JAR (HTTP $HTTP_STATUS)"
+                # exit 1
+                sleep 10000
+              esac
+
+              echo "Verifying JAR file..."
+              curl_check "http://$HOST/api/node/files/biosolr/$BIOSOLR_VERSION/biosolr.jar?omitHeader=true"
+              case "$HTTP_STATUS" in 2*) ;; *)
+                echo "Could not verify BioSolr JAR (HTTP $HTTP_STATUS)"
+                exit 1
+              esac
+
+              echo "Registering package..."
+              curl_check "http://$HOST/api/cluster/package" -H 'Content-type:application/json' -d \
+                "{\"add\":{\"package\":\"biosolr\",\"version\":\"$BIOSOLR_VERSION\",\"files\":[\"$REMOTE_BIOSOLR_PATH\"]}}"
+              case "$HTTP_STATUS" in 2*) ;; *)
+                echo "Failed to register package (HTTP $HTTP_STATUS)"
+                exit 1
+              esac
+
+              echo "Verifying package registration..."
+              curl_check "http://$HOST/api/cluster/package?omitHeader=true"
+              case "$HTTP_STATUS" in 2*) ;; *)
+                echo "Failed to verify package (HTTP $HTTP_STATUS)"
+                exit 1
+              esac
+
+              echo "BioSolr package is ready."
+{{- end }}

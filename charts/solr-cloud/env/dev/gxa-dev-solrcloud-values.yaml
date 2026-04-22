@@ -18,7 +18,7 @@ solr:
     size: 20Gi
     reclaimPolicy: Retain
   secret:
-    name: gxa-solrcloud-package-store-keys
+    name: solrcloud-package-store-keys
     mountPath: /keys
 
 zookeeper:

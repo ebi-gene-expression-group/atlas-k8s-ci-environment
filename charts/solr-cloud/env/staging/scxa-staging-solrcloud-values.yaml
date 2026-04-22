@@ -4,8 +4,21 @@ solr:
   image:
     tag: 8.7.0
   javaMem: "-Xms2000m -Xmx3000m"
+  # TODO: maxBooleanClauses should not be in the helm values file. 
+  # It is set by the setup script index-scxa/bin/create-scxa-analytics-collection.sh
   opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983 -Dsolr.max.booleanClauses=100000000 -Dsolr.allowPaths=/var/solr/backup"
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
+  packages:
+    hookJob:
+      enabled: true
+      packageName: biosolr
+      packageVersion: "2.0.0"
+      upload:
+        destFilestorePath: /biosolr/2.0.0/biosolr.jar
+        nfs:
+          subPath: fg/atlas/biosolr/solr-ontology-update-processor-2.0.0.jar
+  bioSolr:
+    enabled: true  
   resources:
     limits:
       memory: 6Gi
@@ -21,8 +34,6 @@ solr:
     enabled: false
     name: solrcloud-package-store-keys
     mountPath: /keys
-  bioSolr:
-    enabled: true
 
 zookeeper:
   replicas: 3
