@@ -1,0 +1,11 @@
+---
+description: ServiceNow ticket creation preference - save as draft, do not submit
+alwaysApply: true
+---
+
+# ServiceNow Ticket Creation
+
+When creating tickets in ServiceNow (via browser or MCP):
+
+- **Save as draft** — Use "Save as Draft" instead of "Submit"
+- **Do not submit** — Leave the ticket in draft state for the user to review and submit manually
