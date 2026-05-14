@@ -73,7 +73,7 @@ affinity: {}
 
 # Nginx reverse proxy sidecar (gradual rollout - disabled by default)
 nginx:
-  enabled: false
+  enabled: true
   # App context path (e.g. /gxa for GXA) - used for cache bypass paths
   contextPath: /gxa
   image:

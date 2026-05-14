@@ -19,7 +19,7 @@ else
     $(info No .env file found, using system environment variables)
 endif
 
-RELEASE ?= scxa
+RELEASE ?= gxa
 
 ENV ?= test
 SUPPORTED_ENVS = test staging

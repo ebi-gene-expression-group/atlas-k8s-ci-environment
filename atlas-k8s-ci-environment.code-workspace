@@ -5,35 +5,14 @@
 			"path": "."
 		},
 		{
-			"name": "atlas-web-bulk",
-			"path": "../atlas-web-bulk",
-			"settings": {
-				"java.import.exclusions": [
-					"**"
-				]
-			}
-		},
-		{
-			"name": "jenkins-jobs",
-			"path": "../jenkins-jobs"
-		},
-		{
-			"path": "../atlas-web-single-cell"
-		},
-		{
 			"path": "../vtm-terraform-config"
 		},
 		{
-			"name": "atlas-containers",
-			"path": "../atlas-containers"
+			"name": "fg-search",
+			"path": "../fg-search"
 		},
 		{
-			"name": "atlas-conda",
-			"path": "../atlas-conda"
-		},
-		{
-			"name": "wf-bulk-indexing",
-			"path": "../wf-bulk-indexing"
+			"path": "../atlas-web-bulk"
 		}
 	],
 	"settings": {
@@ -61,7 +40,7 @@
 			}
 		],
 		"java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
-		"openctx.enable": true,
+		"openctx.enable": false,
 		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home"
 	}
 }
