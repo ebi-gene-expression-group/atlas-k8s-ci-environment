@@ -230,3 +230,12 @@ Solr hosts URL
 {{- define "app.solrHost" -}}
 {{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
 {{- end }}
+
+{{/* Name of the chart-managed registry pull secret */}}
+{{- define "app.registryPullSecretName" -}}
+{{- if .Values.imagePullSecret.name }}
+{{- .Values.imagePullSecret.name | trunc 253 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-registry" (include "app.fullname" .) | trunc 253 | trimSuffix "-" }}
+{{- end }}
+{{- end }}

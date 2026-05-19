@@ -1,10 +1,11 @@
 # values for gxa test env
 environment: test
 
+
 tomcat:
   createSecret: true
   debug:
-    enabled: true
+    enabled: false
 
 loggingLevel: INFO
 

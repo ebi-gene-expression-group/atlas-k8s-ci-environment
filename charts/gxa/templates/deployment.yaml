@@ -22,9 +22,14 @@ spec:
         {{- include "app.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: webapp
     spec:
-      {{- with .Values.imagePullSecrets }}
+      {{- if or .Values.imagePullSecret.create (not (empty .Values.imagePullSecret.name)) (not (empty .Values.imagePullSecrets)) }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- if or .Values.imagePullSecret.create (not (empty .Values.imagePullSecret.name)) }}
+        - name: {{ include "app.registryPullSecretName" . | quote }}
+        {{- end }}
+        {{- range .Values.imagePullSecrets }}
+        - name: {{ .name | quote }}
+        {{- end }}
       {{- end }}
       serviceAccountName: {{ include "app.serviceAccountName" . }}
       securityContext:
@@ -35,7 +40,7 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "tomcat:8-jdk11" }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.tomcat.debug.enabled }}
           command: [ "catalina.sh" ]
@@ -128,7 +133,7 @@ spec:
               subPath: fg/atlas/ontology
               readOnly: true
             - name: services-volume
-              mountPath: /ifs/public/services/fg/atlas
+              mountPath: /nfs/public/services/fg/atlas
               subPath: fg/atlas
               readOnly: true
             {{- /* webapp properties mounts */}}
@@ -152,8 +157,6 @@ spec:
               mountPath: {{ include "app.tomcatDir" . }}/logs
             - name: tomcat-work
               mountPath: {{ include "app.tomcatDir" . }}/work
-            - name: tomcat-webapps
-              mountPath: {{ include "app.tomcatDir" . }}/webapps
             # Mount managed manager context.xml into the manager webapp
             - name: tomcat-server-config
               mountPath: {{ include "app.tomcatDir" . }}/webapps/manager/META-INF/context.xml
@@ -215,9 +218,6 @@ spec:
             claimName: tomcat-logs
         - name: tomcat-work
           emptyDir: {}
-        - name: tomcat-webapps
-          persistentVolumeClaim:
-            claimName: tomcat-webapps
         - name: tomcat-config
           emptyDir: {}
         {{- if .Values.nginx.enabled }}
@@ -259,18 +259,6 @@ spec:
               mountPath: {{ include "app.servicesDir" . }}
             - name: experiments-snapshot
               mountPath: /experiments_snapshot
-        - name: init-tomcat-manager
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "sh"]
-          args:
-            - "-c"
-            - |
-              set -vx
-              cp -rv {{ include "app.tomcatDir" . }}/webapps.dist/manager {{ include "app.tomcatDir" . }}/webapps/
-          volumeMounts:
-            - name: tomcat-webapps
-              mountPath: {{ include "app.tomcatDir" . }}/webapps
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

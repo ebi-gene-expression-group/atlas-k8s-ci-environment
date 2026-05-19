@@ -51,6 +51,7 @@ tasks:
           fi
         fi
         HELM_SET_ARGS=(--set "appVersion={{.APP_VERSION}}")
+        HELM_SET_ARGS+=(--set "image.tag={{.APP_VERSION}}")
         if [ -n "${DOCKER_CONFIG_JSON:-}" ]; then
           DOCKER_CONFIG_JSON="${DOCKER_CONFIG_JSON//\"/}"
           HELM_SET_ARGS+=(--set-file "registrySecret.dockerconfigjson=${DOCKER_CONFIG_JSON}")
@@ -170,7 +171,7 @@ tasks:
         open "https://grafana-hh-webadmin-35.wp-k8s.ebi.ac.uk/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&var-datasource=default&var-cluster=&var-namespace={{.NAMESPACE}}"
 
   open-webapp:
-    desc: Open the Tomcat app in a browser (NodePort URL for current context)
+    desc: Open the app in a browser via the Ingress URL
     deps: [init-k8s]
     cmds:
       - |
@@ -178,15 +179,17 @@ tasks:
         RELEASE="{{.RELEASE}}"
         NAMESPACE="{{.NAMESPACE}}"
         case "$RELEASE" in
-          gxa) DEPLOY_CTX_PATH="/gxa" ;;
-          scxa) DEPLOY_CTX_PATH="/gxa/sc" ;;
+          gxa) CTX_PATH="/gxa" ;;
+          scxa) CTX_PATH="/gxa/sc" ;;
           *) echo "Error: unknown RELEASE"; exit 1 ;;
         esac
-        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-        TOMCAT_PORT="$(kubectl get service "$RELEASE" --namespace "$NAMESPACE" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)"
-        TOMCAT_SERVER_URL="http://${NODE_HOSTNAME}:${TOMCAT_PORT}"
-        echo "Opening ${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}"
-        open "${TOMCAT_SERVER_URL}${DEPLOY_CTX_PATH}"
+        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')"
+        INGRESS_PORT="$(kubectl get service ingress-nginx-ingress-controller-http \
+          --namespace ingress \
+          -o jsonpath='{.spec.ports[0].nodePort}')"
+        URL="http://${NODE_HOSTNAME}:${INGRESS_PORT}${CTX_PATH}"
+        echo "Opening $URL"
+        open "$URL"
 
   open-solr:
     desc: Open Solr admin UI (NodePort on same node as cluster’s first node)

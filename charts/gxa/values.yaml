@@ -5,12 +5,29 @@
 replicaCount: 1
 
 image:
-  repository: tomcat
+  repository: dockerhub.ebi.ac.uk/ebi-gene-expression/atlas-web-bulk/gxa
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "8-jdk11"
+  tag: 
 
+# Extra pull secrets (by name) in addition to any secret created from imagePullSecret below.
 imagePullSecrets: []
+#  - name: other-registry
+
+# Create a Secret of type kubernetes.io/dockerconfigjson for the container registry.
+# No ServiceAccount required — credentials are on the pod via imagePullSecrets.
+# Set create: true and pass username plus password (use helm -f with a secrets file, or
+# .secrets file gitignored, not plain values in git).
+# Or leave create: false and only use imagePullSecrets with a pre-created secret.
+imagePullSecret:
+  create: false
+  # Kubernetes Secret name (default: <release-name>-fg-search-registry)
+  server: dockerhub.ebi.ac.uk
+  name: gxa-registry
+  username: 
+  password: 
+
+
 nameOverride: ""
 fullnameOverride: ""
 
