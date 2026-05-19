@@ -51,6 +51,22 @@ service:
   type: NodePort
   port: 80
 
+# Path-based routing (e.g. shared host /gxa/...). Requires an ingress controller
+# that honors the default nginx rewrite annotations (strip path prefix before the pod).
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+    # nginx.ingress.kubernetes.io/use-regex: "true"
+    # nginx.ingress.kubernetes.io/rewrite-target: /$2
+  pathPrefix: /gxa
+  # Ingress path rule is built from pathPrefix (regex + rewrite-target). Add host if you need a name-based vhost.
+  hosts:
+    - host: ""
+  tls: []
+# Override URL prefix for the app when ingress is off but traffic is still under a path.
+publicUrlPrefix: ""
+
 resources:
   requests:
     memory: "4Gi"

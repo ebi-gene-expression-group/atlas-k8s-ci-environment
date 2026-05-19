@@ -12,7 +12,8 @@ nfs:
   snapshotComponent: experiments_test
 
 jdbc:
-  url: "jdbc:postgresql://pgsql-hlvm-038:5432/gxpatlaspro"
+  # TODO: change when we have the new database
+  #url: "jdbc:postgresql://pgsql-hlvm-038:5432/gxpatlaspro"
   user: atlasprd3
   pool: gxa
   createSecret: true

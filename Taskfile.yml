@@ -8,15 +8,17 @@ dotenv:
   - .env
 
 vars:
-  RELEASE: gxa
-  ENV: test
+  RELEASE: 
+    sh: echo "${RELEASE:-gxa}"
+  ENV: 
+    sh: echo "${ENV:-test}"
   SUPPORTED_ENVS: test staging
   APP_VERSION: 37.6.0
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
   ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
   CHART_PATH: charts/{{.RELEASE}}
   WAR_FILE_DIR: charts/{{.RELEASE}}/war
-  WAR_FILE_NAME: "{{.RELEASE}}.war"
+  # WAR_FILE_NAME: override via .env or env var (default: $RELEASE.war)
   CURL_DEBUG_OPTS: "--progress-bar"
 
 tasks:
@@ -102,7 +104,7 @@ tasks:
         ENV="{{.ENV}}"
         NAMESPACE="{{.NAMESPACE}}"
         WAR_FILE_DIR="{{.WAR_FILE_DIR}}"
-        WAR_FILE_NAME="{{.WAR_FILE_NAME}}"
+        WAR_FILE_NAME="${WAR_FILE_NAME:-{{.RELEASE}}.war}"
         CURL_DEBUG_OPTS="{{.CURL_DEBUG_OPTS}}"
         case "$RELEASE" in
           gxa) DEPLOY_CTX_PATH="/gxa" ;;
@@ -124,17 +126,20 @@ tasks:
           echo "ERROR: Failed to get deployer password"
           exit 1
         fi
+        echo "Restarting deployment on k8s to apply new WAR..."
+        kubectl rollout restart deployment "$RELEASE" --namespace "$NAMESPACE"
+        echo "Waiting for deployment to complete..."
+        kubectl rollout status deployment "$RELEASE" --namespace "$NAMESPACE" --timeout=300s
         echo "Deploying WAR to ${TOMCAT_SERVER_URL}..."
-        curl --verbose -u "deployer:${DEPLOYER_PASSWORD}" \
+        curl --verbose \
+          --user "deployer:${DEPLOYER_PASSWORD}" \
           --fail \
           --include \
           $CURL_DEBUG_OPTS \
           "${TOMCAT_SERVER_URL}/manager/text/deploy?path=${DEPLOY_CTX_PATH}&update=true" \
           --upload-file "${WAR_FILE_DIR}/${WAR_FILE_NAME}"
-        echo "Restarting deployment on k8s..."
-        kubectl rollout restart deployment "$RELEASE" --namespace "$NAMESPACE"
         echo "Listing deployed applications..."
-        curl -u "deployer:${DEPLOYER_PASSWORD}" \
+        curl --user "deployer:${DEPLOYER_PASSWORD}" \
           --fail \
           $CURL_DEBUG_OPTS \
           "${TOMCAT_SERVER_URL}/manager/text/list"

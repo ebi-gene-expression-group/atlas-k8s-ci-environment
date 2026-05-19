@@ -128,7 +128,7 @@ spec:
               subPath: fg/atlas/ontology
               readOnly: true
             - name: services-volume
-              mountPath: /nfs/public/services/fg/atlas
+              mountPath: /ifs/public/services/fg/atlas
               subPath: fg/atlas
               readOnly: true
             {{- /* webapp properties mounts */}}
