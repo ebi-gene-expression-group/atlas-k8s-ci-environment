@@ -13,20 +13,16 @@
 		},
 		{
 			"path": "../atlas-web-bulk"
+		},
+		{
+			"path": "../jenkins-jobs"
+		},
+		{
+			"path": "../wf-bulk-indexing"
 		}
 	],
 	"settings": {
 		"makefile.configurations": [
-			{
-				"buildTarget": "deploy-test",
-				"env": "test",
-				"name": "Unnamed configuration 1"
-			},
-			{
-				"buildTarget": "deploy-dev",
-				"env": "dev",
-				"name": "Unnamed configuration 2"
-			}
 		],
 		"makefile.configureOnOpen": false,
 		"nextflow.telemetry.enabled": true,
@@ -41,6 +37,42 @@
 		],
 		"java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
 		"openctx.enable": false,
-		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home"
+		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
+		"sqltools.connections": [
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-dlvm-078",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"group": "gxa vm",
+				"name": "gxa test",
+				"database": "gxpatlastst",
+				"username": "atlasprd3"
+			},
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-hlvm-038",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"name": "gxa staging (vm)",
+				"group": "gxa vm",
+				"database": "gxpatlaspro",
+				"username": "atlasprd3"
+			}
+		],
+		"sshfs.configs": [
+			{
+				"name": "codon",
+				"host": "codon-slurm-login",
+				"username": "$USER",
+				"privateKeyPath": "$HOME/.ssh/id_ed25519",
+				"sftpSudo": "fg_atlas",
+				"sftpCommand": "/usr/lib/openssh/sftp-server",
+				"terminalCommand": "become fg_atlas",
+				"group": "codon"
+			}
+		]
 	}
 }

@@ -1,0 +1,19 @@
+# Maps Jenkins TARGET_ENVIRONMENT to Helm deploy settings.
+# GXA_SOURCE_JSON_URL and GXA_TARGET_JSON_URL live in .env — they must describe the same
+# target as TARGET_ENVIRONMENT (see .env.example).
+
+environments:
+  k8s_test:
+    description: GXA on k8s (Helm ENV=test, namespace gxa-test)
+    helm_release: gxa
+    helm_env: test
+  test:
+    description: Legacy wwwdev / non-k8s test (Codon environments/gxa/test.sh)
+    helm_release: null
+    helm_env: null
+  production:
+    description: EBI production (Codon environments/gxa/production.sh)
+    helm_release: null
+    helm_env: null
+
+default_source_json_url: https://www.ebi.ac.uk/gxa/json/experiments

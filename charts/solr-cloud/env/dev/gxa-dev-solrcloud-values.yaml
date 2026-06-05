@@ -6,13 +6,6 @@ solr:
   javaMem: "-Xms4000m -Xmx5000m"
   opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983"
   gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
-  resources:
-    limits:
-      memory: 6Gi
-      cpu: 1
-    requests:
-      memory: 4.5Gi
-      cpu: 1
   storage:
     className: standard-nfs-production
     size: 20Gi

@@ -35,26 +35,7 @@ spec:
             {{- include "solr.backup.volume.source" . | nindent 12 }}
             defaultContainerMount:
               name: backup-volume
-              mountPath: /var/solr/backup
-        {{- if (.Values.solr.secret.enabled | default false) }}
-          - name: keys-secret
-            source:
-              secret:
-                secretName: {{ .Values.solr.secret.name }}
-            defaultContainerMount:
-              name: keys-secret
-              mountPath: {{ .Values.solr.secret.mountPath }}
-        {{- end }}
-        {{- if (.Values.solr.bioSolr.enabled | default false) }}
-          - name: scatlas-owl-volume
-            source:
-              nfs:
-                server: {{ .Values.nfs.server }}
-                path: /ifs/public/services
-            defaultContainerMount:
-              name: scatlas-owl-volume
-              mountPath: /srv/gxa/scatlas.owl
-              subPath: fg/atlas/biosolr/scatlas.owl
+              mountPath: /var/solr/backuph: {{ .Values.solr.secret.mountPath }}
         {{- end }}
   zookeeperRef:
     provided:

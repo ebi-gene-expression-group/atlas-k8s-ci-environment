@@ -13,13 +13,23 @@ vars:
   ENV: 
     sh: echo "${ENV:-test}"
   SUPPORTED_ENVS: test staging
-  APP_VERSION: 37.6.0
+  APP_VERSION: 37.6.47
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
   ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
   CHART_PATH: charts/{{.RELEASE}}
   WAR_FILE_DIR: charts/{{.RELEASE}}/war
+  # Jenkins — set JENKINS_USER and JENKINS_TOKEN in .env
+  JENKINS_URL:
+    sh: echo "${JENKINS_URL:-http://45.88.80.151:30004/jenkins}"
+  JENKINS_JOB: Loading_bulk_using_indexing_pipeline_slurm
+  JENKINS_BIOENTITIES_JOB: H_bioentities_loading_pipeline_bulk_and_sc
   # WAR_FILE_NAME: override via .env or env var (default: $RELEASE.war)
   CURL_DEBUG_OPTS: "--progress-bar"
+  NGINX_CACHE_PURGE_DIR: nginx-cache-purge
+  NGINX_CACHE_PURGE_REGISTRY: dockerhub.ebi.ac.uk
+  NGINX_CACHE_PURGE_IMAGE: dockerhub.ebi.ac.uk/ebi-gene-expression/atlas-web-bulk/nginx-cache-purge
+  NGINX_CACHE_PURGE_TAG:
+    sh: echo "${TAG:-1.29.5}"
 
 tasks:
   default:
@@ -191,6 +201,215 @@ tasks:
         echo "Opening $URL"
         open "$URL"
 
+  gxa-print-urls:
+    desc: Print GXA_SOURCE_JSON_URL, GXA_TARGET_JSON_URL, and TARGET_ENVIRONMENT from .env
+    cmds:
+      - |
+        set -euo pipefail
+        for var in GXA_SOURCE_JSON_URL GXA_TARGET_JSON_URL TARGET_ENVIRONMENT; do
+          val="${!var:-}"
+          if [ -z "$val" ]; then
+            echo "ERROR: $var is not set (see .env.example)" >&2
+            exit 1
+          fi
+          echo "$var=$val"
+        done
+
+  gxa-resolve-target-json-url:
+    desc: Derive GXA_TARGET_JSON_URL from k8s ingress (RELEASE=gxa ENV=test). Compare with .env.
+    deps: [init-k8s]
+    cmds:
+      - bash scripts/resolve-gxa-target-json-url.sh
+
+  gxa-experiments-gap:
+    desc: |
+      Experiments on GXA_SOURCE_JSON_URL but not GXA_TARGET_JSON_URL (species on target only).
+      Usage: task gxa-experiments-gap COUNT=10
+      Optional: PER_SPECIES=3  COMMA_LIST=true (for piping to trigger-indexing)
+    vars:
+      COUNT: '{{default "0" .COUNT}}'
+      PER_SPECIES: '{{default "0" .PER_SPECIES}}'
+      COMMA_LIST: '{{default "false" .COMMA_LIST}}'
+    cmds:
+      - |
+        set -euo pipefail
+        ARGS=()
+        [ "{{.COUNT}}" != "0" ] && ARGS+=(--count "{{.COUNT}}")
+        [ "{{.PER_SPECIES}}" != "0" ] && ARGS+=(--per-species "{{.PER_SPECIES}}")
+        [ "{{.COMMA_LIST}}" = "true" ] && ARGS+=(--comma-list)
+        python3 scripts/gxa_experiments_gap.py "${ARGS[@]}"
+
+  jenkins-params:
+    desc: List parameters accepted by the indexing pipeline job
+    cmds:
+      - |
+        curl -fsSL \
+          --user "${JENKINS_USER}:${JENKINS_TOKEN}" \
+          "{{.JENKINS_URL}}/job/{{.JENKINS_JOB}}/api/json?tree=property\[parameterDefinitions\[name,type\]\]" \
+          | jq
+
+  bioentities-jenkins-params:
+    desc: List parameters for H_bioentities_loading_pipeline_bulk_and_sc (from Jenkins config.xml)
+    cmds:
+      - |
+        set -euo pipefail
+        curl -fsSL --user "${JENKINS_USER}:${JENKINS_TOKEN}" \
+          "{{.JENKINS_URL}}/job/{{.JENKINS_BIOENTITIES_JOB}}/config.xml" \
+          | python3 -c "
+        import sys, xml.etree.ElementTree as ET
+        root = ET.parse(sys.stdin)
+        for d in root.findall('.//parameterDefinitions/*'):
+            name = d.findtext('name') or d.tag
+            desc = (d.findtext('description') or '').strip().replace('\n', ' ')[:120]
+            default = d.findtext('defaultValue')
+            choices = [c.text for c in d.findall('.//choices/a/string') if c.text]
+            print(f'{name}')
+            if desc: print(f'  description: {desc}')
+            if default is not None: print(f'  default: {default}')
+            if choices: print(f'  choices: {choices[:8]}' + (' ...' if len(choices) > 8 else ''))
+            print()
+        "
+
+  gxa-prod-only-species:
+    desc: |
+      Species on GXA_SOURCE_JSON_URL but not on GXA_TARGET_JSON_URL, ranked by experiment count.
+      Usage: task gxa-prod-only-species COUNT=10
+    vars:
+      COUNT: '{{default "10" .COUNT}}'
+    cmds:
+      - python3 scripts/gxa_prod_only_species.py --count "{{.COUNT}}"
+
+  trigger-bioentities:
+    desc: |
+      Trigger H_bioentities_loading_pipeline_bulk_and_sc for one species.
+      Usage: task trigger-bioentities SPECIES=zea_mays
+      Optional: RESOURCE=gxa ENVIRONMENT=k8s_test TARGET=load_bioentities_only PREFIX=build_work
+    vars:
+      SPECIES: '{{.SPECIES}}'
+      RESOURCE: '{{default "gxa" .RESOURCE}}'
+      ENVIRONMENT: '{{default "k8s_test" .ENVIRONMENT}}'
+      TARGET: '{{default "load_bioentities_only" .TARGET}}'
+      FORCEALL: '{{default "false" .FORCEALL}}'
+      GITLAB_SCR: '{{default "/hps/software/users/ma/fg_atlas/git/snakemake-codon-runs/" .GITLAB_SCR}}'
+      PREFIX: '{{default "build_work" .PREFIX}}'
+    preconditions:
+      - sh: '[ -n "{{.SPECIES}}" ]'
+        msg: "SPECIES is required. Usage: task trigger-bioentities SPECIES=zea_mays"
+    cmds:
+      - |
+        set -euo pipefail
+        echo "JOB={{.JENKINS_BIOENTITIES_JOB}}"
+        echo "SPECIES={{.SPECIES}} RESOURCE={{.RESOURCE}} ENVIRONMENT={{.ENVIRONMENT}}"
+        echo "TARGET={{.TARGET}} PREFIX={{.PREFIX}}"
+        DATA_ARGS=()
+        add_param() {
+          local name="$1" value="$2"
+          [ -n "$value" ] && DATA_ARGS+=(--data-urlencode "${name}=${value}")
+        }
+        add_param "SPECIES" "{{.SPECIES}}"
+        add_param "RESOURCE" "{{.RESOURCE}}"
+        add_param "ENVIRONMENT" "{{.ENVIRONMENT}}"
+        add_param "TARGET" "{{.TARGET}}"
+        add_param "FORCEALL" "{{.FORCEALL}}"
+        add_param "GITLAB_SCR" "{{.GITLAB_SCR}}"
+        add_param "PREFIX" "{{.PREFIX}}"
+        RESPONSE=$(curl -si \
+          --user "${JENKINS_USER}:${JENKINS_TOKEN}" \
+          -X POST \
+          "{{.JENKINS_URL}}/job/{{.JENKINS_BIOENTITIES_JOB}}/buildWithParameters" \
+          "${DATA_ARGS[@]}")
+        echo "$RESPONSE"
+        QUEUE_URL=$(echo "$RESPONSE" | grep -i "^location:" | tr -d '\r' | awk '{print $2}')
+        if [ -n "$QUEUE_URL" ]; then
+          echo ""
+          echo "Queued at: $QUEUE_URL"
+        fi
+
+  trigger-bioentities-top:
+    desc: |
+      Load bioentities for top N prod-only species (not on GXA target) with valid Jenkins SPECIES slug.
+      Usage: task trigger-bioentities-top COUNT=2
+      Optional overrides: same as trigger-bioentities (PREFIX, ENVIRONMENT, ...)
+    vars:
+      COUNT: '{{default "2" .COUNT}}'
+      RESOURCE: '{{default "gxa" .RESOURCE}}'
+      ENVIRONMENT: '{{default "k8s_test" .ENVIRONMENT}}'
+      TARGET: '{{default "load_bioentities_only" .TARGET}}'
+      FORCEALL: '{{default "false" .FORCEALL}}'
+      GITLAB_SCR: '{{default "/hps/software/users/ma/fg_atlas/git/snakemake-codon-runs/" .GITLAB_SCR}}'
+      PREFIX: '{{default "build_work" .PREFIX}}'
+    cmds:
+      - |
+        set -euo pipefail
+        GXA_SOURCE_JSON_URL="${GXA_SOURCE_JSON_URL:-https://www.ebi.ac.uk/gxa/json/experiments}"
+        GXA_TARGET_JSON_URL="${GXA_TARGET_JSON_URL:-}"
+        if [ -z "$GXA_TARGET_JSON_URL" ]; then
+          echo "ERROR: GXA_TARGET_JSON_URL is not set (see .env.example)" >&2
+          exit 1
+        fi
+        export GXA_SOURCE_JSON_URL GXA_TARGET_JSON_URL
+        SLUGS=$(python3 scripts/gxa_prod_only_species.py --count "{{.COUNT}}" --comma-slugs)
+        echo "Triggering bioentities for: $SLUGS"
+        IFS=',' read -ra SPECIES_LIST <<< "$SLUGS"
+        for sp in "${SPECIES_LIST[@]}"; do
+          echo ""
+          task trigger-bioentities \
+            SPECIES="$sp" \
+            RESOURCE="{{.RESOURCE}}" \
+            ENVIRONMENT="{{.ENVIRONMENT}}" \
+            TARGET="{{.TARGET}}" \
+            FORCEALL="{{.FORCEALL}}" \
+            GITLAB_SCR="{{.GITLAB_SCR}}" \
+            PREFIX="{{.PREFIX}}"
+        done
+
+  trigger-indexing:
+    desc: |
+      Trigger Loading_bulk_using_indexing_pipeline_slurm.
+      Usage: task trigger-indexing ACCESSIONS="E-MTAB-1234 E-GEOD-5678"
+      Optional overrides: GITLAB_BRANCH=... TARGET_ENVIRONMENT=... RELOAD=... PREFIX=...
+      Requires GXA_TARGET_JSON_URL / TARGET_ENVIRONMENT in .env to match (task gxa-print-urls).
+    vars:
+      ACCESSIONS: '{{.ACCESSIONS}}'
+      GITLAB_BRANCH: '{{default "feature/k8s_compatibility" .GITLAB_BRANCH}}'
+      TARGET_ENVIRONMENT: '{{default "k8s_test" .TARGET_ENVIRONMENT}}'
+      RELOAD: '{{default "true" .RELOAD}}'
+      PREFIX: '{{default "build_work" .PREFIX}}'
+    preconditions:
+      - sh: '[ -n "{{.ACCESSIONS}}" ]'
+        msg: "ACCESSIONS is required. Usage: task trigger-indexing ACCESSIONS=\"E-MTAB-1234 E-GEOD-5678\""
+    cmds:
+      - |
+        set -euo pipefail
+        if [ -z "${GXA_TARGET_JSON_URL:-}" ]; then
+          echo "ERROR: GXA_TARGET_JSON_URL is not set (see .env.example)" >&2
+          exit 1
+        fi
+        echo "GXA_TARGET_JSON_URL=${GXA_TARGET_JSON_URL}"
+        echo "TARGET_ENVIRONMENT={{.TARGET_ENVIRONMENT}}"
+        DATA_ARGS=()
+        add_param() {
+          local name="$1" value="$2"
+          [ -n "$value" ] && DATA_ARGS+=(--data-urlencode "${name}=${value}")
+        }
+        add_param "ACCESSIONS" "{{.ACCESSIONS}}"
+        add_param "GITLAB_BRANCH" "{{.GITLAB_BRANCH}}"
+        add_param "TARGET_ENVIRONMENT" "{{.TARGET_ENVIRONMENT}}"
+        add_param "RELOAD" "{{.RELOAD}}"
+        add_param "PREFIX" "{{.PREFIX}}"
+        RESPONSE=$(curl -si \
+          --user "${JENKINS_USER}:${JENKINS_TOKEN}" \
+          -X POST \
+          "{{.JENKINS_URL}}/job/{{.JENKINS_JOB}}/buildWithParameters" \
+          "${DATA_ARGS[@]}")
+        echo "$RESPONSE"
+        QUEUE_URL=$(echo "$RESPONSE" | grep -i "^location:" | tr -d '\r' | awk '{print $2}')
+        if [ -n "$QUEUE_URL" ]; then
+          echo ""
+          echo "Queued at: $QUEUE_URL"
+          echo "Poll queue item: curl --user \"\${JENKINS_USER}:\${JENKINS_TOKEN}\" \"${QUEUE_URL}api/json\" | python3 -m json.tool"
+        fi
+
   open-solr:
     desc: Open Solr admin UI (NodePort on same node as cluster’s first node)
     deps: [init-k8s]
@@ -205,3 +424,60 @@ tasks:
         echo "NODE_HOSTNAME=$NODE_HOSTNAME SOLR_PORT=$SOLR_PORT"
         echo "Opening $SOLR_SERVER_URL"
         open "$SOLR_SERVER_URL"
+
+  nginx-clear-cache:
+    desc: |
+      Clear GXA nginx proxy cache (shared PVC) and rollout-restart all pods (fresh keys_zone per replica).
+      Usage: task nginx-clear-cache
+      Optional: ENV=test
+    vars:
+      RELEASE: gxa
+    deps:
+      - task: init-k8s
+        vars:
+          RELEASE: gxa
+    cmds:
+      - |
+        set -euo pipefail
+        NAMESPACE="{{.NAMESPACE}}"
+        echo "Clearing /var/cache/nginx on deployment/gxa (namespace ${NAMESPACE}, shared PVC)"
+        # One exec is enough: cache PVC is ReadWriteMany. Rollout restarts every replica's nginx.
+        kubectl exec -n "${NAMESPACE}" deployment/gxa -c nginx -- \
+          sh -c 'rm -rf /var/cache/nginx/*'
+        echo "Rolling out deployment/gxa to reset nginx in-memory cache on all pods..."
+        kubectl rollout restart deployment/gxa --namespace "${NAMESPACE}"
+        kubectl rollout status deployment/gxa --namespace "${NAMESPACE}" --timeout=300s
+        echo "Done."
+
+  nginx-cache-purge:build:
+    desc: Build nginx-cache-purge image (ngx_cache_purge module)
+    dir: "{{.NGINX_CACHE_PURGE_DIR}}"
+    cmds:
+      - |
+        docker build \
+          --pull \
+          -t "{{.NGINX_CACHE_PURGE_IMAGE}}:{{.NGINX_CACHE_PURGE_TAG}}" \
+          .
+
+  nginx-cache-purge:login:
+    desc: Log in to dockerhub.ebi.ac.uk (REGISTRY_USER, REGISTRY_PASSWORD)
+    internal: true
+    cmds:
+      - |
+        set -euo pipefail
+        if [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_PASSWORD:-}" ]; then
+          echo "Set REGISTRY_USER and REGISTRY_PASSWORD (EBI dockerhub API key)." >&2
+          exit 1
+        fi
+        echo "${REGISTRY_PASSWORD}" | docker login "{{.NGINX_CACHE_PURGE_REGISTRY}}" \
+          -u "${REGISTRY_USER}" --password-stdin
+
+  nginx-cache-purge:push:
+    desc: Push nginx-cache-purge image to EBI registry
+    deps: [nginx-cache-purge:login, nginx-cache-purge:build]
+    cmds:
+      - docker push "{{.NGINX_CACHE_PURGE_IMAGE}}:{{.NGINX_CACHE_PURGE_TAG}}"
+
+  nginx-cache-purge:build-push:
+    desc: Build and push nginx-cache-purge (TAG defaults to 1.29.5)
+    deps: [nginx-cache-purge:push]
