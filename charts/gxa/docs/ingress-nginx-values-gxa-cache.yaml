@@ -1,0 +1,18 @@
+# Merge into your existing ingress-nginx Helm values (release: ingress-nginx, namespace: ingress).
+# Do not replace the whole values file — merge with your tcp / other settings.
+#
+#   helm upgrade ingress-nginx ingress-nginx/ingress-nginx -n ingress \
+#     --reuse-values \
+#     -f charts/gxa/docs/ingress-nginx-values-gxa-cache.yaml
+#
+# Or merge these keys into the values file your team already uses for the controller.
+#
+# Verify after upgrade:
+#   kubectl exec -n ingress deploy/ingress-nginx-controller -- nginx -T 2>/dev/null | grep gxa_cache
+
+controller:
+  allowSnippetAnnotations: true
+  config:
+    annotations-risk-level: Critical
+    http-snippet: |
+      proxy_cache_path /tmp/gxa-nginx-cache levels=1:2 keys_zone=gxa_cache:10m max_size=1g inactive=60d use_temp_path=off;

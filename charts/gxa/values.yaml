@@ -81,6 +81,19 @@ ingress:
   hosts:
     - host: ""
   tls: []
+  # Proxy cache at the ingress controller (requires http-snippet on ingress-nginx ConfigMap — see NOTES after install).
+  # When enabled, prefer nginx.cache.enabled: false on the sidecar to avoid double caching.
+  cache:
+    enabled: false
+    zoneName: gxa_cache
+    zoneSize: 10m
+    maxSize: 1g
+    inactive: 60d
+    valid200: 60d
+    proxyReadTimeout: "600"
+    proxySendTimeout: "600"
+    # Disk path on ingress controller pods (used in http-snippet below)
+    controllerCachePath: /tmp/gxa-nginx-cache
 # Override URL prefix for the app when ingress is off but traffic is still under a path.
 publicUrlPrefix: ""
 
@@ -95,7 +108,7 @@ resources:
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 2
   targetCPUUtilizationPercentage: 80
   
 nodeSelector: {}
@@ -110,8 +123,8 @@ nginx:
   # App context path (e.g. /gxa for GXA) - used for cache bypass paths
   contextPath: /gxa
   image:
-    repository: nginx
-    tag: alpine
+    repository: dockerhub.ebi.ac.uk/ebi-gene-expression/atlas-web-bulk/nginx
+    tag: 1.29.5-alpine
     pullPolicy: IfNotPresent
   resources:
     requests:

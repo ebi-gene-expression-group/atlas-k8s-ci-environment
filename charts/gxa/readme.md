@@ -105,6 +105,14 @@ Key | Default | Description
 --- | --- | ---
 `service.type` | `NodePort` | Service type for the webapp.
 `service.port` | `80` | Service port for HTTP.
+`ingress.enabled` | `true` | Create an Ingress resource.
+`ingress.pathPrefix` | `/gxa` | Path prefix for regex routing and health bypass.
+`ingress.cache.enabled` | `false` | Enable ingress-nginx `proxy-cache` annotations on the Ingress.
+`ingress.cache.zoneName` | `gxa_cache` | `keys_zone` name (must match controller `http-snippet`).
+`ingress.cache.valid200` | `60d` | TTL for cached 200 responses.
+`ingress.cache.controllerCachePath` | `/tmp/gxa-nginx-cache` | Disk path in controller `proxy_cache_path` snippet.
+
+**Ingress proxy cache** stores responses on the ingress-nginx controller, not in the GXA pod. Before enabling `ingress.cache.enabled`, merge `docs/ingress-nginx-values-gxa-cache.yaml` into the **ingress-nginx** Helm release (`ingress` namespace) — do not patch the ConfigMap by hand, or the next controller upgrade will revert it. Prefer `nginx.cache.enabled: false` when using ingress cache. Purge by clearing files under `controllerCachePath` on controller pods or restarting them.
 
 ### Debugging
 

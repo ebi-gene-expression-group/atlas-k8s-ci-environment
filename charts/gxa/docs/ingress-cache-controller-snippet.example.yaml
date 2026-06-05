@@ -1,0 +1,15 @@
+# Controller cache zone for GXA ingress.cache (keys_zone gxa_cache).
+#
+# This cluster uses Helm: release ingress-nginx, namespace ingress.
+# Add the keys from ingress-nginx-values-gxa-cache.yaml to your controller values, then:
+#
+#   helm upgrade ingress-nginx ingress-nginx/ingress-nginx -n ingress \
+#     --reuse-values \
+#     -f charts/gxa/docs/ingress-nginx-values-gxa-cache.yaml
+#
+# Do not kubectl-patch the ConfigMap — Helm owns it and will overwrite manual edits.
+#
+# Then enable on GXA: ingress.cache.enabled: true, nginx.cache.enabled: false, helm upgrade gxa.
+#
+# Enable in Helm: ingress.cache.enabled: true
+# Disable sidecar cache to avoid double caching: nginx.cache.enabled: false

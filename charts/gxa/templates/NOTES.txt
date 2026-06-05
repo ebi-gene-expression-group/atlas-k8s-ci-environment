@@ -1,3 +1,25 @@
+{{- if and .Values.ingress.enabled .Values.ingress.cache.enabled }}
+
+Ingress proxy cache is enabled for this release.
+
+1. Add the cache zone via the ingress-nginx Helm release (namespace ingress, release ingress-nginx):
+
+   Merge charts/gxa/docs/ingress-nginx-values-gxa-cache.yaml into controller values, then helm upgrade.
+
+   http-snippet line (must match zoneName {{ .Values.ingress.cache.zoneName }}):
+
+{{ include "app.ingress.controllerHttpSnippet" . | indent 4 }}
+
+   See charts/gxa/docs/ingress-cache-controller-snippet.example.yaml
+
+2. Prefer disabling the pod sidecar cache when using ingress cache:
+
+   nginx.cache.enabled: false
+
+3. Purge ingress cache: delete files under the controller cache path on ingress pods, or restart ingress controller pods.
+
+{{- end }}
+
 1. Get the application URL by running these commands:
 {{- if contains "NodePort" .Values.service.type }}
   export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "app.fullname" . }})

@@ -61,6 +61,44 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Extra nginx configuration-snippet for ingress cache (health bypass, cache methods, debug header).
+Used with nginx.ingress.kubernetes.io/proxy-cache annotation referencing keys_zone from controller http-snippet.
+*/}}
+{{- define "app.ingress.cacheConfigurationSnippet" -}}
+proxy_cache_methods GET HEAD;
+set $skip_cache 0;
+if ($request_uri = {{ .Values.ingress.pathPrefix }}/json/health) {
+  set $skip_cache 1;
+}
+proxy_cache_bypass $skip_cache;
+proxy_no_cache $skip_cache;
+add_header X-Cache-Status $upstream_cache_status;
+{{- end }}
+
+{{/*
+Ingress annotations: user values plus optional ingress-nginx proxy cache.
+*/}}
+{{- define "app.ingress.annotations" -}}
+{{- $ann := deepCopy (.Values.ingress.annotations | default dict) }}
+{{- if .Values.ingress.cache.enabled }}
+{{- $_ := set $ann "nginx.ingress.kubernetes.io/proxy-buffering" "on" }}
+{{- $_ := set $ann "nginx.ingress.kubernetes.io/proxy-read-timeout" (.Values.ingress.cache.proxyReadTimeout | default "600") }}
+{{- $_ := set $ann "nginx.ingress.kubernetes.io/proxy-send-timeout" (.Values.ingress.cache.proxySendTimeout | default "600") }}
+{{- $_ := set $ann "nginx.ingress.kubernetes.io/proxy-cache" .Values.ingress.cache.zoneName }}
+{{- $_ := set $ann "nginx.ingress.kubernetes.io/proxy-cache-valid" (printf "200 %s" .Values.ingress.cache.valid200) }}
+{{- $_ := set $ann "nginx.ingress.kubernetes.io/configuration-snippet" (include "app.ingress.cacheConfigurationSnippet" .) }}
+{{- end }}
+{{- toYaml $ann }}
+{{- end }}
+
+{{/*
+http-snippet to merge into the ingress-nginx controller ConfigMap (not applied by this chart).
+*/}}
+{{- define "app.ingress.controllerHttpSnippet" -}}
+proxy_cache_path {{ .Values.ingress.cache.controllerCachePath }} levels=1:2 keys_zone={{ .Values.ingress.cache.zoneName }}:{{ .Values.ingress.cache.zoneSize }} max_size={{ .Values.ingress.cache.maxSize }} inactive={{ .Values.ingress.cache.inactive }} use_temp_path=off;
+{{- end }}
+
 {{/* Minimal RBAC rules for jobs read access when using kubectl in init containers */}}
 {{- define "app.jobsRbac" -}}
 apiVersion: rbac.authorization.k8s.io/v1
