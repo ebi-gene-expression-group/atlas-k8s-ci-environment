@@ -93,13 +93,21 @@ spec:
             {{- /* These properties are required so that the bioentities SolrClient create
              in the SolrConfig class is authenticated */}}    
             - name: JAVA_TOOL_OPTIONS
-              value: "-Dfile.encoding=UTF8 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\""
+              value: >-
+                -Dfile.encoding=UTF8
+                -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory
+                -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\"
             {{- if .Values.tomcat.debug.enabled }}
             - name: JPDA_ADDRESS
               value: {{ .Values.tomcat.debug.address | quote }}
             {{- end }}
             - name: CATALINA_OPTS
-              value: "-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT} -Dhttp.nonProxyHosts=${NO_PROXY//,/|}"  
+              value: >-
+                -Dhttp.proxyHost=${PROXY_HOST}
+                -Dhttp.proxyPort=${PROXY_PORT}
+                -Dhttps.proxyHost=${PROXY_HOST}
+                -Dhttps.proxyPort=${PROXY_PORT}
+                -Dhttp.nonProxyHosts=${NO_PROXY//,/|}
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
