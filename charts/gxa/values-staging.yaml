@@ -4,7 +4,7 @@ environment: staging
 tomcat:
   createSecret: true
   debug:
-    enabled: true
+    enabled: false
 
 loggingLevel: INFO
 
