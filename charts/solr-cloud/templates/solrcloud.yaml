@@ -30,13 +30,6 @@ spec:
         requests:
           memory: {{ .Values.solr.resources.requests.memory }}
           cpu: {{ .Values.solr.resources.requests.cpu }}
-      volumes:
-          - name: backup-volume
-            {{- include "solr.backup.volume.source" . | nindent 12 }}
-            defaultContainerMount:
-              name: backup-volume
-              mountPath: /var/solr/backuph: {{ .Values.solr.secret.mountPath }}
-        {{- end }}
   zookeeperRef:
     provided:
       persistence:
