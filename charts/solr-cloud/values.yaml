@@ -3,36 +3,14 @@ solr:
   image:
     tag: 8.7.0
   javaMem: "-Xms4000m -Xmx5000m"
-  opts: "-Denable.packages=true -Dblob.max.size.mb=100 -Dsolr.port.advertise=8983"
-  gcTune: "-XX:SurvivorRatio=4 -XX:TargetSurvivorRatio=90 -XX:MaxTenuringThreshold=8"
-  packages:
-    hookJob:
-      enabled: false
-      # Service URL for Solr (common svc is typically port 80)
-      solrBaseUrl: ""
-      adminUser: "admin"
-      adminPasswordSecretName: ""
-      adminPasswordSecretKey: "admin"
-      packageName: ""
-      packageVersion: ""
-      wait:
-        timeoutSeconds: 300
-        sleepSeconds: 3
-      upload:
-        # Path in Solr package store (filestore), must start with '/'
-        destFilestorePath: "/biosolr/2.0.0/biosolr-2.0.0.jar"
-        # The Job pod must be able to read the jar from this path
-        localJarPath: "/input/package.jar"
-        # Optional signature for PUT /api/cluster/files... ?sig=...
-        sig: ""
-        # Mount the jar from NFS into the Job pod
-        nfs:
-          server: ""
-          path: "/ifs/public/services"
-          subPath: ""
-  # biosolr is disabled by default. should be enabled for scxa installations, not for gxa
-  bioSolr:
-    enabled: false
+  opts: >-
+    -Denable.packages=true
+    -Dblob.max.size.mb=100
+    -Dsolr.port.advertise=8983
+  gcTune: >-
+    -XX:SurvivorRatio=4
+    -XX:TargetSurvivorRatio=90
+    -XX:MaxTenuringThreshold=8
   resources:
     limits:
       memory: 9Gi
@@ -62,7 +40,7 @@ zookeeper:
       cpu: 0.5
 
 service:
-   nodePort: null   # Assign a port (30000–32767)
+  nodePort: null   # Assign a port (30000–32767)
 
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
