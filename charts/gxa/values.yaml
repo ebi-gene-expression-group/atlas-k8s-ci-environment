@@ -123,8 +123,8 @@ nginx:
   # App context path (e.g. /gxa for GXA) - used for cache bypass paths
   contextPath: /gxa
   image:
-    repository: dockerhub.ebi.ac.uk/ebi-gene-expression/atlas-web-bulk/nginx
-    tag: 1.29.5-alpine
+    repository: dockerhub.ebi.ac.uk/ebi-gene-expression/atlas-web-bulk/nginx-cache-purge
+    tag: "1.29.5"
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -146,6 +146,16 @@ nginx:
     maxSize: 1g
     inactive: 7d
     valid200: 60d
+    # ngx_cache_purge: PURGE <cached-url> from allowed clients (same location as proxy_cache)
+    purge:
+      enabled: true
+      # Allow purge_all (PURGE any path clears entire zone) — off by default
+      allowPurgeAll: false
+      allow:
+        - 127.0.0.1
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
     # Persistent cache across pod restarts
     storageSize: 2Gi
     storageClassName: standard-nfs-production

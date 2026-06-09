@@ -27,23 +27,21 @@ nginx:
     tag: "1.29.5"
 ```
 
-Add a purge location to the chart `nginx.conf` (example — restrict to internal callers):
+The GXA chart loads the module (`load_module modules/ngx_http_cache_purge_module.so;` at the top of `nginx.conf`)
+and enables purge on the cached `location /` block (`proxy_cache_key "$uri$is_args$args"`).
+Allowed clients are set in `nginx.cache.purge.allow` (private RFC1918 ranges + localhost by default).
 
-```nginx
-location ~ ^/gxa/purge(/.*)$ {
-    allow 127.0.0.1;
-    deny all;
-    proxy_cache_purge gxa_cache "$1$is_args$args";
-}
-```
-
-Purge request (from inside the pod):
+Purge one URL (from inside the pod):
 
 ```bash
-curl -X PURGE "http://127.0.0.1:8081/gxa/purge/json/experiments"
+curl -X PURGE "http://127.0.0.1:8081/gxa/json/experiments"
 ```
 
-Adjust the regex and `proxy_cache_key` so the purge key matches cached entries.
+Purge entire zone (only if `nginx.cache.purge.allowPurgeAll: true` — any PURGE from an allowed client clears the zone):
+
+```bash
+curl -X PURGE "http://127.0.0.1:8081/gxa/json/health"
+```
 
 ## Verify module
 

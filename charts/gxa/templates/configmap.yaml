@@ -56,6 +56,9 @@ data:
 
   {{- if .Values.nginx.enabled }}
   nginx.conf: |
+    {{- if and .Values.nginx.cache.enabled .Values.nginx.cache.purge.enabled }}
+    load_module modules/ngx_http_cache_purge_module.so;
+    {{- end }}
     worker_processes 1;
     error_log /dev/stderr warn;
     pid /tmp/nginx.pid;
@@ -100,9 +103,13 @@ data:
           proxy_set_header X-Forwarded-Proto $scheme;
           {{- if .Values.nginx.cache.enabled }}
           proxy_cache atlas;
+          proxy_cache_key "$uri$is_args$args";
           proxy_cache_valid 200 {{ .Values.nginx.cache.valid200 }};
           proxy_cache_use_stale error timeout updating;
           proxy_cache_methods GET HEAD;
+          {{- if .Values.nginx.cache.purge.enabled }}
+          proxy_cache_purge PURGE{{ if .Values.nginx.cache.purge.allowPurgeAll }} purge_all{{ end }} from {{ join " " .Values.nginx.cache.purge.allow }};
+          {{- end }}
           add_header X-Cache-Status $upstream_cache_status;
           {{- end }}
         }
