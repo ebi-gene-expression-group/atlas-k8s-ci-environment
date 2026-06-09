@@ -1,3 +1,7 @@
+{{- $solrNfsPod := include "solr-cloud.solrNfsDataPodMode" . -}}
+{{- $zkNfsPod := include "solr-cloud.zkNfsDataPodMode" . -}}
+{{- $solrNfsMount := default "/solr-data" .Values.solr.storage.nfsData.mountPath -}}
+{{- $zkNfsMount := default "/zk-data" .Values.zookeeper.storage.nfsData.mountPath -}}
 apiVersion: solr.apache.org/v1beta1
 kind: SolrCloud
 metadata:
@@ -7,14 +11,24 @@ spec:
   solrSecurity:
     authenticationType: Basic
   dataStorage:
+    {{- if eq $solrNfsPod "true" }}
+    ephemeral: {}
+    {{- else }}
     persistent:
       reclaimPolicy: {{ .Values.solr.storage.reclaimPolicy }}
       pvcTemplate:
         spec:
+          {{- if (.Values.solr.storage.nfsData.enabled | default false) }}
+          storageClassName: ""
+          accessModes:
+            - ReadWriteMany
+          {{- else }}
           storageClassName: {{ .Values.solr.storage.className }}
+          {{- end }}
           resources:
             requests:
               storage: {{ .Values.solr.storage.size }}
+    {{- end }}
   replicas: {{ .Values.solr.replicas }}
   solrImage:
     tag: {{ .Values.solr.image.tag }}
@@ -23,6 +37,10 @@ spec:
   solrGCTune: {{ .Values.solr.gcTune | quote }}
   customSolrKubeOptions:
     podOptions:
+      {{- if eq $solrNfsPod "true" }}
+      podSecurityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
       resources:
         limits:
           memory: {{ .Values.solr.resources.limits.memory }}
@@ -30,16 +48,168 @@ spec:
         requests:
           memory: {{ .Values.solr.resources.requests.memory }}
           cpu: {{ .Values.solr.resources.requests.cpu }}
+      {{- if eq $solrNfsPod "true" }}
+      initContainers:
+        - name: solr-link-nfs-data
+          image: busybox:1.28.0-glibc
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {{- toYaml .Values.nfsSecurityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              # Link NFS export entries into /var/solr/data (no copy). NFS stays mounted at {{ $solrNfsMount }} on the Solr container.
+              # Runs after cp-solr-xml — gate on .nfs-seeded, not solr.xml.
+              SRC={{ $solrNfsMount }}/${POD_NAME}
+              MARKER=/var/solr/data/.nfs-seeded
+              if [ -f "${MARKER}" ]; then
+                echo "Solr NFS data already linked from ${SRC}, skipping"
+                exit 0
+              fi
+              if [ ! -e "${SRC}" ]; then
+                echo "ERROR: NFS subdirectory not found: ${SRC}" >&2
+                ls -la {{ $solrNfsMount }} >&2 || true
+                exit 1
+              fi
+              REAL_SRC=$(readlink -f "${SRC}" 2>/dev/null || echo "${SRC}")
+              echo "Linking Solr data from NFS subdirectory: ${SRC}"
+              if [ "${REAL_SRC}" != "${SRC}" ]; then
+                echo "  resolved target: ${REAL_SRC}"
+              fi
+              if [ ! -d "${REAL_SRC}" ]; then
+                echo "ERROR: NFS path is not a directory: ${SRC}" >&2
+                ls -la {{ $solrNfsMount }} >&2 || true
+                exit 1
+              fi
+              ls -la "${REAL_SRC}"
+              linked=0
+              for entry in "${REAL_SRC}"/*; do
+                [ -e "${entry}" ] || continue
+                name=$(basename "${entry}")
+                echo "  /var/solr/data/${name} -> ${entry}"
+                ln -sfn "${entry}" "/var/solr/data/${name}"
+                linked=1
+              done
+              if [ "${linked}" -eq 0 ]; then
+                echo "ERROR: NFS directory is empty: ${REAL_SRC}" >&2
+                exit 1
+              fi
+              touch "${MARKER}"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: data
+              mountPath: /var/solr/data
+            - name: solr-data-nfs
+              mountPath: {{ $solrNfsMount | quote }}
+      volumes:
+        - name: solr-data-nfs
+          defaultContainerMount:
+            name: solr-data-nfs
+            mountPath: {{ $solrNfsMount | quote }}
+          source:
+            nfs:
+              server: {{ required "solr.storage.nfsData requires nfs.server" .Values.nfs.server | quote }}
+              path: {{ include "solr-cloud.solrNfsDataBasePath" . | quote }}
+      {{- end }}
   zookeeperRef:
     provided:
+      {{- if eq $zkNfsPod "true" }}
+      ephemeral:
+        emptydirvolumesource: {}
+      initContainers:
+        - name: zk-link-nfs-data
+          image: busybox:1.28.0-glibc
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {{- toYaml .Values.nfsSecurityContext | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              # Link NFS export entries into /data (no copy). NFS stays mounted at {{ $zkNfsMount }} on the ZK container.
+              SRC={{ $zkNfsMount }}/${POD_NAME}
+              MARKER=/data/.nfs-seeded
+              if [ -f "${MARKER}" ]; then
+                echo "ZK NFS data already linked from ${SRC}, skipping"
+                exit 0
+              fi
+              if [ ! -e "${SRC}" ]; then
+                echo "ERROR: NFS subdirectory not found: ${SRC}" >&2
+                ls -la {{ $zkNfsMount }} >&2 || true
+                exit 1
+              fi
+              REAL_SRC=$(readlink -f "${SRC}" 2>/dev/null || echo "${SRC}")
+              echo "Linking ZK data from NFS subdirectory: ${SRC}"
+              if [ "${REAL_SRC}" != "${SRC}" ]; then
+                echo "  resolved target: ${REAL_SRC}"
+              fi
+              if [ ! -d "${REAL_SRC}" ]; then
+                echo "ERROR: NFS path is not a directory: ${SRC}" >&2
+                ls -la {{ $zkNfsMount }} >&2 || true
+                exit 1
+              fi
+              ls -la "${REAL_SRC}"
+              linked=0
+              for entry in "${REAL_SRC}"/*; do
+                [ -e "${entry}" ] || continue
+                name=$(basename "${entry}")
+                echo "  /data/${name} -> ${entry}"
+                ln -sfn "${entry}" "/data/${name}"
+                linked=1
+              done
+              if [ "${linked}" -eq 0 ]; then
+                echo "ERROR: NFS directory is empty: ${REAL_SRC}" >&2
+                exit 1
+              fi
+              touch "${MARKER}"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: zk-data-nfs
+              mountPath: {{ $zkNfsMount | quote }}
+      volumes:
+        - name: zk-data-nfs
+          nfs:
+            server: {{ required "zookeeper.storage.nfsData requires nfs.server" .Values.nfs.server | quote }}
+            path: {{ include "solr-cloud.zkNfsDataBasePath" . | quote }}
+      volumeMounts:
+        - name: zk-data-nfs
+          mountPath: {{ $zkNfsMount | quote }}
+      {{- else }}
       persistence:
+        reclaimPolicy: {{ .Values.zookeeper.storage.reclaimPolicy }}
         spec:
+          {{- if (.Values.zookeeper.storage.nfsData.enabled | default false) }}
+          storageClassName: ""
+          accessModes:
+            - ReadWriteMany
+          {{- else }}
           storageClassName: {{ .Values.zookeeper.storage.className }}
+          {{- end }}
           resources:
             requests:
               storage: {{ .Values.zookeeper.storage.size }}
+      {{- end }}
       replicas: {{ .Values.zookeeper.replicas }}
       zookeeperPodPolicy:
+        {{- if (.Values.zookeeper.storage.nfsData.enabled | default false) }}
+        securityContext:
+          {{- toYaml .Values.podSecurityContext | nindent 10 }}
+        {{- end }}
         resources:
           limits:
             memory: {{ .Values.zookeeper.resources.limits.memory }}
+            cpu: {{ .Values.zookeeper.resources.limits.cpu }}
+          requests:
+            memory: {{ .Values.zookeeper.resources.requests.memory }}
+            cpu: {{ .Values.zookeeper.resources.requests.cpu }}

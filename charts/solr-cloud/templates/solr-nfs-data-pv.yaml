@@ -1,0 +1,51 @@
+{{- $nfsData := .Values.solr.storage.nfsData | default dict -}}
+{{- if and $nfsData.enabled (eq (default "pod" $nfsData.mode) "pv") }}
+{{- $solrBasePath := include "solr-cloud.solrNfsDataBasePath" . }}
+{{- range $i := until (int .Values.solr.replicas) }}
+{{- $dataDirPrefix := default $.Release.Name $nfsData.dataDirPrefix }}
+{{- $ctx := dict "releaseName" $.Release.Name "dataDirPrefix" $dataDirPrefix "ordinal" $i }}
+{{- $dataDirName := include "solr-cloud.solrDataDirName" $ctx }}
+{{- $pvcName := include "solr-cloud.solrDataPvcName" $ctx }}
+{{- $pvName := include "solr-cloud.solrDataPvName" $ctx }}
+{{- if not (lookup "v1" "PersistentVolume" "" $pvName) }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $pvName }}
+  labels:
+    {{- include "solr-cloud.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: solr-data
+spec:
+  capacity:
+    storage: {{ $.Values.solr.storage.size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    {{- toYaml $.Values.nfs.mountOptions | nindent 4 }}
+  nfs:
+    server: {{ required "solr.storage.nfsData requires nfs.server" $.Values.nfs.server }}
+    path: {{ $solrBasePath }}/{{ $dataDirName }}
+{{- end }}
+{{- if not (lookup "v1" "PersistentVolumeClaim" $.Release.Namespace $pvcName) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvcName }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "solr-cloud.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: solr-data
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ $pvName }}
+  resources:
+    requests:
+      storage: {{ $.Values.solr.storage.size }}
+{{- end }}
+{{- end }}
+{{- end }}

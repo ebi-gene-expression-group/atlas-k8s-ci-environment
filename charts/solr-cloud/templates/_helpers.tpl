@@ -69,3 +69,80 @@ source:
     server: {{ .Values.nfs.server }}
     path: /ifs/public/rw/fg/atlas/solrBackups
 {{- end }}
+
+{{/*
+Solr operator StatefulSet volumeClaimTemplate name is "data"; PVCs are
+data-<release>-solrcloud-<ordinal> (e.g. data-gxa-dev-solrcloud-0).
+Pod names use the Helm release name; NFS data folders may use dataDirPrefix.
+*/}}
+{{- define "solr-cloud.solrPodName" -}}
+{{- printf "%s-solrcloud-%d" .releaseName .ordinal }}
+{{- end }}
+
+{{- define "solr-cloud.solrDataDirName" -}}
+{{- printf "%s-solrcloud-%d" .dataDirPrefix .ordinal }}
+{{- end }}
+
+{{- define "solr-cloud.solrDataPvcName" -}}
+{{- printf "data-%s-solrcloud-%d" .releaseName .ordinal }}
+{{- end }}
+
+{{- define "solr-cloud.solrDataPvName" -}}
+{{- printf "%s-solr-data-%d" .releaseName .ordinal }}
+{{- end }}
+
+{{/*
+Provided ZK StatefulSet volumeClaimTemplate name is "data"; PVCs are
+data-<release>-solrcloud-zookeeper-<ordinal>.
+*/}}
+{{- define "solr-cloud.zkDataDirName" -}}
+{{- printf "%s-solrcloud-zookeeper-%d" .dataDirPrefix .ordinal }}
+{{- end }}
+
+{{- define "solr-cloud.zkDataPvcName" -}}
+{{- printf "data-%s-solrcloud-zookeeper-%d" .releaseName .ordinal }}
+{{- end }}
+
+{{- define "solr-cloud.zkDataPvName" -}}
+{{- printf "%s-zk-data-%d" .releaseName .ordinal }}
+{{- end }}
+
+{{- define "solr-cloud.solrNfsDataBasePath" -}}
+{{- $nfsData := .Values.solr.storage.nfsData | default dict -}}
+{{- if $nfsData.basePath -}}
+{{- $nfsData.basePath -}}
+{{- else -}}
+{{- $base := required "nfs.environmentsBase is required when solr.storage.nfsData is enabled without basePath" .Values.nfs.environmentsBase -}}
+{{- $env := required "environment is required when solr.storage.nfsData is enabled without basePath" .Values.environment -}}
+{{- printf "%s/%s/solr_data" $base $env -}}
+{{- end -}}
+{{- end }}
+
+{{- define "solr-cloud.solrNfsDataMode" -}}
+{{- default "pod" (.Values.solr.storage.nfsData.mode) -}}
+{{- end }}
+
+{{- define "solr-cloud.zkNfsDataMode" -}}
+{{- default "pod" (.Values.zookeeper.storage.nfsData.mode) -}}
+{{- end }}
+
+{{- define "solr-cloud.solrNfsDataPodMode" -}}
+{{- $nfsData := .Values.solr.storage.nfsData | default dict -}}
+{{- if and ($nfsData.enabled | default false) (eq (default "pod" $nfsData.mode) "pod") -}}true{{- end -}}
+{{- end }}
+
+{{- define "solr-cloud.zkNfsDataPodMode" -}}
+{{- $nfsData := .Values.zookeeper.storage.nfsData | default dict -}}
+{{- if and ($nfsData.enabled | default false) (eq (default "pod" $nfsData.mode) "pod") -}}true{{- end -}}
+{{- end }}
+
+{{- define "solr-cloud.zkNfsDataBasePath" -}}
+{{- $nfsData := .Values.zookeeper.storage.nfsData | default dict -}}
+{{- if $nfsData.basePath -}}
+{{- $nfsData.basePath -}}
+{{- else -}}
+{{- $base := required "nfs.environmentsBase is required when zookeeper.storage.nfsData is enabled without basePath" .Values.nfs.environmentsBase -}}
+{{- $env := required "environment is required when zookeeper.storage.nfsData is enabled without basePath" .Values.environment -}}
+{{- printf "%s/%s/zk_data" $base $env -}}
+{{- end -}}
+{{- end }}

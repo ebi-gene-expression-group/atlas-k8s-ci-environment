@@ -1,0 +1,51 @@
+{{- $nfsData := .Values.zookeeper.storage.nfsData | default dict -}}
+{{- if and $nfsData.enabled (eq (default "pod" $nfsData.mode) "pv") }}
+{{- $zkBasePath := include "solr-cloud.zkNfsDataBasePath" . }}
+{{- range $i := until (int .Values.zookeeper.replicas) }}
+{{- $dataDirPrefix := default $.Release.Name $nfsData.dataDirPrefix }}
+{{- $ctx := dict "releaseName" $.Release.Name "dataDirPrefix" $dataDirPrefix "ordinal" $i }}
+{{- $dataDirName := include "solr-cloud.zkDataDirName" $ctx }}
+{{- $pvcName := include "solr-cloud.zkDataPvcName" $ctx }}
+{{- $pvName := include "solr-cloud.zkDataPvName" $ctx }}
+{{- if not (lookup "v1" "PersistentVolume" "" $pvName) }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $pvName }}
+  labels:
+    {{- include "solr-cloud.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: zookeeper-data
+spec:
+  capacity:
+    storage: {{ $.Values.zookeeper.storage.size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    {{- toYaml $.Values.nfs.mountOptions | nindent 4 }}
+  nfs:
+    server: {{ required "zookeeper.storage.nfsData requires nfs.server" $.Values.nfs.server }}
+    path: {{ $zkBasePath }}/{{ $dataDirName }}
+{{- end }}
+{{- if not (lookup "v1" "PersistentVolumeClaim" $.Release.Namespace $pvcName) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $pvcName }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "solr-cloud.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: zookeeper-data
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ $pvName }}
+  resources:
+    requests:
+      storage: {{ $.Values.zookeeper.storage.size }}
+{{- end }}
+{{- end }}
+{{- end }}

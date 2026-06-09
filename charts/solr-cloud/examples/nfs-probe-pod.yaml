@@ -1,0 +1,67 @@
+# Interactive NFS probe for staging migration paths.
+# Apply: kubectl apply -f charts/solr-cloud/examples/nfs-probe-pod.yaml
+# Shell:  kubectl exec -it nfs-probe -n gxa-staging-solrcloud -- sh
+# Delete: kubectl delete -f charts/solr-cloud/examples/nfs-probe-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nfs-probe
+  namespace: gxa-staging-solrcloud
+  labels:
+    app: nfs-probe
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsUser: 2921
+    runAsGroup: 1146
+    fsGroup: 1146
+  containers:
+    - name: probe
+      image: busybox:1.28.0-glibc
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+        - -c
+        - |
+          echo "NFS probe — mounts under /staging, /solr-data, /zk-data, /zk-pvc-0"
+          echo "User/group: $(id)"
+          echo "Groups:     $(id -G)"
+          echo "Examples:"
+          echo "  mount | grep nfs"
+          echo "  ls -la /staging /solr-data /zk-data"
+          echo "  touch /solr-data/.write-test"
+          echo "  touch /zk-data/.write-test"
+          # busybox sleep does not support "infinity"
+          while true; do sleep 3600; done
+      volumeMounts:
+        - name: staging
+          mountPath: /staging
+        - name: solr-data
+          mountPath: /solr-data
+        - name: zk-data
+          mountPath: /zk-data
+        - name: zk-pvc-0
+          mountPath: /zk-pvc-0
+      resources:
+        requests:
+          memory: 100Mi
+          cpu: 100m
+        limits:
+          memory: 200Mi
+          cpu: 200m
+  volumes:
+    - name: staging
+      nfs:
+        server: hh-isi-srv-vlan1496.ebi.ac.uk
+        path: /ifs/public/services/fg/atlas/environments/staging
+    - name: solr-data
+      nfs:
+        server: hh-isi-srv-vlan1496.ebi.ac.uk
+        path: /ifs/public/services/fg/atlas/environments/staging/solr_data
+    - name: zk-data
+      nfs:
+        server: hh-isi-srv-vlan1496.ebi.ac.uk
+        path: /ifs/public/services/fg/atlas/environments/staging/zk_data
+    - name: zk-pvc-0
+      persistentVolumeClaim:
+        claimName: data-gxa-staging-solrcloud-zookeeper-0
