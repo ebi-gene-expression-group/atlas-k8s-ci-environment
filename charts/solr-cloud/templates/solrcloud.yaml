@@ -204,7 +204,11 @@ spec:
       zookeeperPodPolicy:
         {{- if (.Values.zookeeper.storage.nfsData.enabled | default false) }}
         securityContext:
-          {{- toYaml .Values.podSecurityContext | nindent 10 }}
+          runAsUser: {{ .Values.nfsSecurityContext.runAsUser }}
+          runAsGroup: {{ .Values.nfsSecurityContext.runAsGroup }}
+          fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+          supplementalGroups:
+            {{- toYaml .Values.podSecurityContext.supplementalGroups | nindent 12 }}
         {{- end }}
         resources:
           limits:

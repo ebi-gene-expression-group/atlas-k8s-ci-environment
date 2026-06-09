@@ -31,7 +31,7 @@
 
    kubectl create namespace ${RELEASE}-${ENV}-solrcloud --dry-run=client -o yaml | kubectl apply -f -
 
-   # environment selects NFS data under /ifs/public/services/fg/atlas/environments/<environment>/
+   # environment selects NFS data under /ifs/public/rw/fg/atlas/gxa/environments/<environment>/
    helm upgrade --install ${RELEASE}-${ENV} charts/solr-cloud \
          --namespace ${RELEASE}-${ENV}-solrcloud \
          --set environment=${ENV} \
@@ -48,7 +48,7 @@
 
 With `solr.storage.nfsData.enabled` and `zookeeper.storage.nfsData.enabled` (default in
 `values.yaml`), migrated data is read from Isilon exports under
-`/ifs/public/services/fg/atlas/environments/<environment>/{solr_data,zk_data}/<pod-name>/`.
+`/ifs/public/rw/fg/atlas/gxa/environments/<environment>/{solr_data,zk_data}/<pod-name>/`.
 
 ### Write access required
 

@@ -23,15 +23,26 @@ spec:
         - sh
         - -c
         - |
-          echo "NFS probe — mounts under /staging, /solr-data, /zk-data, /zk-pvc-0"
+          echo "NFS probe — mounts under /staging, /solr-data, /zk-data"
           echo "User/group: $(id)"
           echo "Groups:     $(id -G)"
-          echo "Examples:"
+          echo "=== startup checks (set -x) ==="
+          set -x
+          mount | grep nfs
+          ls -la /staging /solr-data /zk-data
+          for path in /staging /solr-data /zk-data; do
+            echo "touch ${path}/.write-test"
+            touch "${path}/.write-test" 2>&1
+            echo "touch ${path}/.write-test exit=$?"
+          done
+          set +x
+          echo "Examples (interactive):"
+          echo "  set -x"
           echo "  mount | grep nfs"
           echo "  ls -la /staging /solr-data /zk-data"
-          echo "  touch /solr-data/.write-test"
-          echo "  touch /zk-data/.write-test"
-          # busybox sleep does not support "infinity"
+          echo "  touch /solr-data/.write-test 2>&1; echo exit:\$?"
+          echo "  set +x"
+          # busybox touch has no -v; use set -x and 2>&1 for verbose output
           while true; do sleep 3600; done
       volumeMounts:
         - name: staging
@@ -40,8 +51,6 @@ spec:
           mountPath: /solr-data
         - name: zk-data
           mountPath: /zk-data
-        - name: zk-pvc-0
-          mountPath: /zk-pvc-0
       resources:
         requests:
           memory: 100Mi
@@ -53,15 +62,12 @@ spec:
     - name: staging
       nfs:
         server: hh-isi-srv-vlan1496.ebi.ac.uk
-        path: /ifs/public/services/fg/atlas/environments/staging
+        path: /ifs/public/rw/fg/atlas/gxa/environments/staging
     - name: solr-data
       nfs:
         server: hh-isi-srv-vlan1496.ebi.ac.uk
-        path: /ifs/public/services/fg/atlas/environments/staging/solr_data
+        path: /ifs/public/rw/fg/atlas/gxa/environments/staging/solr_data
     - name: zk-data
       nfs:
         server: hh-isi-srv-vlan1496.ebi.ac.uk
-        path: /ifs/public/services/fg/atlas/environments/staging/zk_data
-    - name: zk-pvc-0
-      persistentVolumeClaim:
-        claimName: data-gxa-staging-solrcloud-zookeeper-0
+        path: /ifs/public/rw/fg/atlas/gxa/environments/staging/zk_data

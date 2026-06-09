@@ -63,13 +63,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "solr.backup.volume.source" -}}
-source:
-  nfs:
-    server: {{ .Values.nfs.server }}
-    path: /ifs/public/rw/fg/atlas/solrBackups
-{{- end }}
-
 {{/*
 Solr operator StatefulSet volumeClaimTemplate name is "data"; PVCs are
 data-<release>-solrcloud-<ordinal> (e.g. data-gxa-dev-solrcloud-0).

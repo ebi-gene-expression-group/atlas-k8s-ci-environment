@@ -411,17 +411,27 @@ tasks:
         fi
 
   open-solr:
-    desc: Open Solr admin UI (NodePort on same node as cluster’s first node)
+    desc: Open Solr admin UI (NodePort; ENV must match solr-cloud helm release, e.g. ENV=staging)
     deps: [init-k8s]
     cmds:
       - |
         set -euo pipefail
         RELEASE="{{.RELEASE}}"
         ENV="{{.ENV}}"
-        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-        SOLR_PORT="$(kubectl get service "${RELEASE}-${ENV}-solrcloud-nodeport" --namespace "${RELEASE}-${ENV}-solrcloud" -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)"
-        SOLR_SERVER_URL="http://${NODE_HOSTNAME}:${SOLR_PORT}/solr/#/"
-        echo "NODE_HOSTNAME=$NODE_HOSTNAME SOLR_PORT=$SOLR_PORT"
+        SOLR_NS="${RELEASE}-${ENV}-solrcloud"
+        SOLR_SVC="${RELEASE}-${ENV}-solrcloud-nodeport"
+        SOLR_NODE="$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
+        if [ -z "$SOLR_NODE" ]; then
+          SOLR_NODE="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+        fi
+        SOLR_PORT="$(kubectl get service "$SOLR_SVC" --namespace "$SOLR_NS" -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)"
+        if [ -z "$SOLR_PORT" ]; then
+          echo "Error: could not resolve NodePort from service $SOLR_SVC in namespace $SOLR_NS"
+          echo "Hint: pass ENV matching the solr-cloud release (e.g. task open-solr ENV=staging)"
+          exit 1
+        fi
+        SOLR_SERVER_URL="http://${SOLR_NODE}:${SOLR_PORT}/solr/#/"
+        echo "SOLR_NODE=$SOLR_NODE SOLR_PORT=$SOLR_PORT"
         echo "Opening $SOLR_SERVER_URL"
         open "$SOLR_SERVER_URL"
 
