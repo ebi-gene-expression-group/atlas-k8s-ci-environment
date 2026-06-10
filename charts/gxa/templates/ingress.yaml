@@ -16,18 +16,17 @@ spec:
     {{- toYaml .Values.ingress.tls | nindent 4 }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - {{- if .host }}
-      host: {{ .host | quote }}
+    - {{- $host := include "app.ingress.host" . }}
+      {{- if $host }}
+      host: {{ $host | quote }}
       {{- end }}
       http:
         paths:
-          - path: {{ printf "%s(/|$)(.*)" $.Values.ingress.pathPrefix | quote }}
+          - path: {{ printf "%s(/|$)(.*)" .Values.ingress.pathPrefix | quote }}
             pathType: ImplementationSpecific
             backend:
               service:
-                name: {{ include "app.fullname" $ }}
+                name: {{ include "app.fullname" . }}
                 port:
-                  number: {{ int $.Values.service.port }}
-    {{- end }}
+                  number: {{ int .Values.service.port }}
 {{- end }}

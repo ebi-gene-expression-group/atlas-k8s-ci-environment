@@ -71,15 +71,17 @@ service:
 # Path-based routing (e.g. shared host /gxa/...). Requires an ingress controller
 # that honors the default nginx rewrite annotations (strip path prefix before the pod).
 ingress:
-  enabled: true
+  enabled: false
   className: nginx
   annotations: {}
     # nginx.ingress.kubernetes.io/use-regex: "true"
     # nginx.ingress.kubernetes.io/rewrite-target: /$2
   pathPrefix: /gxa
-  # Ingress path rule is built from pathPrefix (regex + rewrite-target). Add host if you need a name-based vhost.
-  hosts:
-    - host: ""
+  # Cluster-specific DNS suffix (no env prefix). Set at deploy time, e.g. via INGRESS_HOST_BASE in .env.
+  # With environment (test/staging/...) in env values, host becomes "{environment}.{hostBase}".
+  hostBase: ""
+  # Optional full host override; if set, hostBase and environment are ignored for the Ingress rule.
+  host: ""
   tls: []
   # Proxy cache at the ingress controller (requires http-snippet on ingress-nginx ConfigMap — see NOTES after install).
   # When enabled, prefer nginx.cache.enabled: false on the sidecar to avoid double caching.

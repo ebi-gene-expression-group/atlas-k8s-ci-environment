@@ -77,6 +77,18 @@ add_header X-Cache-Status $upstream_cache_status;
 {{- end }}
 
 {{/*
+Ingress host: optional override, or {environment}.{hostBase} when both are set.
+hostBase is cluster-specific and supplied at deploy time (not the full URL in the chart).
+*/}}
+{{- define "app.ingress.host" -}}
+{{- if .Values.ingress.host -}}
+{{- .Values.ingress.host -}}
+{{- else if and .Values.environment .Values.ingress.hostBase -}}
+{{- printf "%s.%s" .Values.environment .Values.ingress.hostBase -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Ingress annotations: user values plus optional ingress-nginx proxy cache.
 */}}
 {{- define "app.ingress.annotations" -}}
@@ -174,7 +186,7 @@ Root directory for data mounts
 Source directory for experiments on NFS
 */}}
 {{- define "app.experimentsSourceDir" -}}
-{{- include "app.servicesDir" . -}}/fg/atlas/{{- .Values.nfs.snapshotComponent -}}
+{{ include "app.dataDir" . }}/gxa_codon/.snapshot/gxa_codon_2025-10-14_13:34/experiments
 {{- end }}
 
 
@@ -222,29 +234,6 @@ Proxy environment variables, used in containers
 {{/*
 NFS volume mounts, used in deployments and jobs
 */}}
-
-
-{{- define "app.gxaCodonVolume" -}}
-- name: codon-volume
-  nfs:
-    server: {{ .Values.nfs.server }}
-    path: /ifs/public/ro/gxa_codon
-{{- end }}
-
-{{- define "app.servicesVolume" -}}
-- name: services-volume
-  nfs:
-    server: {{ .Values.nfs.server }}
-    path: /ifs/public/services
-{{- end }}
-
-{{- define "app.expdesignVolume" -}}
-- name: expdesign-volume
-  nfs:
-    server: {{ .Values.nfs.server }}
-    path: /ifs/public/services/fg/atlas/experiments_test/expDesign
-    readOnly: true
-{{- end }}
 
 {{/*
 Secrets volume mount

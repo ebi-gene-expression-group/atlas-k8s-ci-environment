@@ -16,6 +16,7 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -56,13 +57,13 @@ spec:
               containerPort: {{ .Values.tomcat.debug.port }}
               protocol: TCP
             {{- end }}
-          # startupProbe:
-          #   httpGet:
-          #     path: /gxa/json/experiments
-          #     port: http
-          #   initialDelaySeconds: 25
-          #   periodSeconds: 5
-          #   failureThreshold: 7
+          startupProbe:
+            httpGet:
+              path: /gxa/json/experiments
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            failureThreshold: 1
           # livenessProbe:
           #   httpGet:
           #     path: /gxa/json/health
@@ -193,9 +194,19 @@ spec:
             {{- toYaml .Values.nginx.resources | nindent 12 }}
         {{- end }}
       volumes:
-        {{- include "app.gxaCodonVolume" . | nindent 8 }}
-        {{- include "app.servicesVolume" . | nindent 8 }}
-        {{- include "app.expdesignVolume" . | nindent 8 }}
+        - name: codon-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/ro/gxa_codon
+        - name: services-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/services
+        - name: expdesign-volume
+          nfs:
+            server: {{ .Values.nfs.server }}
+            path: /ifs/public/services/fg/atlas/environments/{{ .Values.environment }}/expdesign
+            readOnly: true
         - name: experiments-snapshot
           emptyDir: {}
         - name: admin-volume
@@ -253,6 +264,8 @@ spec:
             - "-c"
             - |
               set -vx
+              echo environment dir content: $(ls -l {{ include "app.servicesDir" . }}/fg/atlas/environments/{{- .Values.environment -}})
+              echo "Experiments source dir: {{ include "app.experimentsSourceDir" . }}" 
               EXPERIMENTS_SOURCE_DIR="{{- include "app.experimentsSourceDir" . -}}"
               if [ ! -d "$EXPERIMENTS_SOURCE_DIR" ]; then
                 echo "ERROR: experimentsSourceDir does not exist: $EXPERIMENTS_SOURCE_DIR" >&2

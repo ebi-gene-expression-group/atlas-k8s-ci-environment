@@ -60,6 +60,18 @@
 				"group": "gxa vm",
 				"database": "gxpatlaspro",
 				"username": "atlasprd3"
+			},
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-hlvm-147",
+				"port": 5432,
+				"askForPassword": true,
+				"driver": "PostgreSQL",
+				"name": "gxa staging (k8s)",
+				"group": "gxa k8s",
+				"database": "gxpatlaspro",
+				"username": "atlasprd3"
 			}
 		],
 		"sshfs.configs": [
