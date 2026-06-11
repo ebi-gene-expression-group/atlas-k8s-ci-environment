@@ -110,7 +110,7 @@ resources:
 autoscaling:
   enabled: true
   minReplicas: 1
-  maxReplicas: 2
+  maxReplicas: 1
   targetCPUUtilizationPercentage: 80
   
 nodeSelector: {}
@@ -179,4 +179,3 @@ loggingLevel: DEBUG
 
 nfs:
   server: "hh-isi-srv-vlan1496.ebi.ac.uk"
-  snapshotComponent: "experiments"

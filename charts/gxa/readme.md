@@ -97,7 +97,6 @@ Key | Default | Description
 `solr.collection` | unset | Default Solr collection name.
 `solr.timeout` | unset | Solr client timeout (ms).
 `nfs.server` | `hh-isi-srv-vlan1496.ebi.ac.uk` | NFS server hostname.
-`nfs.snapshotComponent` | `experiments` | Snapshot component under the services NFS path.
 
 ### Network access
 

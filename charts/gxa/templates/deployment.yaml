@@ -59,25 +59,26 @@ spec:
             {{- end }}
           startupProbe:
             httpGet:
-              path: /gxa/json/experiments
+              path: /gxa/json/health
               port: http
-            initialDelaySeconds: 60
-            periodSeconds: 60
-            failureThreshold: 1
-          # livenessProbe:
-          #   httpGet:
-          #     path: /gxa/json/health
-          #     port: http
-          #   periodSeconds: 30
-          #   timeoutSeconds: 10
-          #   failureThreshold: 3
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 20
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /gxa/json/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
           # readinessProbe:
           #   httpGet:
           #     path: /gxa/json/experiments
           #     port: http
-          #   periodSeconds: 120
-          #   timeoutSeconds: 30
-          #   failureThreshold: 3
+          #   periodSeconds: 30
+          #   timeoutSeconds: 300
+          #   failureThreshold: 1
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER
@@ -97,7 +98,7 @@ spec:
               value: >-
                 -Dfile.encoding=UTF8
                 -Dsolr.httpclient.builder.factory=org.apache.solr.client.solrj.impl.PreemptiveBasicAuthClientBuilderFactory
-                -Dbasicauth=\"$(SOLR_USER):$(SOLR_PASS)\"
+                -Dbasicauth=$(SOLR_USER):$(SOLR_PASS)
             {{- if .Values.tomcat.debug.enabled }}
             - name: JPDA_ADDRESS
               value: {{ .Values.tomcat.debug.address | quote }}
