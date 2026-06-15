@@ -6,7 +6,7 @@
 #   JSON:  /json/experiments/{accession}/resources/DATA, .../resources/PLOTS
 #
 # Individual results: tab-separated lines written to LOG_FILE (duration_s, status, bytes, url).
-# Summary (throughput, slowest request): written to stdout. Progress/config: stderr.
+# Summary (tps, throughput, avg latency): stdout, stderr, and LOG_FILE.summary. Progress/config: stderr.
 # Config (env or .env): BASE_URL, EXPERIMENTS_JSON_URL, LIMIT, SHUFFLE, PARALLEL, SORT_OUTPUT, LOG_FILE
 # Colors: auto when stdout is a TTY; NO_COLOR=1 disables, FORCE_COLOR=1 enables when piped
 # LOG_FILE: defaults to scripts/gxa-hit-YYYYMMDD-HHMMSS.tsv next to this script
@@ -104,16 +104,64 @@ colorize_result_line() {
     "$bytes" "$url"
 }
 
-print_summary_line() {
-  printf '%b\n' "$1"
-}
-
 print_slowest_line() {
   local line="$1"
   if [[ "$USE_COLOR" == "1" ]]; then
     colorize_result_line "$line"
   else
     printf '%s\n' "$line"
+  fi
+}
+
+emit_summary() {
+  local total ok fail slowest run_elapsed aggregate_rps total_bytes aggregate_bps
+  local aggregate_bps_display total_bytes_display avg_latency summary_file
+
+  total=$(wc -l <"$log_file" | tr -d ' ')
+  ok=$(awk -F'\t' '$2 >= 200 && $2 < 400 { c++ } END { print c + 0 }' "$log_file")
+  fail=$((total - ok))
+  slowest=$(head -n1 "$log_file")
+  run_elapsed=$(awk -v s="$run_start" -v e="$run_end" 'BEGIN { printf "%.3f", e - s }')
+  aggregate_rps=$(awk -v n="$total" -v t="$run_elapsed" 'BEGIN { if (t > 0) printf "%.2f", n / t; else print "0.00" }')
+  total_bytes=$(awk -F'\t' '{ bytes += $3 } END { print bytes + 0 }' "$log_file")
+  aggregate_bps=$(awk -v b="$total_bytes" -v t="$run_elapsed" 'BEGIN { if (t > 0) print b / t; else print 0 }')
+  aggregate_bps_display=$(format_bytes_rate "$aggregate_bps")
+  total_bytes_display=$(format_bytes_total "$total_bytes")
+  avg_latency=$(awk -F'\t' '{ sum += $1; n++ } END { if (n > 0) printf "%.3f", sum / n; else print "0.000" }' "$log_file")
+  summary_file="${LOG_FILE%.*}.summary"
+
+  {
+    echo "=== summary ==="
+    echo "requests:     ${total} (${ok} ok, ${fail} failed)"
+    echo "wall time:    ${run_elapsed}s"
+    echo "tps:          ${aggregate_rps} req/s"
+    echo "throughput:   ${aggregate_bps_display} (${total_bytes_display} total)"
+    echo "avg latency:  ${avg_latency}s"
+    echo "slowest:      ${slowest}"
+    echo "log file:     ${LOG_FILE}"
+  } >"$summary_file"
+
+  if [[ "$USE_COLOR" == "1" ]]; then
+    if (( fail > 0 )); then
+      fail_part="${C_RED}${fail} failed${C_RESET}"
+    else
+      fail_part="${C_GREEN}0 failed${C_RESET}"
+    fi
+    {
+      printf '%b\n' "${C_BOLD}=== summary ===${C_RESET}"
+      printf 'requests:     %s (%s ok, %b)\n' "$total" "${C_GREEN}${ok}${C_RESET}" "$fail_part"
+      printf 'wall time:    %ss\n' "$run_elapsed"
+      printf 'tps:          %b%s req/s%b\n' "$C_CYAN" "$aggregate_rps" "$C_RESET"
+      printf 'throughput:   %b%s%b (%s total)\n' "$C_CYAN" "$aggregate_bps_display" "$C_RESET" "$total_bytes_display"
+      printf 'avg latency:  %b%ss%b\n' "$C_CYAN" "$avg_latency" "$C_RESET"
+      printf '%b' "${C_MAGENTA}slowest:      ${C_RESET}"
+      print_slowest_line "$slowest"
+      printf '%b\n' "${C_DIM}log file:     ${C_RESET}${LOG_FILE}"
+      printf '%b\n' "${C_DIM}summary file: ${C_RESET}${summary_file}"
+    } | tee /dev/stderr
+  else
+    tee /dev/stderr <"$summary_file"
+    echo "summary file: ${summary_file}"
   fi
 }
 
@@ -132,6 +180,7 @@ echo "${C_DIM}PARALLEL:${C_RESET} $PARALLEL" >&2
 echo "${C_DIM}HTML endpoints:${C_RESET} ${HTML_ENDPOINTS[*]}" >&2
 echo "${C_DIM}JSON endpoints:${C_RESET} ${JSON_ENDPOINTS[*]}" >&2
 echo "${C_DIM}LOG_FILE:${C_RESET} $LOG_FILE" >&2
+echo "${C_DIM}summary:${C_RESET} ${LOG_FILE%.*}.summary" >&2
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "${C_RED}ERROR: jq is required${C_RESET}" >&2
@@ -208,36 +257,4 @@ if [[ "$SORT_OUTPUT" == "1" ]]; then
   mv "$sorted_file" "$log_file"
 fi
 
-{
-  total=$(wc -l <"$log_file" | tr -d ' ')
-  ok=$(awk -F'\t' '$2 >= 200 && $2 < 400 { c++ } END { print c + 0 }' "$log_file")
-  fail=$((total - ok))
-  slowest=$(sort -t $'\t' -k1,1nr "$log_file" | head -n1)
-  run_elapsed=$(awk -v s="$run_start" -v e="$run_end" 'BEGIN { printf "%.3f", e - s }')
-  aggregate_rps=$(awk -v n="$total" -v t="$run_elapsed" 'BEGIN { if (t > 0) printf "%.2f", n / t; else print "0.00" }')
-  total_bytes=$(awk -F'\t' '{ bytes += $3 } END { print bytes + 0 }' "$log_file")
-  aggregate_bps=$(awk -v b="$total_bytes" -v t="$run_elapsed" 'BEGIN { if (t > 0) print b / t; else print 0 }')
-  aggregate_bps_display=$(format_bytes_rate "$aggregate_bps")
-  total_bytes_display=$(format_bytes_total "$total_bytes")
-
-  if [[ "$USE_COLOR" == "1" ]]; then
-    if (( fail > 0 )); then
-      fail_part="${C_RED}${fail} failed${C_RESET}"
-    else
-      fail_part="${C_GREEN}0 failed${C_RESET}"
-    fi
-    print_summary_line "--- ${C_BOLD}summary${C_RESET}: ${total} requests, ${C_GREEN}${ok} ok${C_RESET}, ${fail_part}, ${C_CYAN}${aggregate_rps} req/s${C_RESET}, ${C_CYAN}${aggregate_bps_display}${C_RESET} (${total_bytes_display} total, ${run_elapsed}s wall) ---"
-    if [[ -n "$slowest" ]]; then
-      printf '%b' "${C_MAGENTA}slowest:${C_RESET} "
-      print_slowest_line "$slowest"
-    fi
-    print_summary_line "${C_DIM}log file:${C_RESET} $LOG_FILE"
-  else
-    print_summary_line "--- summary: ${total} requests, ${ok} ok, ${fail} failed, ${aggregate_rps} req/s, ${aggregate_bps_display} (${total_bytes_display} total, ${run_elapsed}s wall) ---"
-    if [[ -n "$slowest" ]]; then
-      printf 'slowest: '
-      print_slowest_line "$slowest"
-    fi
-    print_summary_line "log file: $LOG_FILE"
-  fi
-}
+emit_summary
