@@ -1,0 +1,178 @@
+# RBAC on fg-public (hh-wp-webadmin-35) for an external Jenkins controller.
+#
+# Apply:
+#   kubectl --context=fg-public apply -f jenkins/fg-public-agent-rbac.yaml
+#
+# List everything created by this file:
+#   kubectl --context=fg-public get sa,role,rolebinding,ns -A \
+#     -l atlas.ebi.ac.uk/jenkins-integration=fg-public
+#
+# Generate kubeconfig (used for both Jenkins cloud and deploy pipeline):
+#   ./scripts/jenkins-fg-public-kubeconfig.sh > fg-public-k8s-cloud.kubeconfig
+#
+# Jenkins credentials (Secret file):
+#   fg-public-k8s-cloud  — Kubernetes cloud + KUBECONFIG in deploy pipeline
+#   gxa-secrets-staging  — Helm values secrets (jdbc, tomcat, imagePullSecret, etc.)
+#
+# Note: jenkins-cloud SA is used for the shared kubeconfig. admin-jenkins-fg is the
+#       in-pod identity referenced by jenkins-k8s-pod-deploy.yaml (deploy uses KUBECONFIG).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+  annotations:
+    atlas.ebi.ac.uk/description: "Namespace for FG Atlas Jenkins CI agent pods"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+---
+# SA behind fg-public-k8s-cloud kubeconfig (cloud connection + helm/kubectl deploy).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-cloud
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: cloud
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+    atlas.ebi.ac.uk/jenkins-role: cloud
+  annotations:
+    atlas.ebi.ac.uk/description: "SA for fg-public-k8s-cloud (cloud + deploy)"
+    atlas.ebi.ac.uk/jenkins-credential: fg-public-k8s-cloud
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+---
+# In-pod SA referenced by jenkins-k8s-pod-deploy.yaml. Deploy auth comes from KUBECONFIG.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-jenkins-fg
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+    atlas.ebi.ac.uk/jenkins-role: agent
+  annotations:
+    atlas.ebi.ac.uk/description: "In-pod SA for Jenkins agent pods"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+---
+# Role: jenkins-agent-pods (namespace: gxa-jenkins)
+# Lets Jenkins spawn and manage CI agent pods.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-agent-pods
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: cloud
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+    atlas.ebi.ac.uk/jenkins-role: cloud
+  annotations:
+    atlas.ebi.ac.uk/description: "Manage Jenkins CI agent pods in gxa-jenkins"
+    atlas.ebi.ac.uk/jenkins-credential: fg-public-k8s-cloud
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-cloud-agent-pods
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: cloud
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+    atlas.ebi.ac.uk/jenkins-role: cloud
+  annotations:
+    atlas.ebi.ac.uk/description: "Binds jenkins-cloud SA to jenkins-agent-pods Role"
+    atlas.ebi.ac.uk/jenkins-credential: fg-public-k8s-cloud
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-cloud
+    namespace: gxa-jenkins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-agent-pods
+---
+# Role: jenkins-gxa-deploy (namespace: gxa-staging)
+# Helm/kubectl deploy permissions for the shared fg-public-k8s-cloud kubeconfig.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-gxa-deploy
+  namespace: gxa-staging
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: deploy
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+    atlas.ebi.ac.uk/jenkins-role: deploy
+    atlas.ebi.ac.uk/target-namespace: gxa-staging
+  annotations:
+    atlas.ebi.ac.uk/description: "Helm/kubectl deploy permissions for GXA staging"
+    atlas.ebi.ac.uk/jenkins-credential: fg-public-k8s-cloud
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-gxa-deploy
+  namespace: gxa-staging
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: deploy
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-public
+    atlas.ebi.ac.uk/jenkins-role: deploy
+    atlas.ebi.ac.uk/target-namespace: gxa-staging
+  annotations:
+    atlas.ebi.ac.uk/description: "Binds jenkins-cloud SA to jenkins-gxa-deploy Role"
+    atlas.ebi.ac.uk/jenkins-credential: fg-public-k8s-cloud
+    atlas.ebi.ac.uk/source-file: jenkins/fg-public-agent-rbac.yaml
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-cloud
+    namespace: gxa-jenkins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-gxa-deploy
