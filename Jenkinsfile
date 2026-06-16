@@ -94,7 +94,6 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
 
   sh """
     set -euo pipefail
-    kubectl config set-context --current --namespace='${namespace}'
 
     if [ ! -f "\${SECRETS_SOURCE}" ]; then
       echo "Missing secrets file from Jenkins credential gxa-secrets-${env}" >&2
