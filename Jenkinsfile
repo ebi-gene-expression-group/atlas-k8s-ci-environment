@@ -71,13 +71,15 @@ pipeline {
           }
         }
       }
-      post {
-        success {
-          script {
-            if (!params.DRY_RUN) {
-              recordDeployment(params.RELEASE, params.ENV, params.IMAGE_TAG.trim())
-            }
-          }
+    }
+
+    // DevOps Portal persists deployment records on the controller; run off the K8s agent.
+    stage('Record deployment') {
+      when { expression { !params.DRY_RUN } }
+      agent none
+      steps {
+        script {
+          recordDeployment(params.RELEASE, params.ENV, params.IMAGE_TAG.trim())
         }
       }
     }
