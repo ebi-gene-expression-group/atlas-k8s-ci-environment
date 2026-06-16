@@ -100,18 +100,14 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       exit 1
     fi
 
-    HELM_CMD=(helm upgrade --install '${release}' 'charts/${release}'
-      --namespace '${namespace}'
-      --create-namespace
-      -f '${valuesFile}'
-      -f "\${SECRETS_SOURCE}"
-      --set 'appVersion=${imageTag}'
-      --set 'image.tag=${imageTag}'
-    )
-    if [ -n '${dryRunFlags}' ]; then
-      HELM_CMD+=(${dryRunFlags})
-    fi
-    "\${HELM_CMD[@]}"
+    helm upgrade --install '${release}' 'charts/${release}' \\
+      --namespace '${namespace}' \\
+      --create-namespace \\
+      -f '${valuesFile}' \\
+      -f "\${SECRETS_SOURCE}" \\
+      --set 'appVersion=${imageTag}' \\
+      --set 'image.tag=${imageTag}' \\
+      ${dryRunFlags}
   """
 
   if (!dryRun) {
