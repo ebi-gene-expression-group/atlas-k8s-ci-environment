@@ -65,7 +65,6 @@ pipeline {
         script {
           def secretsCredential = "gxa-secrets-${params.ENV}"
           withCredentials([
-            file(credentialsId: 'hh-wp-admin-35', variable: 'KUBECONFIG'),
             file(credentialsId: secretsCredential, variable: 'SECRETS_SOURCE'),
           ]) {
             runHelmDeploy(params.RELEASE, params.ENV, params.IMAGE_TAG.trim(), params.DRY_RUN)
