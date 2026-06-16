@@ -3,7 +3,7 @@ kind: Pod
 metadata:
   namespace: gxa-jenkins
 spec:
-  serviceAccountName: admin-jenkins-fg
+  serviceAccountName: jenkins-cloud
   securityContext:
     fsGroup: 1000
   containers:
