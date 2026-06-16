@@ -29,7 +29,7 @@ pipeline {
 
   agent {
     kubernetes {
-      cloud 'fg-public'
+      cloud 'hh-webadmin-35'
       defaultContainer 'helm'
       yamlFile 'jenkins-k8s-pod-deploy.yaml'
     }
