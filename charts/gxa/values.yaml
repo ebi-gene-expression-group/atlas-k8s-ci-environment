@@ -177,5 +177,56 @@ tomcat:
 
 loggingLevel: DEBUG
 
+# Optional in-cluster PostgreSQL 16.
+# Default is disabled: most environments connect to an external PG via jdbc.url.
+# When enabled, the chart provisions a StatefulSet + Service and creates two roles:
+#   - atlasprd3:   read-only (the role the webapp connects as)
+#   - atlasdataload: read/write, owns the public schema (used by data loading)
+# Passwords must be supplied via the gitignored .secrets-<env>.yaml (never in git).
+postgresql:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "16"
+    pullPolicy: IfNotPresent
+  database: gxpatlas
+  superuser: postgres
+  # Passwords supplied via .secrets-<env>.yaml
+  superuserPassword: ""
+  atlasprd3Password: ""
+  atlasdataloadPassword: ""
+  service:
+    port: 5432
+  persistence:
+    enabled: true
+    size: 20Gi
+    # storageClassName left empty -> use the cluster default StorageClass
+    storageClassName: ""
+  resources:
+    requests:
+      # keep CPU request modest so it schedules; the limit lets it burst
+      memory: "1Gi"
+      cpu: "250m"
+    limits:
+      memory: "8Gi"
+      cpu: "4"
+  # Optional data population job: streams pg_dump from a source DB straight into
+  # psql on the in-cluster DB as atlasdataload (no intermediate file). Runs as a
+  # plain background Job (helm does not wait on it). To re-populate, delete the
+  # Job ({release}-pg-populate) and re-deploy.
+  populate:
+    enabled: false
+    source:
+      host: ""
+      port: 5432
+      database: ""
+      user: atlasprd3
+      # Source DB password supplied via .secrets-<env>.yaml
+      password: ""
+    # pg_dump flags: portable restore under atlasdataload, idempotent re-runs
+    dumpArgs: "--no-owner --no-privileges --clean --if-exists"
+    backoffLimit: 1
+    resources: {}
+
 nfs:
   server: "hh-isi-srv-vlan1496.ebi.ac.uk"

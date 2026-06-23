@@ -1,0 +1,119 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "app.fullname" . }}-postgresql
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgresql
+      port: {{ .Values.postgresql.service.port }}
+      targetPort: postgresql
+      protocol: TCP
+  selector:
+    {{- include "app.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "app.fullname" . }}-postgresql
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  serviceName: {{ include "app.fullname" . }}-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgresql
+    spec:
+      securityContext:
+        # Default postgres image runs as uid/gid 999; fsGroup makes the PVC writable.
+        fsGroup: 999
+      containers:
+        - name: postgresql
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          ports:
+            - name: postgresql
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.superuser | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database | quote }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-postgresql
+                  key: POSTGRES_PASSWORD
+            - name: ATLASPRD3_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-postgresql
+                  key: ATLASPRD3_PASSWORD
+            - name: ATLASDATALOAD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-postgresql
+                  key: ATLASDATALOAD_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgresql.superuser }}", "-d", "{{ .Values.postgresql.database }}"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgresql.superuser }}", "-d", "{{ .Values.postgresql.database }}"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: initdb
+          configMap:
+            name: {{ include "app.fullname" . }}-postgresql-initdb
+            defaultMode: 0755
+        {{- if not .Values.postgresql.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "app.labels" . | nindent 10 }}
+          app.kubernetes.io/component: postgresql
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.postgresql.persistence.storageClassName }}
+        storageClassName: {{ .Values.postgresql.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size | quote }}
+  {{- end }}
+{{- end }}

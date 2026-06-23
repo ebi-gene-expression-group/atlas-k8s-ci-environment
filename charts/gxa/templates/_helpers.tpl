@@ -248,14 +248,33 @@ Secrets volume mount
 Solr Zookeeper hosts URL
 */}}
 {{- define "app.solrZkHosts" -}}
-{{ .Values.solr.namespace }}-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
+{{ include "app.name" . }}-solrcloud-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
 {{- end }}
 
 {{/*
 Solr hosts URL
 */}}
 {{- define "app.solrHost" -}}
-{{ .Values.solr.namespace }}-common.{{ .Values.solr.namespace }}.svc.cluster.local
+{{ include "app.name" . }}-solrcloud-common.{{ .Values.solr.namespace }}.svc.cluster.local
+{{- end }}
+
+{{/*
+In-cluster PostgreSQL Service hostname (FQDN within the release namespace)
+*/}}
+{{- define "app.postgresqlHost" -}}
+{{ include "app.fullname" . }}-postgresql.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}
+
+{{/*
+JDBC URL: explicit jdbc.url wins; otherwise derive from the in-cluster
+PostgreSQL Service when postgresql.enabled.
+*/}}
+{{- define "app.jdbcUrl" -}}
+{{- if .Values.jdbc.url -}}
+{{- .Values.jdbc.url -}}
+{{- else if and .Values.postgresql .Values.postgresql.enabled -}}
+{{- printf "jdbc:postgresql://%s:%v/%s" (include "app.postgresqlHost" .) .Values.postgresql.service.port .Values.postgresql.database -}}
+{{- end -}}
 {{- end }}
 
 {{/* Name of the chart-managed registry pull secret */}}

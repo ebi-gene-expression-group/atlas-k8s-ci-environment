@@ -1,0 +1,39 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "app.fullname" . }}-postgresql-initdb
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+data:
+  # Runs once on first init (empty data dir). Passwords are read from env vars
+  # via psql \getenv so plaintext never lands in this ConfigMap, and :'var'
+  # quoting is injection-safe regardless of special characters.
+  01-init-roles.sh: |
+    #!/bin/bash
+    set -e
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'EOSQL'
+    \getenv prd3pw ATLASPRD3_PASSWORD
+    \getenv loadpw ATLASDATALOAD_PASSWORD
+    \getenv dbname POSTGRES_DB
+
+    -- atlasdataload: read/write, owns the public schema and may create new
+    -- schemas/objects in this database (needed to restore a full pg_dump).
+    CREATE ROLE atlasdataload LOGIN PASSWORD :'loadpw';
+    GRANT ALL ON DATABASE :"dbname" TO atlasdataload;
+    ALTER SCHEMA public OWNER TO atlasdataload;
+    GRANT ALL ON SCHEMA public TO atlasdataload;
+
+    -- atlasprd3: read-only (the role the webapp connects as)
+    CREATE ROLE atlasprd3 LOGIN PASSWORD :'prd3pw';
+    GRANT CONNECT ON DATABASE :"dbname" TO atlasprd3;
+    GRANT USAGE  ON SCHEMA public TO atlasprd3;
+    GRANT SELECT ON ALL TABLES    IN SCHEMA public TO atlasprd3;
+    GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO atlasprd3;
+
+    -- future objects created by atlasdataload are also readable by atlasprd3
+    ALTER DEFAULT PRIVILEGES FOR ROLE atlasdataload IN SCHEMA public GRANT SELECT ON TABLES    TO atlasprd3;
+    ALTER DEFAULT PRIVILEGES FOR ROLE atlasdataload IN SCHEMA public GRANT SELECT ON SEQUENCES TO atlasprd3;
+    EOSQL
+{{- end }}

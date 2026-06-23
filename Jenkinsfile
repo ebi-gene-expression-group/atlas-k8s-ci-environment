@@ -2,7 +2,11 @@ pipeline {
   parameters {
     choice(
       name: 'ENV',
-      choices: ['staging', 'prod'],
+      choices: [
+        'ci',
+        'staging',
+         'prod'
+      ],
       description: 'Target environment (namespace: gxa-<env>). Requires charts/gxa/values-<env>.yaml.'
     )
     string(

@@ -57,6 +57,54 @@ is also populated to ensure Java-based proxy support.
 
 - **SolrCloud:** host and ZK endpoints are configured via `values.yaml` and injected
   into `configuration.properties` and secrets for authenticated access.
+- **PostgreSQL:** by default the app connects to an **external** PG via `jdbc.url`.
+  Optionally, the chart can provision an **in-cluster** PG (see below).
+
+## Bundled PostgreSQL (optional)
+
+By default `postgresql.enabled: false`, so environments connect to an external
+PostgreSQL via `jdbc.url`. Set `postgresql.enabled: true` to have the chart
+provision an in-cluster **PostgreSQL 16** `StatefulSet` + `Service` instead.
+
+When enabled the chart creates two roles (passwords from the gitignored
+`.secrets-<env>.yaml`):
+
+- `atlasprd3` — read-only; this is the role the webapp connects as.
+- `atlasdataload` — read/write; owns the `public` schema (used for data loading).
+
+`atlasprd3` is granted `SELECT` on existing and future objects (via
+`ALTER DEFAULT PRIVILEGES`), which keeps it effectively read-only. Role creation
+and grants run once on first init via a `ConfigMap` mounted into
+`/docker-entrypoint-initdb.d`; passwords are read from env vars with psql
+`\getenv` so plaintext never lands in a ConfigMap.
+
+When `postgresql.enabled` is true and `jdbc.url` is left unset, `jdbc.url`
+auto-derives to the in-cluster Service
+(`jdbc:postgresql://{release}-postgresql.{namespace}.svc.cluster.local:5432/{database}`).
+`jdbc.password` must equal `postgresql.atlasprd3Password` (the webapp connects as
+atlasprd3).
+
+Data is stored on a `volumeClaimTemplate` using the cluster default StorageClass
+(set `postgresql.persistence.storageClassName` to override, or
+`postgresql.persistence.enabled: false` for an ephemeral `emptyDir`).
+
+### Data population job (pg_dump -> psql)
+
+Set `postgresql.populate.enabled: true` to run a **plain background Job** that
+streams `pg_dump` from a source DB straight into `psql` on the in-cluster DB as
+`atlasdataload` (no intermediate file, so no scratch volume needed). It is a
+normal Job (not a Helm hook), so helm does not block on it — useful for large
+datasets that take far longer than helm's hook timeout. Configure the source
+under `postgresql.populate.source.*` (password via `.secrets-<env>.yaml`).
+Default `dumpArgs` (`--no-owner --no-privileges --clean --if-exists`) make the
+restore portable and re-runs idempotent.
+
+The Job runs once and is retained on completion (so later `helm upgrade`s are
+no-ops). To re-populate, delete it and re-deploy:
+`kubectl delete job {release}-pg-populate`.
+
+Size `postgresql.persistence.size` with headroom for the restored data (indexes,
+WAL) — e.g. the `ci` environment uses `50Gi` for a ~17 GB source DB.
 
 ## Namespaces and environments
 
@@ -64,6 +112,9 @@ is also populated to ensure Java-based proxy support.
   (already used by `make deploy`) or create the namespace ahead of time.
 - Each environment is expected to have its own values file named
   `values-<env>.yaml` under `charts/gxa/`.
+- The `ci` environment (`values-ci.yaml`) provisions an in-cluster PostgreSQL and
+  populates it from the staging source DB; it expects a `gxa-ci-solrcloud`
+  SolrCloud namespace to exist.
 - You can scaffold a new environment values file from the test template:
   `scripts/create-env.sh <env> [release]` (defaults to `gxa`).
 
@@ -89,8 +140,23 @@ Key | Default | Description
 `tomcat.curatorPassword` | unset | Tomcat curator password.
 `loggingLevel` | `DEBUG` | Application logging level.
 `jdbc.populator.run` | unset | Enable JDBC populator job if defined.
-`jdbc.url` | unset | JDBC URL for the GXA database.
-`jdbc.password` | unset | JDBC password for the GXA database.
+`jdbc.url` | unset | JDBC URL for the GXA database (auto-derived to the in-cluster Service when `postgresql.enabled` and unset).
+`jdbc.password` | unset | JDBC password for the GXA database (must equal `postgresql.atlasprd3Password` when using the bundled PG).
+`postgresql.enabled` | `false` | Provision an in-cluster PostgreSQL 16 instead of using an external DB.
+`postgresql.database` | `gxpatlas` | In-cluster database name.
+`postgresql.superuser` | `postgres` | In-cluster superuser role.
+`postgresql.superuserPassword` | `""` | Superuser password (set via `.secrets-<env>.yaml`).
+`postgresql.atlasprd3Password` | `""` | Read-only role password (set via `.secrets-<env>.yaml`).
+`postgresql.atlasdataloadPassword` | `""` | Read/write role password (set via `.secrets-<env>.yaml`).
+`postgresql.persistence.enabled` | `true` | Use a PVC for DB data (else ephemeral `emptyDir`).
+`postgresql.persistence.size` | `20Gi` | PVC size for DB data.
+`postgresql.persistence.storageClassName` | `""` | StorageClass for the PVC (empty -> cluster default).
+`postgresql.populate.enabled` | `false` | Run the streaming pg_dump -> psql population Job (plain background Job).
+`postgresql.populate.source.host` | `""` | Source DB host for `pg_dump`.
+`postgresql.populate.source.database` | `""` | Source DB name for `pg_dump`.
+`postgresql.populate.source.user` | `atlasprd3` | Source DB user for `pg_dump`.
+`postgresql.populate.source.password` | `""` | Source DB password (set via `.secrets-<env>.yaml`).
+`postgresql.populate.dumpArgs` | `--no-owner --no-privileges --clean --if-exists` | Flags passed to `pg_dump`.
 `solr.namespace` | unset | Namespace where SolrCloud is deployed.
 `solr.user` | unset | Solr username.
 `solr.password` | unset | Solr password.

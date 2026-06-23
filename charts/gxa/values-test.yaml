@@ -17,6 +17,6 @@ jdbc:
 
 
 solr:
-  namespace: gxa-dev-solrcloud
+  namespace: gxa-test-solrcloud
   user: admin
   createSecret: true

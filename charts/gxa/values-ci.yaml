@@ -1,0 +1,39 @@
+# values for gxa ci env
+environment: ci
+
+tomcat:
+  createSecret: true
+  debug:
+    enabled: false
+
+loggingLevel: INFO
+
+# In-cluster PostgreSQL 16 for CI. The DB has already been populated from the
+# staging source DB; populate.enabled is false so re-deploys don't reload it.
+# To re-populate: delete the gxa-pg-populate Job, set populate.enabled: true, deploy.
+postgresql:
+  enabled: true
+  database: gxpatlas
+  persistence:
+    # fg-public has no default StorageClass; use the cluster's NFS class (as the other PVCs do)
+    storageClassName: standard-nfs-production
+    # staging source DB is ~17 GB; size with headroom for indexes/WAL
+    size: 50Gi
+  populate:
+    enabled: false
+    source:
+      host: pgsql-hlvm-147.ebi.ac.uk   # same DB as staging
+      port: 5432
+      database: gxpatlaspro
+      user: atlasprd3
+
+jdbc:
+  # url omitted -> auto-derives to the in-cluster Service (see app.jdbcUrl)
+  user: atlasprd3
+  pool: gxa
+  createSecret: true
+
+solr:
+  namespace: gxa-ci-solrcloud
+  user: admin
+  createSecret: true
