@@ -17,7 +17,7 @@ solr:
   replicas: 4
   image:
     tag: 8.7.0
-  javaMem: "-Xms4000m -Xmx5000m"
+  javaMem: "-Xms8000m -Xmx8000m"
   opts: >-
     -Denable.packages=true
     -Dblob.max.size.mb=100

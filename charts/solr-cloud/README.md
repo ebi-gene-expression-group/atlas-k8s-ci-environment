@@ -27,21 +27,21 @@
 
    ```bash
    ENV=staging
-   RELEASE=gxa
+   APP=gxa
 
-   kubectl create namespace ${RELEASE}-${ENV}-solrcloud --dry-run=client -o yaml | kubectl apply -f -
+   kubectl create namespace ${APP}-${ENV}-solrcloud --dry-run=client -o yaml | kubectl apply -f -
 
    # environment selects NFS data under /ifs/public/rw/fg/atlas/gxa/environments/<environment>/
-   helm upgrade --install ${RELEASE}-${ENV} charts/solr-cloud \
+   helm upgrade --install ${APP} charts/solr-cloud \
          --namespace ${RELEASE}-${ENV}-solrcloud \
-         --set environment=${ENV} \
+         --values values-${ENV}.yaml
          --create-namespace=false
    ```
 
    Get the Solr admin password (created automatically by the operator):
 
    ```bash
-   kubectl get secret ${RELEASE}-${ENV}-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n ${RELEASE}-${ENV}-solrcloud | base64 --decode;echo
+   kubectl get secret ${APP}-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n ${RELEASE}-${ENV}-solrcloud | base64 --decode;echo
    ```
 
 ## NFS migration storage
