@@ -2,6 +2,10 @@
 {{- $zkNfsPod := include "solr-cloud.zkNfsDataPodMode" . -}}
 {{- $solrNfsMount := default "/solr-data" .Values.solr.storage.nfsData.mountPath -}}
 {{- $zkNfsMount := default "/zk-data" .Values.zookeeper.storage.nfsData.mountPath -}}
+{{- $solrNfsData := .Values.solr.storage.nfsData | default dict -}}
+{{- $solrDataDirPrefix := default .Release.Name $solrNfsData.dataDirPrefix -}}
+{{- $zkNfsData := .Values.zookeeper.storage.nfsData | default dict -}}
+{{- $zkDataDirPrefix := default .Release.Name $zkNfsData.dataDirPrefix -}}
 apiVersion: solr.apache.org/v1beta1
 kind: SolrCloud
 metadata:
@@ -61,7 +65,9 @@ spec:
             - |
               # Link NFS export entries into /var/solr/data (no copy). NFS stays mounted at {{ $solrNfsMount }} on the Solr container.
               # Runs after cp-solr-xml — gate on .nfs-seeded, not solr.xml.
-              SRC={{ $solrNfsMount }}/${POD_NAME}
+              # NFS folder names use dataDirPrefix (default: release name); may differ from pod name after a release rename.
+              ORDINAL="${POD_NAME##*-}"
+              SRC={{ $solrNfsMount }}/{{ $solrDataDirPrefix }}-solrcloud-${ORDINAL}
               MARKER=/var/solr/data/.nfs-seeded
               if [ -f "${MARKER}" ]; then
                 echo "Solr NFS data already linked from ${SRC}, skipping"
@@ -132,7 +138,8 @@ spec:
             - -c
             - |
               # Link NFS export entries into /data (no copy). NFS stays mounted at {{ $zkNfsMount }} on the ZK container.
-              SRC={{ $zkNfsMount }}/${POD_NAME}
+              ORDINAL="${POD_NAME##*-}"
+              SRC={{ $zkNfsMount }}/{{ $zkDataDirPrefix }}-solrcloud-zookeeper-${ORDINAL}
               MARKER=/data/.nfs-seeded
               if [ -f "${MARKER}" ]; then
                 echo "ZK NFS data already linked from ${SRC}, skipping"

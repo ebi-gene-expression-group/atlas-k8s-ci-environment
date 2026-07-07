@@ -1,5 +1,8 @@
 # Environment name for NFS paths: .../gxa/environments/<environment>/{solr_data,zk_data}/...
 # Pass at install time: helm ... --set environment=dev
+#
+# Helm release name must be {chart}-{environment} (e.g. gxa-staging), not bare "gxa".
+# Namespace is typically {release}-solrcloud (e.g. gxa-staging-solrcloud). See README.md.
 environment: ""
 
 # fg_atlas ownership on Isilon NFS exports (same as gxa chart).
@@ -29,10 +32,10 @@ solr:
   resources:
     limits:
       memory: 9Gi
-      cpu: 4
+      cpu: 3
     requests:
       memory: 7Gi
-      cpu: 3
+      cpu: 2
   storage:
     className: standard-nfs-production
     size: 20Gi
@@ -46,6 +49,8 @@ solr:
       mode: pod
       mountPath: /solr-data
       basePath: ""
+      # Folder under solr_data: {dataDirPrefix}-solrcloud-{ordinal}. Defaults to Helm release name.
+      # Set when NFS symlinks predate a release rename (e.g. staging: dataDirPrefix=gxa).
       dataDirPrefix: ""
   secret:
     name: solrcloud-package-store-keys

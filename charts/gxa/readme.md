@@ -108,13 +108,13 @@ WAL) — e.g. the `ci` environment uses `50Gi` for a ~17 GB source DB.
 
 ## Namespaces and environments
 
-- The chart does not create a `Namespace` resource. Use Helm's `--create-namespace`
-  (already used by `make deploy`) or create the namespace ahead of time.
+- The chart does not create a `Namespace` resource. Use `task deploy` (Helm
+  `--create-namespace`) or create the namespace ahead of time.
 - Each environment is expected to have its own values file named
   `values-<env>.yaml` under `charts/gxa/`.
 - The `ci` environment (`values-ci.yaml`) provisions an in-cluster PostgreSQL and
-  populates it from the staging source DB; it expects a `gxa-ci-solrcloud`
-  SolrCloud namespace to exist.
+  populates it from the staging source DB; it expects SolrCloud release `gxa-ci` in
+  namespace `gxa-ci-solrcloud` to exist.
 - You can scaffold a new environment values file from the test template:
   `scripts/create-env.sh <env> [release]` (defaults to `gxa`).
 
@@ -157,7 +157,8 @@ Key | Default | Description
 `postgresql.populate.source.user` | `atlasprd3` | Source DB user for `pg_dump`.
 `postgresql.populate.source.password` | `""` | Source DB password (set via `.secrets-<env>.yaml`).
 `postgresql.populate.dumpArgs` | `--no-owner --no-privileges --clean --if-exists` | Flags passed to `pg_dump`.
-`solr.namespace` | unset | Namespace where SolrCloud is deployed.
+`solr.namespace` | unset | Namespace where SolrCloud is deployed (e.g. `gxa-staging-solrcloud`).
+`solr.releaseName` | `{app.name}-{environment}` | SolrCloud Helm release name (e.g. `gxa-staging`). Service DNS is `{releaseName}-solrcloud-common`.
 `solr.user` | unset | Solr username.
 `solr.password` | unset | Solr password.
 `solr.collection` | unset | Default Solr collection name.

@@ -1,0 +1,14 @@
+# values for solr-cloud ci env
+environment: test
+
+solr:
+  # Heap kept well under the 2Gi container limit to leave room for
+  # non-heap memory (metaspace, thread stacks, direct buffers).
+  javaMem: "-Xms1024m -Xmx1536m"
+  resources:
+    limits:
+      memory: 2Gi
+      cpu: 1
+    requests:
+      memory: 2Gi
+      cpu: 1

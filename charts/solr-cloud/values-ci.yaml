@@ -2,13 +2,22 @@
 environment: ci
 
 solr:
-  # Heap kept well under the 2Gi container limit to leave room for
-  # non-heap memory (metaspace, thread stacks, direct buffers).
-  javaMem: "-Xms1024m -Xmx1536m"
+  storage:
+    nfsData:
+      # Migrated Isilon symlinks are gxa-solrcloud-{n}, not gxa-ci-solrcloud-{n}.
+      dataDirPrefix: gxa
+  # Same ~90GB/shard bulk-analytics indexes as staging; inherit javaMem (8Gi heap) from
+  # values.yaml. The previous 1.5Gi heap OOMed under Jenkins streaming-expression ITs,
+  # dropping pods 0/3 from ZK live_nodes and leaving shard1/shard3 unreachable.
   resources:
     limits:
-      memory: 2Gi
-      cpu: 1
+      memory: 9Gi
+      cpu: "2"
     requests:
-      memory: 2Gi
-      cpu: 1
+      memory: 7Gi
+      cpu: "500m"
+
+zookeeper:
+  storage:
+    nfsData:
+      dataDirPrefix: gxa

@@ -110,7 +110,6 @@ spec:
                 -Dhttps.proxyHost=${PROXY_HOST}
                 -Dhttps.proxyPort=${PROXY_PORT}
                 -Dhttp.nonProxyHosts=${NO_PROXY//,/|}
-
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

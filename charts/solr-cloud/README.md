@@ -25,24 +25,84 @@
 
 ## Deploying a SolrCloud
 
+Helm **release name** must be `{app}-{environment}` (e.g. `gxa-staging`). The **namespace** is
+`{app}-{environment}-solrcloud`. Do not use bare `gxa` as the release — that collides across
+environments (ZK PV names, service DNS) and breaks the GXA webapp Solr URLs.
+
+With [Task](https://taskfile.dev/) (from repo root; set `K8S_CONTEXT` in `.env`). The target
+namespace must already exist (e.g. `gxa-staging-solrcloud`); `task deploy-solrcloud` does not
+create namespaces (requires cluster-admin).
+
+   ```bash
+   task deploy-solrcloud ENV=staging
+   # Helm 4 + solr-operator SSA conflicts:
+   FORCE_CONFLICTS=1 task deploy-solrcloud ENV=staging
+   ```
+
+Equivalent raw Helm:
+
    ```bash
    ENV=staging
    APP=gxa
+   RELEASE=${APP}-${ENV}
+   NS=${APP}-${ENV}-solrcloud
 
-   kubectl create namespace ${APP}-${ENV}-solrcloud --dry-run=client -o yaml | kubectl apply -f -
+   kubectl create namespace ${NS} --dry-run=client -o yaml | kubectl apply -f -
 
-   # environment selects NFS data under /ifs/public/rw/fg/atlas/gxa/environments/<environment>/
-   helm upgrade --install ${APP} charts/solr-cloud \
-         --namespace ${RELEASE}-${ENV}-solrcloud \
-         --values values-${ENV}.yaml
+   helm upgrade --install ${RELEASE} charts/solr-cloud \
+         --namespace ${NS} \
+         --values charts/solr-cloud/values-${ENV}.yaml \
          --create-namespace=false
    ```
 
    Get the Solr admin password (created automatically by the operator):
 
    ```bash
-   kubectl get secret ${APP}-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n ${RELEASE}-${ENV}-solrcloud | base64 --decode;echo
+   kubectl get secret ${RELEASE}-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n ${NS} | base64 --decode;echo
    ```
+
+   Resulting names (example `ENV=staging`):
+
+   | Kind | Name |
+   |------|------|
+   | Namespace | `gxa-staging-solrcloud` |
+   | Helm release / SolrCloud CR | `gxa-staging` |
+   | Solr pods | `gxa-staging-solrcloud-0` … |
+   | ZK pods | `gxa-staging-solrcloud-zookeeper-0` … |
+   | Solr service | `gxa-staging-solrcloud-common` |
+   | NodePort | `gxa-staging-solrcloud-nodeport` |
+   | ZK PVs | `gxa-staging-zk-data-0` … |
+
+### ZooKeeper PVC stuck Pending
+
+ZK uses static NFS PVs (`zookeeper.storage.nfsData.mode: pv`). Helm must create
+`data-{release}-solrcloud-zookeeper-{n}` PVCs with `volumeName` set **before** the Solr
+operator's StatefulSet creates them. If the operator wins the race, PVCs stay Pending
+(no `volumeName`, no storage class) while the NFS PVs remain Available.
+
+Fix:
+
+```bash
+task fix-solrcloud-zk-pvcs ENV=staging
+kubectl delete pod -n gxa-staging-solrcloud -l app=gxa-staging-solrcloud-zookeeper
+```
+
+`task deploy-solrcloud` applies PV/PVC manifests before the full chart upgrade to avoid this.
+
+### Recovering from release name `gxa` (wrong)
+
+If SolrCloud was ever installed with release `gxa` instead of `gxa-${ENV}`, remove that
+release **only if it still exists**, then install the correct one. **Keep** existing
+`gxa-${ENV}-zk-data-*` PVs and `data-gxa-${ENV}-solrcloud-zookeeper-*` PVCs if present.
+
+```bash
+# Skip uninstall if the wrong release is already gone:
+helm list -n gxa-staging-solrcloud | grep -w gxa && \
+  helm uninstall gxa -n gxa-staging-solrcloud
+
+FORCE_CONFLICTS=1 task deploy-solrcloud ENV=staging
+task deploy ENV=staging   # GXA webapp — picks up gxa-staging-solrcloud-* service DNS
+```
 
 ## NFS migration storage
 
@@ -92,17 +152,20 @@ symlinks cores into `/var/solr/data`.
 After switching from PV mode, delete old migration PVs/PVCs before reinstalling:
 
 ```bash
-NS=${RELEASE}-${ENV}-solrcloud
-kubectl delete solrcloud ${RELEASE}-${ENV} -n ${NS}
-kubectl delete pvc -n ${NS} -l app.kubernetes.io/instance=${RELEASE}-${ENV}
-kubectl delete pv ${RELEASE}-${ENV}-solr-data-{0,1,2,3} ${RELEASE}-${ENV}-zk-data-{0,1,2} 2>/dev/null || true
-helm upgrade --install ${RELEASE}-${ENV} charts/solr-cloud --namespace ${NS} --set environment=${ENV}
+APP=gxa
+ENV=staging
+RELEASE=${APP}-${ENV}
+NS=${APP}-${ENV}-solrcloud
+kubectl delete solrcloud ${RELEASE} -n ${NS}
+kubectl delete pvc -n ${NS} -l app.kubernetes.io/instance=${RELEASE}
+kubectl delete pv ${RELEASE}-solr-data-{0,1,2,3} ${RELEASE}-zk-data-{0,1,2} 2>/dev/null || true
+helm upgrade --install ${RELEASE} charts/solr-cloud --namespace ${NS} --set environment=${ENV}
 ```
 
 Verify pod NFS mounts:
 
 ```bash
-kubectl describe pod ${RELEASE}-${ENV}-solrcloud-0 -n ${NS} | grep -A3 'solr-data-nfs\|zk-data-nfs'
+kubectl describe pod ${RELEASE}-solrcloud-0 -n ${NS} | grep -A3 'solr-data-nfs\|zk-data-nfs'
 ```
 
 ### NFS permissions

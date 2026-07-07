@@ -1,0 +1,13 @@
+# values for solr-cloud staging env
+environment: staging
+
+solr:
+  storage:
+    nfsData:
+      # Migrated Isilon symlinks are gxa-solrcloud-{n} (from release "gxa"), not gxa-staging-solrcloud-{n}.
+      dataDirPrefix: gxa
+  # Keep production-like heap/memory from values.yaml; lower CPU requests to ease
+  # scheduling on fg-public (actual Solr CPU usage on staging is typically low).
+  resources:
+    requests:
+      cpu: "1"

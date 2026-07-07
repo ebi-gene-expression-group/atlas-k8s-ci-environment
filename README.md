@@ -45,19 +45,14 @@ Helm will create a `ServiceAccount` that defines an `imagePullSecret`  using whi
 This repo includes a [`Taskfile.yml`](Taskfile.yml) using [Task](https://taskfile.dev/) so common commands are named, documented, and easy to discover. Install the [Task CLI](https://taskfile.dev/installation/), then:
 
 - **`task`** or **`task --list`** — list all tasks with short descriptions (good starting point for new contributors).
-- **`task deploy ENV=test`** — deploy the app chart (same idea as `ENV=test make deploy` below).
+- **`task deploy ENV=test`** — deploy the GXA/SCXA webapp chart.
+- **`task deploy-solrcloud ENV=staging`** — deploy SolrCloud (`charts/solr-cloud/README.md`).
 
-Other useful examples: `task deploy-test`, `task print-env`, `task mongodb-install ENV=test`. Set `K8S_CONTEXT` (and optionally `RELEASE`, `ENV`) in your environment or a `.env` file at the repo root (see `.env.example`).
+Other useful examples: `task deploy-test`, `task open-solr ENV=staging`, `task print-env`, `task mongodb-install ENV=test`. Set `K8S_CONTEXT` (and optionally `RELEASE`, `ENV`) in your environment or a `.env` file at the repo root (see `.env.example`).
 
 **GXA indexing gap / Jenkins loads:** set `GXA_SOURCE_JSON_URL` (production catalogue) and `GXA_TARGET_JSON_URL` (deployment under test) in `.env`. Jenkins `TARGET_ENVIRONMENT` (e.g. `k8s_test`) must match that target — see `config/gxa-environments.yaml`. Then `task gxa-print-urls`, `task gxa-experiments-gap COUNT=10`, and `task trigger-indexing ACCESSIONS="..."`.
 
 **Bioentities (new species on k8s):** `task bioentities-jenkins-params`, `task gxa-prod-only-species COUNT=10`, `task trigger-bioentities SPECIES=zea_mays`, or `task trigger-bioentities-top COUNT=2` (top prod-only species with a valid Jenkins `SPECIES` slug; default `PREFIX=build_work`).
-
-You can still use **Make** for the same workflows; see the `Makefile` (e.g. `ENV=test make deploy`).
-
-```sh
-ENV=test make deploy
-```
 
 ### Configuration
 

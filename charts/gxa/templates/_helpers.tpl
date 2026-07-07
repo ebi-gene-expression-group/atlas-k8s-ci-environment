@@ -245,17 +245,29 @@ Secrets volume mount
 {{- end }}
 
 {{/*
+SolrCloud Helm release name (must match solr-cloud chart install name, e.g. gxa-staging).
+Defaults to {app.name}-{environment}; override with solr.releaseName when needed.
+*/}}
+{{- define "app.solrReleaseName" -}}
+{{- if .Values.solr.releaseName -}}
+{{- .Values.solr.releaseName -}}
+{{- else -}}
+{{- printf "%s-%s" (include "app.name" .) (required "environment is required for Solr service DNS" .Values.environment) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Solr Zookeeper hosts URL
 */}}
 {{- define "app.solrZkHosts" -}}
-{{ include "app.name" . }}-solrcloud-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
+{{ include "app.solrReleaseName" . }}-solrcloud-zookeeper-client.{{ .Values.solr.namespace }}.svc.cluster.local:2181
 {{- end }}
 
 {{/*
 Solr hosts URL
 */}}
 {{- define "app.solrHost" -}}
-{{ include "app.name" . }}-solrcloud-common.{{ .Values.solr.namespace }}.svc.cluster.local
+{{ include "app.solrReleaseName" . }}-solrcloud-common.{{ .Values.solr.namespace }}.svc.cluster.local
 {{- end }}
 
 {{/*

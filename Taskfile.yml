@@ -15,7 +15,7 @@ vars:
   ENV: 
     sh: echo "${ENV:-test}"
   SUPPORTED_ENVS: test staging
-  APP_VERSION: 37.6.47
+  APP_VERSION: 37.6.79
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
   ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
   CHART_PATH: charts/{{.RELEASE}}
@@ -97,6 +97,92 @@ tasks:
       - task: deploy
         vars:
           ENV: test
+
+  deploy-solrcloud:
+    desc: |
+      Deploy solr-cloud chart. Helm release defaults to {RELEASE}-{ENV} (override with SOLR_HELM_RELEASE);
+      namespace is {RELEASE}-{ENV}-solrcloud. Set FORCE_CONFLICTS=1 if Helm 4 reports SSA conflicts.
+    cmds:
+      - |
+        set -euo pipefail
+        kubectx "${K8S_CONTEXT}"
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        SOLR_HELM_RELEASE="${SOLR_HELM_RELEASE:-${RELEASE}-${ENV}}"
+        NS="${RELEASE}-${ENV}-solrcloud"
+        VALUES="charts/solr-cloud/values-${ENV}.yaml"
+        if [ ! -f "$VALUES" ]; then
+          echo "Error: missing $VALUES (add values-${ENV}.yaml or pick another ENV)"
+          exit 1
+        fi
+        if ! kubectl get namespace "$NS" >/dev/null 2>&1; then
+          echo "Error: namespace $NS does not exist. Create it via your platform team (team-admin cannot patch namespaces)." >&2
+          exit 1
+        fi
+        # NFS ZK/Solr PV+PVC must exist before the Solr operator creates StatefulSets;
+        # otherwise the operator creates PVCs without volumeName and they stay Pending.
+        for tmpl in zk-nfs-data-pv.yaml solr-nfs-data-pv.yaml; do
+          rendered="$(helm template "$SOLR_HELM_RELEASE" charts/solr-cloud \
+            --namespace "$NS" \
+            -f "$VALUES" \
+            -s "templates/${tmpl}" 2>/dev/null || true)"
+          if [ -n "$rendered" ]; then
+            echo "$rendered" | kubectl apply -f -
+          fi
+        done
+        HELM_EXTRA=()
+        case "${FORCE_CONFLICTS:-}" in
+          1|true|yes) HELM_EXTRA+=(--force-conflicts) ;;
+        esac
+        helm upgrade --install "$SOLR_HELM_RELEASE" charts/solr-cloud \
+          --namespace "$NS" \
+          -f "$VALUES" \
+          --create-namespace=false \
+          "${HELM_EXTRA[@]}"
+
+  uninstall-solrcloud:
+    desc: Uninstall solr-cloud Helm release {RELEASE}-{ENV} from namespace {RELEASE}-{ENV}-solrcloud
+    cmds:
+      - |
+        set -euo pipefail
+        kubectx "${K8S_CONTEXT}"
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        SOLR_HELM_RELEASE="${SOLR_HELM_RELEASE:-${RELEASE}-${ENV}}"
+        NS="${RELEASE}-${ENV}-solrcloud"
+        helm uninstall "$SOLR_HELM_RELEASE" --namespace "$NS"
+
+  fix-solrcloud-zk-pvcs:
+    desc: |
+      Fix ZK PVCs stuck Pending (operator created them without volumeName).
+      Deletes broken Pending PVCs and re-applies Helm NFS PV/PVC manifests.
+    cmds:
+      - |
+        set -euo pipefail
+        kubectx "${K8S_CONTEXT}"
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        SOLR_HELM_RELEASE="${SOLR_HELM_RELEASE:-${RELEASE}-${ENV}}"
+        NS="${RELEASE}-${ENV}-solrcloud"
+        VALUES="charts/solr-cloud/values-${ENV}.yaml"
+        for i in 0 1 2; do
+          PVC="data-${SOLR_HELM_RELEASE}-solrcloud-zookeeper-${i}"
+          VN="$(kubectl get pvc "$PVC" -n "$NS" -o jsonpath='{.spec.volumeName}' 2>/dev/null || true)"
+          PHASE="$(kubectl get pvc "$PVC" -n "$NS" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+          if [ "$PHASE" = "Pending" ] && [ -z "$VN" ]; then
+            echo "Deleting broken PVC $PVC (Pending, no volumeName)"
+            kubectl delete pvc "$PVC" -n "$NS" --wait=true
+          elif [ -n "$VN" ]; then
+            echo "OK: $PVC bound to $VN"
+          else
+            echo "Skip: $PVC (phase=${PHASE:-missing})"
+          fi
+        done
+        helm template "$SOLR_HELM_RELEASE" charts/solr-cloud \
+          --namespace "$NS" \
+          -f "$VALUES" \
+          -s templates/zk-nfs-data-pv.yaml | kubectl apply -f -
+        echo "Recreate ZK pods if needed: kubectl delete pod -n $NS -l app=${SOLR_HELM_RELEASE}-solrcloud-zookeeper"
 
   uninstall:
     desc: Remove the Atlas web app Helm release from the namespace
@@ -414,7 +500,7 @@ tasks:
         fi
 
   open-solr:
-    desc: Open Solr admin UI (NodePort; ENV must match solr-cloud helm release, e.g. ENV=staging)
+    desc: Open Solr admin UI (NodePort; uses Helm release {RELEASE}-{ENV}, e.g. ENV=staging → gxa-staging-solrcloud-nodeport)
     deps: [init-k8s]
     cmds:
       - |
