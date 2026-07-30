@@ -5,8 +5,8 @@ metadata:
   labels:
     {{- include "app.labels" . | nindent 4 }}
 data:
-  HTTP_PROXY: "http://hx-wwwcache.ebi.ac.uk:3128"
-  HTTPS_PROXY: "http://hx-wwwcache.ebi.ac.uk:3128"
-  PROXY_HOST: "hx-wwwcache.ebi.ac.uk"
+  HTTP_PROXY: "http://hh-wwwcache.ebi.ac.uk:3128"
+  HTTPS_PROXY: "http://hh-wwwcache.ebi.ac.uk:3128"
+  PROXY_HOST: "hh-wwwcache.ebi.ac.uk"
   PROXY_PORT: "3128"
   NO_PROXY: "localhost,127.0.0.1,*.cluster.local,*.svc,*.svc.cluster.local"
