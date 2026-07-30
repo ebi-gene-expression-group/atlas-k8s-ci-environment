@@ -58,3 +58,101 @@ Other useful examples: `task deploy-test`, `task open-solr ENV=staging`, `task p
 
 - customize deployments by editing the respective `values-<env>.yaml` files
 - passowrds (jdbc, tomcat deployer, etc.) can be configured in `.secrets-<env>.yaml`
+
+### Adding a new deploy environment
+
+Use a short environment name (e.g. `ci`, `staging`, `prod`). The Helm release deploys to namespace **`gxa-<env>`** (e.g. `gxa-ci`). SolrCloud, if used, lives in **`gxa-<env>-solrcloud`**.
+
+Scaffold chart values locally first:
+
+```bash
+scripts/create-env.sh <env>          # creates charts/gxa/values-<env>.yaml
+# edit charts/gxa/values-<env>.yaml and charts/gxa/.secrets-<env>.yaml (gitignored)
+```
+
+Then complete these four Jenkins / cluster steps before deploying from the pipeline.
+
+#### 1. DevOps Portal environment
+
+The deploy pipeline records deployments via `reportDeployOperation`. The `targetService` must match an environment label in **Jenkins → DevOps Portal → Manage Environments**.
+
+For GXA, the label is **`gxa-<env>`** (same as the Kubernetes namespace), e.g. `gxa-ci`, `gxa-staging`.
+
+Add that label in DevOps Portal before the first non–dry-run deploy to the new environment.
+
+#### 2. Jenkins secrets credential
+
+The pipeline loads secrets with credential id **`gxa-secrets-<env>`** (see `Jenkinsfile`).
+
+In Jenkins (**Manage Credentials**), create a **Secret file** credential:
+
+| Field | Value |
+| --- | --- |
+| ID | `gxa-secrets-<env>` (e.g. `gxa-secrets-ci`) |
+| File | YAML with the same structure as `charts/gxa/.secrets-<env>.yaml` |
+
+Typical keys (set only what the values file needs):
+
+```yaml
+postgresql:
+  superuserPassword: "..."
+  atlasprd3Password: "..."
+  atlasdataloadPassword: "..."
+  populate:
+    source:
+      password: "..."   # if using postgresql.populate
+jdbc:
+  password: "..."
+solr:
+  password: "..."
+tomcat:
+  deployerPassword: "..."
+  curatorPassword: "..."
+imagePullSecret:
+  create: yes
+  username: "..."
+  password: "..."
+```
+
+Copy from an existing environment’s local `.secrets-*.yaml` as a template. Do not commit secrets to git.
+
+#### 3. Jenkinsfile parameter
+
+Add the new name to the `ENV` choice list in [`Jenkinsfile`](Jenkinsfile):
+
+```groovy
+choice(
+  name: 'ENV',
+  choices: [
+    'ci',
+    'staging',
+    '<env>',   // add here
+    'prod',
+  ],
+  ...
+)
+```
+
+Push the change, then run **Build Now** once on the pipeline job so Jenkins refreshes the parameter list (the UI caches the previous definition until a build runs).
+
+The pipeline also requires `charts/gxa/values-<env>.yaml` to exist; it fails validation if missing.
+
+#### 4. Kubernetes deploy Role
+
+Jenkins deploys as service account **`jenkins-cloud`** in namespace **`gxa-jenkins`**. It needs a **Role** and **RoleBinding** in the target namespace **`gxa-<env>`**.
+
+Copy the `jenkins-gxa-deploy` Role + RoleBinding block for an existing environment in [`jenkins/fg-public-agent-rbac.yaml`](jenkins/fg-public-agent-rbac.yaml) (see `gxa-staging` or `gxa-ci`), change the namespace and `atlas.ebi.ac.uk/target-namespace` label to `gxa-<env>`, then apply:
+
+```bash
+kubectl --context=fg-public apply -f jenkins/fg-public-agent-rbac.yaml
+```
+
+Verify:
+
+```bash
+kubectl get role,rolebinding -n gxa-<env> -l atlas.ebi.ac.uk/jenkins-role=deploy
+```
+
+If you deploy SolrCloud to Jenkins as well, repeat the same Role/RoleBinding pattern in **`gxa-<env>-solrcloud`** (or create that namespace and RBAC before `task deploy-solrcloud`).
+
+Ensure namespace **`gxa-<env>`** exists (the pipeline uses `helm upgrade --install ... --create-namespace`, but namespace creation may require cluster-admin; creating the namespace ahead of time avoids that).

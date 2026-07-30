@@ -47,5 +47,6 @@ Created ${TARGET_FILE}
 
 Next steps:
 - Review and update JDBC, Solr, and experiment settings in the new file.
-- Deploy with: RELEASE=${RELEASE} ENV=${ENV_NAME} make deploy
+- Deploy Solr: task deploy-solrcloud ENV=${ENV_NAME}
+- Deploy webapp: task deploy ENV=${ENV_NAME}
 EOF
