@@ -19,6 +19,14 @@
 		},
 		{
 			"path": "../wf-bulk-indexing"
+		},
+
+		{
+			"path": "../annotare-ng"
+		},
+		{
+			"name": "fenix-submissions-ui",
+			"path": "../fenix-submissions-ui"
 		}
 	],
 	"settings": {
@@ -27,7 +35,7 @@
 		"makefile.configureOnOpen": false,
 		"nextflow.telemetry.enabled": true,
 		"java.compile.nullAnalysis.mode": "automatic",
-		"java.configuration.updateBuildConfiguration": "interactive",
+		"java.configuration.updateBuildConfiguration": "disabled",
 		"java.configuration.runtimes": [
 			{
 				"name": "JavaSE-11",
@@ -35,6 +43,7 @@
 				"default": true
 			}
 		],
+		"python.terminal.useEnvFile": true,
 		"java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
 		"openctx.enable": false,
 		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
