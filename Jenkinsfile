@@ -5,7 +5,7 @@ pipeline {
       choices: [
         'ci',
         'staging',
-         'prod'
+        'prod'
       ],
       description: 'Target environment (namespace: gxa-<env>). Requires charts/gxa/values-<env>.yaml.'
     )
@@ -27,8 +27,9 @@ pipeline {
   }
 
   options {
-    buildDiscarder(logRotator(numToKeepStr: '20'))
+    buildDiscarder(logRotator(numToKeepStr: '40'))
     disableConcurrentBuilds()
+    timeout(time: 10, unit: 'MINUTES')
   }
 
   agent {
