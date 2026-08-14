@@ -1,0 +1,7 @@
+# values for solr-cloud fallback env (hx-wp-webadmin-25 / fg-fallback)
+environment: fallback
+
+solr:
+  resources:
+    requests:
+      cpu: "1"

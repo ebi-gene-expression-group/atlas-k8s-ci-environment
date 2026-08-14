@@ -1,0 +1,43 @@
+# values for gxa public env (hh-wp-webadmin-35 / fg-public)
+environment: public
+
+tomcat:
+  createSecret: true
+  debug:
+    enabled: false
+
+loggingLevel: INFO
+
+jdbc:
+  url: "jdbc:postgresql://pgsql-dlvmpub2-023.ebi.ac.uk:5432/gxpatlaspub"
+  user: atlasprd3
+  pool: gxa
+  createSecret: true
+
+# Stream staging PG into the public external PG (one-shot Job).
+# Passwords: postgresql.populate.source.password + target.password in .secrets-public.yaml.
+# Requires firewall access from the cluster to both hosts:5432.
+# To re-run: kubectl -n gxa-public delete job gxa-pg-populate && redeploy.
+postgresql:
+  populate:
+    enabled: false
+    source:
+      host: pgsql-hlvm-147.ebi.ac.uk
+      port: 5432
+      database: gxpatlaspro
+      user: atlasprd3
+    target:
+      host: pgsql-dlvmpub2-023.ebi.ac.uk
+      port: 5432
+      database: gxpatlaspro
+      user: atlasdataload
+
+solr:
+  namespace: gxa-public-solrcloud
+  user: admin
+  createSecret: true
+
+# Pull secret is mirrored from platform-secrets (do not let Helm recreate it).
+imagePullSecret:
+  create: false
+  name: gxa-registry

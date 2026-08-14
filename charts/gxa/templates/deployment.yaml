@@ -205,7 +205,8 @@ spec:
         - name: expdesign-volume
           nfs:
             server: {{ .Values.nfs.server }}
-            path: /ifs/public/services/fg/atlas/environments/{{ .Values.environment }}/expdesign
+            {{- /* Override with nfs.expdesignPath when env dir name differs (e.g. public has expdesigns). */}}
+            path: {{ .Values.nfs.expdesignPath | default (printf "/ifs/public/services/fg/atlas/environments/%s/expdesign" .Values.environment) }}
             readOnly: true
         - name: experiments-snapshot
           emptyDir: {}

@@ -1,10 +1,28 @@
-{{- if and .Values.postgresql.enabled .Values.postgresql.populate.enabled }}
+{{- if .Values.postgresql.populate.enabled }}
 {{- /*
   Plain (non-hook) Job: helm does not wait on it, so a large load does not block
   or fail the release. It streams pg_dump from the source straight into psql on
-  the target (no intermediate .sql file). Runs once; to re-populate, delete this
-  Job and re-deploy (or `kubectl delete job {{ include "app.fullname" . }}-pg-populate`).
+  the target (no intermediate .sql file). Target is either the in-cluster
+  PostgreSQL (postgresql.enabled) or an explicit populate.target.* / jdbc-derived
+  external host. Runs once; to re-populate, delete this Job and re-deploy
+  (or `kubectl delete job {{ include "app.fullname" . }}-pg-populate`).
 */}}
+{{- $tgtHost := .Values.postgresql.populate.target.host | default "" }}
+{{- $tgtPort := .Values.postgresql.populate.target.port | default "" }}
+{{- $tgtDb := .Values.postgresql.populate.target.database | default "" }}
+{{- $tgtUser := .Values.postgresql.populate.target.user | default "atlasdataload" }}
+{{- if and (empty $tgtHost) .Values.postgresql.enabled }}
+  {{- $tgtHost = include "app.postgresqlHost" . }}
+  {{- $tgtPort = .Values.postgresql.service.port | toString }}
+  {{- $tgtDb = .Values.postgresql.database }}
+{{- end }}
+{{- if empty $tgtHost }}
+  {{- fail "postgresql.populate.target.host is required when populate.enabled=true and postgresql.enabled=false" }}
+{{- end }}
+{{- if empty $tgtPort }}{{ $tgtPort = "5432" }}{{ end }}
+{{- if empty $tgtDb }}
+  {{- fail "postgresql.populate.target.database is required when populate.enabled=true and postgresql.enabled=false" }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -21,6 +39,10 @@ spec:
         app.kubernetes.io/component: pg-populate
     spec:
       restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: pg-populate
           image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
@@ -40,49 +62,55 @@ spec:
                   name: {{ include "app.fullname" . }}-postgresql
                   key: SOURCE_PG_PASSWORD
             - name: TGT_HOST
-              value: {{ include "app.postgresqlHost" . | quote }}
+              value: {{ $tgtHost | quote }}
             - name: TGT_PORT
-              value: {{ .Values.postgresql.service.port | quote }}
+              value: {{ $tgtPort | quote }}
             - name: TGT_DB
-              value: {{ .Values.postgresql.database | quote }}
-            - name: ATLASDATALOAD_PASSWORD
+              value: {{ $tgtDb | quote }}
+            - name: TGT_USER
+              value: {{ $tgtUser | quote }}
+            - name: TARGET_PG_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "app.fullname" . }}-postgresql
-                  key: ATLASDATALOAD_PASSWORD
+                  key: {{ if .Values.postgresql.enabled }}ATLASDATALOAD_PASSWORD{{ else }}TARGET_PG_PASSWORD{{ end }}
             - name: DUMP_ARGS
               value: {{ .Values.postgresql.populate.dumpArgs | default "--no-owner --no-privileges --clean --if-exists" | quote }}
+            - name: GRANT_READONLY
+              value: {{ .Values.postgresql.populate.grantReadonly | default true | quote }}
           command: ["bash", "-c"]
           args:
             - |
               set -euo pipefail
               echo "Waiting for target ${TGT_HOST}:${TGT_PORT} to be ready ..."
-              until pg_isready -h "${TGT_HOST}" -p "${TGT_PORT}" -U atlasdataload -d "${TGT_DB}"; do
+              until pg_isready -h "${TGT_HOST}" -p "${TGT_PORT}" -U "${TGT_USER}" -d "${TGT_DB}"; do
                 sleep 2
               done
-              echo "Streaming pg_dump from ${SRC_HOST}:${SRC_PORT}/${SRC_DB} (as ${SRC_USER}) into ${TGT_HOST}/${TGT_DB} (as atlasdataload) ..."
+              echo "Streaming pg_dump from ${SRC_HOST}:${SRC_PORT}/${SRC_DB} (as ${SRC_USER}) into ${TGT_HOST}/${TGT_DB} (as ${TGT_USER}) ..."
               # psql (target) reads PGPASSWORD from the environment; pg_dump (source)
               # gets its own PGPASSWORD scoped to that command in the pipeline.
-              export PGPASSWORD="${ATLASDATALOAD_PASSWORD}"
+              export PGPASSWORD="${TARGET_PG_PASSWORD}"
               PGPASSWORD="${SOURCE_PG_PASSWORD}" pg_dump \
                 -h "${SRC_HOST}" -p "${SRC_PORT}" -U "${SRC_USER}" -d "${SRC_DB}" \
                 ${DUMP_ARGS} \
-                | psql -v ON_ERROR_STOP=1 -h "${TGT_HOST}" -p "${TGT_PORT}" -U atlasdataload -d "${TGT_DB}"
-              echo "Granting read-only access on restored schemas to atlasprd3 ..."
-              # The dump may create schemas beyond public (e.g. atlasprd3, atlasprd3_ref),
-              # owned by atlasdataload. Grant the read-only role USAGE + SELECT on each.
-              psql -v ON_ERROR_STOP=1 -h "${TGT_HOST}" -p "${TGT_PORT}" -U atlasdataload -d "${TGT_DB}" <<'SQL'
-              DO $$
+                | psql -v ON_ERROR_STOP=1 -h "${TGT_HOST}" -p "${TGT_PORT}" -U "${TGT_USER}" -d "${TGT_DB}"
+              if [ "${GRANT_READONLY}" = "true" ]; then
+                echo "Granting read-only access on restored schemas to atlasprd3 ..."
+                # The dump may create schemas beyond public (e.g. atlasprd3, atlasprd3_ref),
+                # owned by the load user. Grant the read-only role USAGE + SELECT on each.
+                psql -v ON_ERROR_STOP=1 -h "${TGT_HOST}" -p "${TGT_PORT}" -U "${TGT_USER}" -d "${TGT_DB}" <<SQL
+              DO \$\$
               DECLARE s text;
               BEGIN
-                FOR s IN SELECT nspname FROM pg_namespace WHERE nspowner = 'atlasdataload'::regrole LOOP
+                FOR s IN SELECT nspname FROM pg_namespace WHERE nspowner = '${TGT_USER}'::regrole LOOP
                   EXECUTE format('GRANT USAGE ON SCHEMA %I TO atlasprd3', s);
                   EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO atlasprd3', s);
                   EXECUTE format('GRANT SELECT ON ALL SEQUENCES IN SCHEMA %I TO atlasprd3', s);
                   EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT ON TABLES TO atlasprd3', s);
                 END LOOP;
-              END $$;
+              END \$\$;
               SQL
+              fi
               echo "Done."
           resources:
             {{- toYaml (.Values.postgresql.populate.resources | default dict) | nindent 12 }}

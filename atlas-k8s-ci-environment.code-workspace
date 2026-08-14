@@ -48,6 +48,7 @@
 		"openctx.enable": false,
 		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
 		"sqltools.connections": [
+			
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
@@ -57,7 +58,8 @@
 				"group": "gxa vm",
 				"name": "gxa test",
 				"database": "gxpatlastst",
-				"username": "atlasprd3"
+				"username": "atlasprd3",
+				"usePassword": "SQLTools Driver Credentials"
 			},
 			{
 				"ssh": "Disabled",
@@ -68,16 +70,52 @@
 				"name": "gxa staging (vm)",
 				"group": "gxa vm",
 				"database": "gxpatlaspro",
-				"username": "atlasprd3"
+				"username": "atlasprd3",
+				"usePassword": "SQLTools Driver Credentials"
 			},
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-dlvmpub2-023.ebi.ac.uk",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"name": "gxa public r/o",
+				"group": "gxa k8s",
+				"database": "gxpatlaspub",
+				"username": "atlasprd3",
+				"usePassword": "SQLTools Driver Credentials"
+			},
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-dlvmpub2-023.ebi.ac.uk",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"name": "gxa public r/w",
+				"group": "gxa k8s",
+				"database": "gxpatlaspub",
+				"username": "atlasdataload",
+				"usePassword": "SQLTools Driver Credentials"
+			},	
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-dlvmpubfall2-019.ebi.ac.uk",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"name": "gxa fallback r/o",
+				"group": "gxa k8s",
+				"database": "gxpatlaspro",
+				"username": "atlasprd3",
+				"usePassword": "SQLTools Driver Credentials"
+			},	
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
 				"server": "pgsql-hlvm-147",
 				"port": 5432,
-				"askForPassword": true,
 				"driver": "PostgreSQL",
-				"name": "gxa staging (k8s)",
+				"name": "gxa staging r/o",
 				"group": "gxa k8s",
 				"database": "gxpatlaspro",
 				"username": "atlasprd3"

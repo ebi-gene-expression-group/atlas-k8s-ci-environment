@@ -211,7 +211,8 @@ postgresql:
       memory: "8Gi"
       cpu: "4"
   # Optional data population job: streams pg_dump from a source DB straight into
-  # psql on the in-cluster DB as atlasdataload (no intermediate file). Runs as a
+  # psql on the target (no intermediate file). Target is the in-cluster DB when
+  # postgresql.enabled, otherwise populate.target.* (external host). Runs as a
   # plain background Job (helm does not wait on it). To re-populate, delete the
   # Job ({release}-pg-populate) and re-deploy.
   populate:
@@ -223,6 +224,17 @@ postgresql:
       user: atlasprd3
       # Source DB password supplied via .secrets-<env>.yaml
       password: ""
+    # Required when postgresql.enabled=false (e.g. public/fallback external PG).
+    # Ignored when postgresql.enabled=true (target is the in-cluster Service).
+    target:
+      host: ""
+      port: 5432
+      database: ""
+      user: atlasdataload
+      # Target DB password supplied via .secrets-<env>.yaml (TARGET_PG_PASSWORD)
+      password: ""
+    # After restore, GRANT SELECT on schemas owned by the target user to atlasprd3
+    grantReadonly: true
     # pg_dump flags: portable restore under atlasdataload, idempotent re-runs
     dumpArgs: "--no-owner --no-privileges --clean --if-exists"
     backoffLimit: 1
@@ -230,3 +242,6 @@ postgresql:
 
 nfs:
   server: "hh-isi-srv-vlan1496.ebi.ac.uk"
+  # Optional full NFS path for experiment designs. Default:
+  # /ifs/public/services/fg/atlas/environments/<environment>/expdesign
+  # expdesignPath: ""

@@ -1,0 +1,38 @@
+{{- if .Values.jdbc.url }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "app.fullname" . }}-test-jdbc"
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: test-jdbc
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: jdbc-tcp-probe
+      image: busybox:1.36
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -eu
+          URL="{{ .Values.jdbc.url }}"
+          # jdbc:postgresql://host:port/db -> host + port
+          HP="${URL#jdbc:postgresql://}"
+          HP="${HP%%/*}"
+          HOST="${HP%%:*}"
+          PORT="${HP##*:}"
+          if [ -z "$HOST" ] || [ -z "$PORT" ] || [ "$HOST" = "$PORT" ]; then
+            echo "ERROR: could not parse host/port from jdbc.url=$URL" >&2
+            exit 1
+          fi
+          echo "Probing PostgreSQL TCP ${HOST}:${PORT} (from jdbc.url)"
+          if nc -z -w 5 "$HOST" "$PORT"; then
+            echo "OK: ${HOST}:${PORT} is reachable"
+            exit 0
+          fi
+          echo "FAIL: ${HOST}:${PORT} is not reachable (firewall / wrong host / network policy?)" >&2
+          exit 1
+{{- end }}

@@ -9,7 +9,7 @@ tomcat:
 loggingLevel: INFO
 
 jdbc:
-  # TODO: change when we have the new database
+  # Shared with ci (populate source): pgsql-hlvm-147
   url: "jdbc:postgresql://pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro"
   user: atlasprd3
   pool: gxa

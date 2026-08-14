@@ -1,0 +1,11 @@
+# values for solr-cloud public env (hh-wp-webadmin-35 / fg-public)
+# Same heap/memory as staging (inherit values.yaml); lower CPU request for scheduling.
+# NFS dirs: .../environments/public/{solr_data,zk_data}/gxa-public-solrcloud[-zookeeper]-{n}
+environment: public
+
+solr:
+  # Keep production-like heap/memory from values.yaml; lower CPU requests to ease
+  # scheduling on fg-public (actual Solr CPU usage on staging is typically low).
+  resources:
+    requests:
+      cpu: "1"

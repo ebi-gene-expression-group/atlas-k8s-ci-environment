@@ -21,11 +21,7 @@ postgresql:
     size: 50Gi
   populate:
     enabled: false
-    source:
-      host: pgsql-hlvm-147.ebi.ac.uk   # same DB as staging
-      port: 5432
-      database: gxpatlaspro
-      user: atlasprd3
+
 
 jdbc:
   # url omitted -> auto-derives to the in-cluster Service (see app.jdbcUrl)

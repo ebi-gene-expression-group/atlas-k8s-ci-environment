@@ -1,0 +1,20 @@
+# values for gxa fallback env (hx-wp-webadmin-25 / fg-fallback)
+environment: fallback
+
+tomcat:
+  createSecret: true
+  debug:
+    enabled: false
+
+loggingLevel: INFO
+
+jdbc:
+  url: "jdbc:postgresql://pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspro"
+  user: atlasprd3
+  pool: gxa
+  createSecret: true
+
+solr:
+  namespace: gxa-fallback-solrcloud
+  user: admin
+  createSecret: true
