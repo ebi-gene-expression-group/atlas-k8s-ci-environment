@@ -105,9 +105,10 @@ data-<release>-solrcloud-zookeeper-<ordinal>.
 {{- if $nfsData.basePath -}}
 {{- $nfsData.basePath -}}
 {{- else -}}
+{{- $publicPath := .Values.nfs.publicPath -}}
 {{- $base := required "nfs.environmentsBase is required when solr.storage.nfsData is enabled without basePath" .Values.nfs.environmentsBase -}}
 {{- $env := required "environment is required when solr.storage.nfsData is enabled without basePath" .Values.environment -}}
-{{- printf "%s/%s/solr_data" $base $env -}}
+{{- printf "%s/%s/%s/solr_data" $publicPath $base $env -}}
 {{- end -}}
 {{- end }}
 
@@ -134,8 +135,9 @@ data-<release>-solrcloud-zookeeper-<ordinal>.
 {{- if $nfsData.basePath -}}
 {{- $nfsData.basePath -}}
 {{- else -}}
+{{- $publicPath := .Values.nfs.publicPath -}}
 {{- $base := required "nfs.environmentsBase is required when zookeeper.storage.nfsData is enabled without basePath" .Values.nfs.environmentsBase -}}
 {{- $env := required "environment is required when zookeeper.storage.nfsData is enabled without basePath" .Values.environment -}}
-{{- printf "%s/%s/zk_data" $base $env -}}
+{{- printf "%s/%s/%s/zk_data" $publicPath $base $env -}}
 {{- end -}}
 {{- end }}

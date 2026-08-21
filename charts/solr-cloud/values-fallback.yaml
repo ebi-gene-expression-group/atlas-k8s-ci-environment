@@ -1,7 +1,11 @@
-# values for solr-cloud fallback env (hx-wp-webadmin-25 / fg-fallback)
+# values for solr-cloud fallback env (hx-wp-webadmin-121 / fg-fallback)
 environment: fallback
 
 solr:
   resources:
     requests:
       cpu: "1"
+
+nfs:
+  server: "hx-isi-srv-vlan157.ebi.ac.uk"
+  publicPath: /ifs/public-r

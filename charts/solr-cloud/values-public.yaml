@@ -1,9 +1,13 @@
 # values for solr-cloud public env (hh-wp-webadmin-35 / fg-public)
 # Same heap/memory as staging (inherit values.yaml); lower CPU request for scheduling.
-# NFS dirs: .../environments/public/{solr_data,zk_data}/gxa-public-solrcloud[-zookeeper]-{n}
+# NFS dirs: .../environments/public/{solr_data,zk_data}/ with gxa-solrcloud-{n} (not gxa-public-*).
 environment: public
 
 solr:
+  storage:
+    nfsData:
+      # Migrated Isilon symlinks are gxa-solrcloud-{n} (from release "gxa"), not gxa-public-solrcloud-{n}.
+      dataDirPrefix: gxa
   # Keep production-like heap/memory from values.yaml; lower CPU requests to ease
   # scheduling on fg-public (actual Solr CPU usage on staging is typically low).
   resources:

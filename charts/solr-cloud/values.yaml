@@ -84,7 +84,8 @@ service:
 nfs:
   server: hh-isi-srv-vlan1496.ebi.ac.uk
   # /ifs/public/rw/fg/atlas/gxa/environments/<environment>/{solr_data,zk_data}/<pod-name>/
-  environmentsBase: /ifs/public/rw/fg/atlas/gxa/environments
+  publicPath: /ifs/public
+  environmentsBase: rw/fg/atlas/gxa/environments
   # Used only when nfsData.mode is pv (pod-mode NFS has no mountOptions in the pod spec).
   mountOptions:
     - hard
