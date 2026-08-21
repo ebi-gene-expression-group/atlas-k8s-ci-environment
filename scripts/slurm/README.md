@@ -40,4 +40,11 @@ sbatch --job-name=gxa-rsync-zk \
 
 Progress uses `--info=progress2` (overall %, not per-file).
 
-After both finish: create `gxa-public-*` symlinks and rewrite `zoo.cfg.dynamic*` hostnames before redeploying SolrCloud.
+After both finish, stop destination ZK/Solr, then rewrite names (creates `gxa-public-*` ZK links and replaces `gxa-staging-solrcloud` in `zoo.cfg.dynamic*`):
+
+```bash
+# On Codon (NFS at /nfs/public/...)
+SRC=staging DST=public ./scripts/slurm/rewrite-gxa-zk-env-names.sh
+```
+
+Then redeploy SolrCloud. Script: [`rewrite-gxa-zk-env-names.sh`](rewrite-gxa-zk-env-names.sh).
