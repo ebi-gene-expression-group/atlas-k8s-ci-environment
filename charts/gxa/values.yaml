@@ -240,8 +240,10 @@ postgresql:
     backoffLimit: 1
     resources: {}
 
+# see https://embl.service-now.com/esc?id=kb_article&sysparm_article=KB0011170
 nfs:
   server: "hh-isi-srv-vlan1496.ebi.ac.uk"
+  publicPath: /ifs/public
   # Optional full NFS path for experiment designs. Default:
   # /ifs/public/services/fg/atlas/environments/<environment>/expdesign
   # expdesignPath: ""

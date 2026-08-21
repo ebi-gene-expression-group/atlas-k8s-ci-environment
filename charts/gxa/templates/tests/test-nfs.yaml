@@ -73,14 +73,14 @@ spec:
     - name: codon-volume
       nfs:
         server: {{ .Values.nfs.server }}
-        path: /ifs/public/ro/gxa_codon
+        path: {{ .Values.nfs.publicPath }}/ro/gxa_codon
     - name: services-volume
       nfs:
         server: {{ .Values.nfs.server }}
-        path: /ifs/public/services
+        path: {{ .Values.nfs.publicPath }}/services
     - name: expdesign-volume
       nfs:
         server: {{ .Values.nfs.server }}
-        path: {{ .Values.nfs.expdesignPath | default (printf "/ifs/public/services/fg/atlas/environments/%s/expdesign" .Values.environment) }}
+        path: {{ .Values.nfs.expdesignPath | default (printf "%s/services/fg/atlas/environments/%s/expdesign" .Values.nfs.publicPath .Values.environment) }}
         readOnly: true
 {{- end }}

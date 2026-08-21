@@ -18,3 +18,12 @@ solr:
   namespace: gxa-fallback-solrcloud
   user: admin
   createSecret: true
+
+# see https://embl.service-now.com/esc?id=kb_article&sysparm_article=KB0011170
+nfs:
+  server: "hx-isi-srv-vlan157.ebi.ac.uk"
+  publicPath: /ifs/public-r
+
+# hpa not supported on k8s 1.18 (the version of cluster 25)
+autoscaling:
+  enabled: false
