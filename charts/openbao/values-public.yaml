@@ -1,0 +1,70 @@
+# OpenBao on fg-public (hh-wp-webadmin-35).
+# Standalone (file storage, 1 replica) — not HA. Unseal keys live in
+# .secrets-init-public.yaml (gitignored); store a copy off-cluster.
+#
+# Agent Injector / CSI / auth-delegator stay off: team-admin cannot create
+# ClusterRoleBindings or MutatingWebhookConfigurations.
+
+global:
+  enabled: true
+  tlsDisable: true
+
+injector:
+  enabled: false
+
+csi:
+  enabled: false
+
+server:
+  image:
+    registry: quay.io
+    repository: openbao/openbao
+    tag: "2.6.1"
+    pullPolicy: IfNotPresent
+
+  extraLabels:
+    team: fg
+    app: openbao
+
+  # fg-public has no direct egress. Google OIDC discovery/token exchange
+  # must go through the EBI wwwcache (same as GXA). Chart uppercases keys;
+  # Go's HTTP client reads HTTP_PROXY / HTTPS_PROXY / NO_PROXY.
+  extraEnvironmentVars:
+    HTTP_PROXY: http://hh-wwwcache.ebi.ac.uk:3128
+    HTTPS_PROXY: http://hh-wwwcache.ebi.ac.uk:3128
+    NO_PROXY: localhost,127.0.0.1,.cluster.local,.svc,.svc.cluster.local
+
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+  authDelegator:
+    enabled: false
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    # TLS is terminated in front of the cluster (EBI wildcard). Ingress stays HTTP.
+    hosts:
+      - host: openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+        paths: []
+    tls: []
+
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    storageClass: standard-nfs-production
+    accessMode: ReadWriteOnce
+
+  standalone:
+    enabled: true
+
+  ha:
+    enabled: false
+
+ui:
+  enabled: true

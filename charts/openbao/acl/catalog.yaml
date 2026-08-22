@@ -1,0 +1,156 @@
+# OpenBao ACL catalog (no secret values). Applied by: task openbao-apply-acl
+# Values: charts/gxa/.secrets-<env>.yaml (and optional .secrets-kv-public.yaml)
+# OIDC client: charts/openbao/.secrets-oidc-public.yaml (gitignored)
+#
+# KV path: kv/data/<service>/<environment>/<class>/<name>  (apps)
+#          kv/data/<service>/<cluster-server>/<class>/<name>  (cluster-scoped, e.g. kubeconfig)
+# Cluster server = kubeconfig clusters[].cluster.server host (no scheme/port).
+
+environments: [test, ci, staging, public, fallback]
+# kubeconfig clusters[].cluster.server host, no scheme/port (more than one "public" cluster).
+clusters:
+  - hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+  - hx-wp-webadmin-25.wp-k8s.ebi.ac.uk
+classes: [app, ops]
+
+# Per-service Kubernetes namespaces for each environment (where known).
+services:
+  gxa:
+    namespaces:
+      test: gxa-test
+      ci: gxa-ci
+      staging: gxa-staging
+      public: gxa-public
+      fallback: gxa-fallback
+  fenix: {}
+  annotare: {}
+  fg-search: {}
+  boarding-pass: {}
+  k8s:
+    scope: cluster
+
+auth:
+  oidc:
+    # UI tab label is the mount path (spaces are not allowed). Description is EMBL-EBI Login.
+    path: embl-ebi
+    display_name: EMBL-EBI Login
+    provider: google
+    hosted_domains: [ebi.ac.uk]
+    ui_url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+    redirect_uris:
+      - https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/auth/embl-ebi/oidc/callback
+      - http://localhost:8250/oidc/callback
+
+groups:
+  fg:
+    display_name: Functional Genomics
+    services: [gxa, fenix, annotare, fg-search, boarding-pass, k8s]
+    roles:
+      viewer:
+        grants:
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read] }
+      developer:
+        grants:
+          - { environments: [test, ci, staging], classes: [app, ops], access: [read, write] }
+          - { environments: [public, fallback], classes: [app], access: [read] }
+      operator:
+        grants:
+          - { environments: [test, ci, staging, public, fallback], classes: [app, ops], access: [read, write] }
+          - { clusters: [hh-wp-webadmin-35.wp-k8s.ebi.ac.uk, hx-wp-webadmin-25.wp-k8s.ebi.ac.uk], classes: [ops], access: [read, write] }
+  its:
+    display_name: ITS Applications
+    services: []
+    roles:
+      viewer:
+        grants: []
+      developer:
+        grants: []
+      operator:
+        grants: []
+      admin:
+        grants:
+          - { all_kv: true, access: [read] }
+
+# Memberships without services apply the role to every service in the group.
+# Optional services: restrict that role to named services (gxa vs annotare, etc.).
+users:
+  amnon:
+    email: amnon@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator }
+  cernst:
+    email: cernst@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer }
+  anilthanki:
+    email: anilthanki@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [gxa] }
+  sands:
+    email: sands@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa] }
+  haber:
+    email: haber@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa] }
+  sandeepkurri:
+    email: sandeepkurri@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa] }
+      - { group: fg, role: operator, services: [annotare] }
+  schellhaass:
+    email: schellhaass@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa] }
+  irisyu:
+    email: irisyu@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [gxa] }
+  jcmarca:
+    email: jcmarca@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [annotare] }
+  sfexova:
+    email: sfexova@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [annotare] }
+  docana:
+    email: docana@ebi.ac.uk
+    memberships:
+      - { group: its, role: admin }
+  portert:
+    email: portert@ebi.ac.uk
+    memberships:
+      - { group: its, role: admin }
+
+# Expanded by the apply script into kv/data/<service>/<environment>/<class>/<name>
+secret_sets:
+  - service: gxa
+    environments: [test, ci, staging, public, fallback]
+    secrets:
+      - { class: app, name: jdbc, description: "Webapp DB user atlasprd3" }
+      - { class: app, name: solr, description: "Webapp Solr" }
+      - { class: ops, name: tomcat-deployer, description: "Tomcat manager-script" }
+      - { class: ops, name: tomcat-curator, description: "Tomcat admin" }
+      - { class: ops, name: nginx-cache-purge, description: "Sidecar nginx cache purge (Basic auth)" }
+      - { class: ops, name: postgres-atlasdataload, description: "Data-load DB user + password" }
+  - service: gxa
+    environments: [ci]
+    secrets:
+      - { class: ops, name: postgres-superuser, description: "In-cluster Postgres superuser" }
+  - service: annotare
+    environments: [public]
+    secrets:
+      - { class: app, name: jdbc, description: "Annotare PROD MySQL annotare2 (user annotare)" }
+      - { class: app, name: jdbc-readonly, description: "Annotare PROD MySQL annotare2 (user readonly)" }
+  - service: annotare
+    environments: [test]
+    secrets:
+      - { class: app, name: jdbc, description: "Annotare DEV MySQL ae_annotare2 (user annotare)" }
+  - service: k8s
+    clusters:
+      - hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+      - hx-wp-webadmin-25.wp-k8s.ebi.ac.uk
+    secrets:
+      - { class: ops, name: kubeconfig, description: "kubectl kubeconfig (multiline field config)" }
