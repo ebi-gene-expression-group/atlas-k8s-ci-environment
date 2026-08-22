@@ -1,0 +1,528 @@
+# Gene Expression Atlas — Backstage catalog (spike).
+# One Component per env: Links for one-click access; dependsOn → Resources (Postgres/Solr/NFS).
+# NFS server from charts/gxa/values.yaml and charts/solr-cloud/values.yaml (nfs.server).
+# Topology source: config/gxa-environments.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: fg_team
+  title: Functional Genomics
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: gxa
+  title: Gene Expression Atlas
+  description: GXA webapp + SolrCloud + Postgres across ci / staging / public / fallback
+spec:
+  owner: fg_team
+---
+# JSON HTTP API provided by the GXA webapp (context path /gxa).
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: gxa-json
+  title: GXA JSON API
+  description: >
+    GXA endpoints under /gxa —
+    JSON experiments list/detail, health, build info, and experiment zip download.
+  tags:
+    - gxa
+    - json
+  annotations:
+    # Enables the catalog table "View" action (opens this URL).
+    backstage.io/view-url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa/json/experiments
+spec:
+  type: openapi
+  lifecycle: production
+  owner: fg_team
+  system: gxa
+  definition: |
+    openapi: 3.0.3
+    info:
+      title: GXA JSON API
+      version: "1.0"
+      description: Gene Expression Atlas endpoints (served under context path /gxa).
+    servers:
+      - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa
+        description: public (hh-wp-webadmin-35)
+      - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa
+        description: staging (hh-wp-webadmin-35)
+      - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa
+        description: ci (hh-wp-webadmin-35)
+      - url: http://hx-rke-wp-webadmin-25-worker-1.caas.ebi.ac.uk:31622/gxa
+        description: fallback (hx-wp-webadmin-25)
+    paths:
+      /json/experiments:
+        get:
+          summary: List experiments
+          operationId: listExperiments
+          responses:
+            "200":
+              description: Experiment list JSON
+      /json/experiments/{accession}:
+        get:
+          summary: Experiment by accession
+          operationId: getExperiment
+          parameters:
+            - name: accession
+              in: path
+              required: true
+              schema:
+                type: string
+          responses:
+            "200":
+              description: Experiment JSON
+      /experiments/download/zip:
+        get:
+          summary: Download experiments as zip
+          operationId: downloadExperimentsZip
+          description: >
+            Download one or more experiments as a zip archive.
+            Repeat the accession query parameter for each accession
+            (e.g. ?accession=E-MTAB-1&accession=E-MTAB-2).
+          parameters:
+            - name: accession
+              in: query
+              required: true
+              description: Experiment accession(s); repeat for multiple
+              schema:
+                type: array
+                items:
+                  type: string
+                minItems: 1
+              style: form
+              explode: true
+          responses:
+            "200":
+              description: Zip archive of experiment files
+              content:
+                application/zip:
+                  schema:
+                    type: string
+                    format: binary
+      /json/health:
+        get:
+          summary: Health check
+          operationId: health
+          responses:
+            "200":
+              description: Healthy
+      /json/build:
+        get:
+          summary: Build / version info
+          operationId: build
+          responses:
+            "200":
+              description: Build metadata JSON
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gxa-ci
+  title: GXA (ci)
+  description: Namespace gxa-ci on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - gxa
+    - ci
+  annotations:
+    ebi.ac.uk/gxa-environment: ci
+    backstage.io/view-url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa
+  links:
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa
+      title: Webapp (Home)
+      icon: dashboard
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa/json/health
+      title: API — /json/health
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa/json/build
+      title: API — /json/build
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa/json/experiments
+      title: API — /json/experiments
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30996/solr/
+      title: Solr Admin
+      icon: catalog
+    - url: postgresql://pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro
+      title: "Postgres — pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro (atlasprd3)"
+      icon: storage
+    - url: nfs://hh-isi-srv-vlan1496.ebi.ac.uk/ifs/public/rw/fg/atlas/gxa/environments
+      title: "NFS — hh-isi-srv-vlan1496.ebi.ac.uk"
+      icon: storage
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/Bulk%20Expression%20Atlas%20-%20Develop/
+      title: Jenkins — Build (Develop)
+      icon: catalog
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
+      title: Jenkins — Deploy
+      icon: catalog
+spec:
+  type: website
+  lifecycle: ci
+  owner: fg_team
+  system: gxa
+  providesApis:
+    - gxa-json
+  dependsOn:
+    - resource:default/gxa-ci-postgres
+    - resource:default/gxa-ci-solrcloud
+    - resource:default/gxa-nfs
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gxa-staging
+  title: GXA (staging)
+  description: Namespace gxa-staging on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - gxa
+    - staging
+  annotations:
+    ebi.ac.uk/gxa-environment: staging
+    backstage.io/view-url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa
+  links:
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa
+      title: Webapp (Home)
+      icon: dashboard
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa/json/health
+      title: API — /json/health
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa/json/build
+      title: API — /json/build
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa/json/experiments
+      title: API — /json/experiments
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30799/solr/
+      title: Solr Admin
+      icon: catalog
+    - url: postgresql://pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro
+      title: "Postgres — pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro (atlasprd3)"
+      icon: storage
+    - url: nfs://hh-isi-srv-vlan1496.ebi.ac.uk/ifs/public/rw/fg/atlas/gxa/environments
+      title: "NFS — hh-isi-srv-vlan1496.ebi.ac.uk"
+      icon: storage
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/Bulk%20Expression%20Atlas%20-%20Develop/
+      title: Jenkins — Build (Develop)
+      icon: catalog
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
+      title: Jenkins — Deploy
+      icon: catalog
+spec:
+  type: website
+  lifecycle: staging
+  owner: fg_team
+  system: gxa
+  providesApis:
+    - gxa-json
+  dependsOn:
+    - resource:default/gxa-staging-postgres
+    - resource:default/gxa-staging-solrcloud
+    - resource:default/gxa-nfs
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gxa-public
+  title: GXA (public)
+  description: Namespace gxa-public on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - gxa
+    - public
+  annotations:
+    ebi.ac.uk/gxa-environment: public
+    backstage.io/view-url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa
+  links:
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa
+      title: Webapp (Home)
+      icon: dashboard
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa/json/health
+      title: API — /json/health
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa/json/build
+      title: API — /json/build
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa/json/experiments
+      title: API — /json/experiments
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31363/solr/
+      title: Solr Admin
+      icon: catalog
+    - url: postgresql://pgsql-dlvmpub2-023.ebi.ac.uk:5432/gxpatlaspub
+      title: "Postgres — pgsql-dlvmpub2-023.ebi.ac.uk:5432/gxpatlaspub (atlasprd3)"
+      icon: storage
+    - url: nfs://hh-isi-srv-vlan1496.ebi.ac.uk/ifs/public/rw/fg/atlas/gxa/environments
+      title: "NFS — hh-isi-srv-vlan1496.ebi.ac.uk"
+      icon: storage
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/Bulk%20Expression%20Atlas%20-%20Develop/
+      title: Jenkins — Build (Develop)
+      icon: catalog
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
+      title: Jenkins — Deploy
+      icon: catalog
+spec:
+  type: website
+  lifecycle: public
+  owner: fg_team
+  system: gxa
+  providesApis:
+    - gxa-json
+  dependsOn:
+    - resource:default/gxa-public-postgres
+    - resource:default/gxa-public-solrcloud
+    - resource:default/gxa-nfs
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gxa-fallback
+  title: GXA (fallback)
+  description: Namespace gxa-fallback on hx-wp-webadmin-121 (fg-fallback).
+  tags:
+    - gxa
+    - fallback
+  annotations:
+    ebi.ac.uk/gxa-environment: fallback
+    backstage.io/view-url: http://hx-rke-wp-webadmin-121-worker-1.caas.ebi.ac.uk:30720/gxa
+  links:
+    - url: http://hx-rke-wp-webadmin-121-worker-1.caas.ebi.ac.uk:30720/gxa
+      title: Webapp (Home)
+      icon: dashboard
+    - url: http://hx-rke-wp-webadmin-121-worker-1.caas.ebi.ac.uk:30720/gxa/json/health
+      title: API — /json/health
+      icon: catalog
+    - url: http://hx-rke-wp-webadmin-121-worker-1.caas.ebi.ac.uk:30720/gxa/json/build
+      title: API — /json/build
+      icon: catalog
+    - url: http://hx-rke-wp-webadmin-121-worker-1.caas.ebi.ac.uk:30720/gxa/json/experiments
+      title: API — /json/experiments
+      icon: catalog
+    - url: postgresql://pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspro
+      title: "Postgres — pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspro (atlasprd3)"
+      icon: storage
+    - url: nfs://hh-isi-srv-vlan1496.ebi.ac.uk/ifs/public/rw/fg/atlas/gxa/environments
+      title: "NFS — hh-isi-srv-vlan1496.ebi.ac.uk"
+      icon: storage
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/Bulk%20Expression%20Atlas%20-%20Develop/
+      title: Jenkins — Build (Develop)
+      icon: catalog
+    - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
+      title: Jenkins — Deploy
+      icon: catalog
+spec:
+  type: website
+  lifecycle: fallback
+  owner: fg_team
+  system: gxa
+  providesApis:
+    - gxa-json
+  dependsOn:
+    - resource:default/gxa-fallback-postgres
+    - resource:default/gxa-fallback-solrcloud
+    - resource:default/gxa-nfs
+---
+# Shared Isilon NFS (charts/gxa/values.yaml + charts/solr-cloud/values.yaml → nfs.server)
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-nfs
+  title: GXA NFS (Isilon)
+  description: >
+    NFS server hh-isi-srv-vlan1496.ebi.ac.uk (nfs.server in gxa and solr-cloud values).
+    Solr/ZK env data under /ifs/public/rw/fg/atlas/gxa/environments/{ci,staging,public,fallback}/…
+  tags:
+    - gxa
+    - nfs
+  annotations:
+    ebi.ac.uk/nfs-server: hh-isi-srv-vlan1496.ebi.ac.uk
+    ebi.ac.uk/nfs-environments-base: /ifs/public/rw/fg/atlas/gxa/environments
+  links:
+    - url: nfs://hh-isi-srv-vlan1496.ebi.ac.uk/ifs/public/rw/fg/atlas/gxa/environments
+      title: "hh-isi-srv-vlan1496.ebi.ac.uk:/ifs/public/rw/fg/atlas/gxa/environments"
+      icon: storage
+spec:
+  type: storage
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-ci-postgres
+  title: GXA Postgres (ci)
+  description: "host=pgsql-hlvm-147.ebi.ac.uk port=5432 db=gxpatlaspro user=atlasprd3 (shared with staging)"
+  tags:
+    - gxa
+    - ci
+  annotations:
+    ebi.ac.uk/gxa-environment: ci
+    ebi.ac.uk/db-host: pgsql-hlvm-147.ebi.ac.uk
+    ebi.ac.uk/db-port: "5432"
+    ebi.ac.uk/db-name: gxpatlaspro
+  links:
+    - url: postgresql://pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro
+      title: "pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-staging-postgres
+  title: GXA Postgres (staging)
+  description: "host=pgsql-hlvm-147.ebi.ac.uk port=5432 db=gxpatlaspro user=atlasprd3 (shared with ci)"
+  tags:
+    - gxa
+    - staging
+  annotations:
+    ebi.ac.uk/gxa-environment: staging
+    ebi.ac.uk/db-host: pgsql-hlvm-147.ebi.ac.uk
+    ebi.ac.uk/db-port: "5432"
+    ebi.ac.uk/db-name: gxpatlaspro
+  links:
+    - url: postgresql://pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro
+      title: "pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-public-postgres
+  title: GXA Postgres (public)
+  description: "host=pgsql-dlvmpub2-023.ebi.ac.uk port=5432 db=gxpatlaspub user=atlasprd3"
+  tags:
+    - gxa
+    - public
+  annotations:
+    ebi.ac.uk/gxa-environment: public
+    ebi.ac.uk/db-host: pgsql-dlvmpub2-023.ebi.ac.uk
+    ebi.ac.uk/db-port: "5432"
+    ebi.ac.uk/db-name: gxpatlaspub
+  links:
+    - url: postgresql://pgsql-dlvmpub2-023.ebi.ac.uk:5432/gxpatlaspub
+      title: "pgsql-dlvmpub2-023.ebi.ac.uk:5432/gxpatlaspub"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-fallback-postgres
+  title: GXA Postgres (fallback)
+  description: "host=pgsql-dlvmpubfall2-019.ebi.ac.uk port=5432 db=gxpatlaspro user=atlasprd3"
+  tags:
+    - gxa
+    - fallback
+  annotations:
+    ebi.ac.uk/gxa-environment: fallback
+    ebi.ac.uk/db-host: pgsql-dlvmpubfall2-019.ebi.ac.uk
+    ebi.ac.uk/db-port: "5432"
+    ebi.ac.uk/db-name: gxpatlaspro
+  links:
+    - url: postgresql://pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspro
+      title: "pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspro"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-ci-solrcloud
+  title: GXA Solr (ci)
+  description: >
+    In-cluster: gxa-ci-solrcloud-common.gxa-ci-solrcloud.svc:80.
+    NodePort admin: hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30996
+  tags:
+    - gxa
+    - ci
+  annotations:
+    ebi.ac.uk/gxa-environment: ci
+    backstage.io/kubernetes-namespace: gxa-ci-solrcloud
+  links:
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30996/solr/
+      title: Solr Admin
+      icon: catalog
+spec:
+  type: solrcloud
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-staging-solrcloud
+  title: GXA Solr (staging)
+  description: >
+    In-cluster: gxa-staging-solrcloud-common.gxa-staging-solrcloud.svc:80.
+    NodePort admin: hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30799
+  tags:
+    - gxa
+    - staging
+  annotations:
+    ebi.ac.uk/gxa-environment: staging
+    backstage.io/kubernetes-namespace: gxa-staging-solrcloud
+  links:
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30799/solr/
+      title: Solr Admin
+      icon: catalog
+spec:
+  type: solrcloud
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-public-solrcloud
+  title: GXA Solr (public)
+  description: >
+    In-cluster: gxa-public-solrcloud-common.gxa-public-solrcloud.svc:80 on hh-wp-webadmin-35.
+    NodePort admin: hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31363
+  tags:
+    - gxa
+    - public
+  annotations:
+    ebi.ac.uk/gxa-environment: public
+    backstage.io/kubernetes-namespace: gxa-public-solrcloud
+  links:
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31363/solr/
+      title: Solr Admin
+      icon: catalog
+spec:
+  type: solrcloud
+  owner: fg_team
+  system: gxa
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: gxa-fallback-solrcloud
+  title: GXA Solr (fallback)
+  description: Namespace gxa-fallback-solrcloud on hx-wp-webadmin-25 — SolrCloud NS not present yet.
+  tags:
+    - gxa
+    - fallback
+  annotations:
+    ebi.ac.uk/gxa-environment: fallback
+    backstage.io/kubernetes-namespace: gxa-fallback-solrcloud
+spec:
+  type: solrcloud
+  owner: fg_team
+  system: gxa

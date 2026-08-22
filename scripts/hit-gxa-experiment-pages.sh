@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 
 # Hit GXA experiment pages to warm caches, exercise the application and gather performance metrics.
-# Fetches experiment accessions, then requests four endpoints per experiment:
-#   HTML:  /experiments/{accession}/Results, /experiments/{accession}/Plots
-#   JSON:  /json/experiments/{accession}/resources/DATA, .../resources/PLOTS
+# Two phases (env-controlled, each loops all accessions):
+#   WARM_ACCESSIONS=1  -> warm_accessions()  — HTML + JSON resource endpoints
+#   WARM_BIOENTITIES=1 -> warm_bioentities() — experiment JSON + bioentity URLs
 #
 # Individual results: tab-separated lines written to LOG_FILE (duration_s, status, bytes, url).
 # Summary (tps, throughput, avg latency): stdout, stderr, and LOG_FILE.summary. Progress/config: stderr.
-# Config (env or .env): BASE_URL, EXPERIMENTS_JSON_URL, LIMIT, SHUFFLE, PARALLEL, SORT_OUTPUT, LOG_FILE
+# Config (env or .env): BASE_URL, EXPERIMENTS_JSON_URL, LIMIT, SHUFFLE, PARALLEL,
+#   WARM_ACCESSIONS, WARM_BIOENTITIES, PROGRESS, PROGRESS_INTERVAL, SORT_OUTPUT, LOG_FILE
+# WARM_ACCESSIONS=1 — HTML + JSON resource endpoints per accession (default)
+# WARM_BIOENTITIES=1 — /json/experiments/{accession} -> profiles.rows -> bioentity URLs (default)
 # Colors: auto when stdout is a TTY; NO_COLOR=1 disables, FORCE_COLOR=1 enables when piped
 # LOG_FILE: defaults to scripts/gxa-hit-YYYYMMDD-HHMMSS.tsv next to this script
 #
@@ -33,7 +36,11 @@ EXPERIMENTS_JSON_URL="${EXPERIMENTS_JSON_URL:-${BASE_URL}/json/experiments}"
 LIMIT="${LIMIT:-}"          # empty or 0 = all experiments
 SHUFFLE="${SHUFFLE:-1}"     # 1 = random order, 0 = catalogue order
 PARALLEL="${PARALLEL:-32}"  # max concurrent curl requests
+WARM_ACCESSIONS="${WARM_ACCESSIONS:-1}"  # 1 = HTML + JSON resource endpoints per accession
+WARM_BIOENTITIES="${WARM_BIOENTITIES:-1}"  # 1 = experiment JSON + /json/bioentity-information/{id}
 SORT_OUTPUT="${SORT_OUTPUT:-1}"
+PROGRESS="${PROGRESS:-1}"  # 1 = accession + request counts on stderr
+PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-0.5}"  # seconds between live progress updates
 CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-10}"
 MAX_TIME="${MAX_TIME:-120}"
 LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/gxa-hit-$(date +%Y%m%d-%H%M%S).tsv}"
@@ -177,6 +184,9 @@ echo "${C_DIM}EXPERIMENTS_JSON_URL:${C_RESET} $EXPERIMENTS_JSON_URL" >&2
 echo "${C_DIM}LIMIT:${C_RESET} ${LIMIT:-all}" >&2
 echo "${C_DIM}SHUFFLE:${C_RESET} $SHUFFLE" >&2
 echo "${C_DIM}PARALLEL:${C_RESET} $PARALLEL" >&2
+echo "${C_DIM}WARM_ACCESSIONS:${C_RESET} $WARM_ACCESSIONS" >&2
+echo "${C_DIM}WARM_BIOENTITIES:${C_RESET} $WARM_BIOENTITIES" >&2
+echo "${C_DIM}PROGRESS:${C_RESET} $PROGRESS" >&2
 echo "${C_DIM}HTML endpoints:${C_RESET} ${HTML_ENDPOINTS[*]}" >&2
 echo "${C_DIM}JSON endpoints:${C_RESET} ${JSON_ENDPOINTS[*]}" >&2
 echo "${C_DIM}LOG_FILE:${C_RESET} $LOG_FILE" >&2
@@ -213,14 +223,66 @@ if [[ "$SHUFFLE" == "1" ]]; then
   accessions=("${shuffled[@]}")
 fi
 
-echo "${C_BOLD}Hitting ${#accessions[@]} experiment(s), $(( ${#HTML_ENDPOINTS[@]} + ${#JSON_ENDPOINTS[@]} )) requests each${C_RESET}" >&2
+if [[ "$WARM_ACCESSIONS" != "1" && "$WARM_BIOENTITIES" != "1" ]]; then
+  echo "${C_RED}ERROR: enable WARM_ACCESSIONS and/or WARM_BIOENTITIES${C_RESET}" >&2
+  exit 1
+fi
+
+warm_plan=""
+[[ "$WARM_ACCESSIONS" == "1" ]] && warm_plan="${#HTML_ENDPOINTS[@]} HTML + ${#JSON_ENDPOINTS[@]} JSON per accession"
+[[ "$WARM_ACCESSIONS" == "1" && "$WARM_BIOENTITIES" == "1" ]] && warm_plan+=", "
+[[ "$WARM_BIOENTITIES" == "1" ]] && warm_plan+="bioentity URLs from profiles.rows"
+echo "${C_BOLD}Hitting ${#accessions[@]} experiment(s) (${warm_plan})${C_RESET}" >&2
 
 log_file="$LOG_FILE"
 mkdir -p "$(dirname "$log_file")"
 : >"$log_file"
+progress_state_file="${log_file}.progress"
+progress_watch_flag="${log_file}.watch"
+
+write_progress_state() {
+  printf '%s\t%s\n' "$acc_index" "$current_accession" >"$progress_state_file"
+}
+
+read_progress_state() {
+  acc_index=0
+  current_accession=""
+  if [[ -f "$progress_state_file" ]]; then
+    IFS=$'\t' read -r acc_index current_accession <"$progress_state_file" || true
+    acc_index="${acc_index:-0}"
+  fi
+}
+
+INTERRUPTED=0
+
+kill_background_jobs() {
+  local pid
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+  done < <(jobs -rp)
+}
+
+on_interrupt() {
+  if [[ "$INTERRUPTED" == "1" ]]; then
+    kill_background_jobs
+    exit 130
+  fi
+  INTERRUPTED=1
+  printf '\n%bInterrupted — stopping...%b\n' "$C_YELLOW" "$C_RESET" >&2
+  stop_progress_watcher
+  kill_background_jobs
+  wait 2>/dev/null || true
+  run_end=$(now_s)
+  if [[ -s "$log_file" ]]; then
+    emit_summary
+  fi
+  exit 130
+}
+
+trap on_interrupt INT TERM
 
 wait_for_slot() {
-  while true; do
+  while [[ "$INTERRUPTED" != "1" ]]; do
     active=$(jobs -rp | wc -l | tr -d ' ')
     (( active < PARALLEL )) && break
     sleep 0.05
@@ -235,18 +297,142 @@ hit_url() {
     "$1" >>"$log_file" 2>/dev/null || true
 }
 
-run_start=$(now_s)
-
-for accession in "${accessions[@]}"; do
+warm_accession_pages() {
+  local accession="$1"
+  [[ "$INTERRUPTED" == "1" ]] && return 0
+  local endpoint
   for endpoint in "${HTML_ENDPOINTS[@]}"; do
     wait_for_slot
+    [[ "$INTERRUPTED" == "1" ]] && return 0
     hit_url "${BASE_URL}/experiments/${accession}/${endpoint}" &
   done
   for endpoint in "${JSON_ENDPOINTS[@]}"; do
     wait_for_slot
+    [[ "$INTERRUPTED" == "1" ]] && return 0
     hit_url "${BASE_URL}/json/experiments/${accession}/${endpoint}" &
   done
-done
+}
+
+warm_accessions() {
+  acc_index=0
+  for accession in "${accessions[@]}"; do
+    [[ "$INTERRUPTED" == "1" ]] && break
+    current_accession="$accession"
+    ((acc_index++)) || true
+    write_progress_state
+    warm_accession_pages "$accession"
+  done
+}
+
+# Fetch experiment JSON (logged), then queue /json/bioentity-information/{id} for each profiles.rows id.
+warm_bioentity_accession() {
+  local accession="$1"
+  [[ "$INTERRUPTED" == "1" ]] && return 0
+  local experiment_json_url="${BASE_URL}/json/experiments/${accession}"
+  local tmp
+  tmp="$(mktemp)"
+
+  curl -sS -L -o "$tmp" \
+    --connect-timeout "$CONNECT_TIMEOUT" \
+    --max-time "$MAX_TIME" \
+    -w "$CURL_WRITE_OUT" \
+    "$experiment_json_url" >>"$log_file" 2>/dev/null || true
+
+  while IFS= read -r id; do
+    [[ "$INTERRUPTED" == "1" ]] && break
+    [[ -n "$id" ]] || continue
+    wait_for_slot
+    [[ "$INTERRUPTED" == "1" ]] && break
+    hit_url "${BASE_URL}/json/bioentity-information/${id}" &
+  done < <(jq -r '.profiles.rows[]?.id // empty' "$tmp" 2>/dev/null || true)
+
+  rm -f "$tmp"
+}
+
+warm_bioentities() {
+  acc_index=0
+  for accession in "${accessions[@]}"; do
+    [[ "$INTERRUPTED" == "1" ]] && break
+    current_accession="$accession"
+    ((acc_index++)) || true
+    write_progress_state
+    warm_bioentity_accession "$accession"
+  done
+}
+
+report_progress() {
+  local current="$1"
+  local total="$2"
+  local accession="$3"
+  [[ "$PROGRESS" == "1" ]] || return 0
+  local logged elapsed req_per_sec
+  logged=$(wc -l <"$log_file" | tr -d ' ')
+  elapsed=$(awk -v s="$run_start" -v e="$(now_s)" 'BEGIN { printf "%.1f", e - s }')
+  req_per_sec=$(awk -v n="$logged" -v t="$elapsed" 'BEGIN {
+    if (t > 0) printf "%.1f", n / t
+    else print "0.0"
+  }')
+  if [[ -t 2 && "$USE_COLOR" == "1" ]]; then
+    printf '\r%bexperiments: %d/%d%b  %brequests: %s%b  %b%.1f req/s%b  %s' \
+      "$C_CYAN" "$current" "$total" "$C_RESET" \
+      "$C_DIM" "$logged" "$C_RESET" \
+      "$C_CYAN" "$req_per_sec" "$C_RESET" \
+      "$accession" >&2
+  else
+    printf 'experiments: %d/%d  requests: %s  %.1f req/s  %s\n' \
+      "$current" "$total" "$logged" "$req_per_sec" "$accession" >&2
+  fi
+}
+
+progress_watcher() {
+  while [[ -f "$progress_watch_flag" && "$INTERRUPTED" != "1" ]]; do
+    read_progress_state
+    report_progress "$acc_index" "$total_accessions" "$current_accession"
+    sleep "$PROGRESS_INTERVAL" &
+    wait $! 2>/dev/null || true
+  done
+}
+
+start_progress_watcher() {
+  [[ "$PROGRESS" == "1" ]] || return 0
+  : >"$progress_state_file"
+  touch "$progress_watch_flag"
+  progress_watcher &
+  progress_watch_pid=$!
+}
+
+stop_progress_watcher() {
+  [[ -n "${progress_watch_pid:-}" ]] || return 0
+  rm -f "$progress_watch_flag"
+  kill "$progress_watch_pid" 2>/dev/null || true
+  wait "$progress_watch_pid" 2>/dev/null || true
+  unset progress_watch_pid
+  rm -f "$progress_state_file" "$progress_watch_flag"
+}
+
+run_start=$(now_s)
+total_accessions=${#accessions[@]}
+acc_index=0
+current_accession=""
+
+write_progress_state
+start_progress_watcher
+
+if [[ "$WARM_ACCESSIONS" == "1" ]]; then
+  warm_accessions
+fi
+if [[ "$WARM_BIOENTITIES" == "1" ]]; then
+  warm_bioentities
+fi
+
+stop_progress_watcher
+report_progress "$acc_index" "$total_accessions" "$current_accession"
+
+if [[ "$PROGRESS" == "1" && -t 2 ]]; then
+  echo >&2
+fi
+
+[[ "$INTERRUPTED" == "1" ]] && exit 130
 
 wait
 run_end=$(now_s)

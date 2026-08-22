@@ -1,0 +1,227 @@
+# Annotare — Backstage catalog (spike).
+# Staging/public webapps, MySQL (host/user only — passwords in OpenBao / ops secrets),
+# NFS upload paths, submission pipelines.
+# Do not commit DB passwords here.
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: annotare
+  title: Annotare
+  description: Annotare submission UI and related MySQL, NFS upload paths, and Jenkins pipelines
+spec:
+  owner: fg_team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: annotare-staging
+  title: Annotare (staging)
+  description: Annotare staging / wwwdev — https://wwwdev.ebi.ac.uk/fg/annotare
+  tags:
+    - annotare
+    - staging
+  annotations:
+    ebi.ac.uk/gxa-environment: staging
+    backstage.io/view-url: https://wwwdev.ebi.ac.uk/fg/annotare
+  links:
+    - url: https://wwwdev.ebi.ac.uk/fg/annotare
+      title: Webapp (Home)
+      icon: dashboard
+    - url: mysql://mysql-annotare-dev.ebi.ac.uk:4420/ae_annotare2
+      title: "MySQL — mysql-annotare-dev.ebi.ac.uk:4420/ae_annotare2 (annotare)"
+      icon: storage
+    - url: file:///nfs/ftp/private/annotare/dev
+      title: "NFS FTP upload — /nfs/ftp/private/annotare/dev"
+      icon: storage
+    - url: file:///nfs/public/rw/fg/annotare/an2dev_home/upload
+      title: "NFS upload — /nfs/public/rw/fg/annotare/an2dev_home/upload"
+      icon: storage
+spec:
+  type: website
+  lifecycle: staging
+  owner: fg_team
+  system: annotare
+  dependsOn:
+    - resource:default/annotare-mysql-dev
+    - resource:default/annotare-nfs-ftp-upload
+    - resource:default/annotare-nfs-upload
+    - component:default/annotare-submission-status-poller
+    - component:default/annotare-submission-file-validation
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: annotare-public
+  title: Annotare (public)
+  description: Annotare public / www — https://www.ebi.ac.uk/fg/annotare
+  tags:
+    - annotare
+    - public
+  annotations:
+    ebi.ac.uk/gxa-environment: public
+    backstage.io/view-url: https://www.ebi.ac.uk/fg/annotare
+  links:
+    - url: https://www.ebi.ac.uk/fg/annotare
+      title: Webapp (Home)
+      icon: dashboard
+    - url: mysql://mysql-annotare-prod.ebi.ac.uk:4444/annotare2
+      title: "MySQL — mysql-annotare-prod.ebi.ac.uk:4444/annotare2 (annotare)"
+      icon: storage
+    - url: mysql://mysql-annotare-prod.ebi.ac.uk:4444/annotare2
+      title: "MySQL RO — mysql-annotare-prod.ebi.ac.uk:4444/annotare2 (readonly)"
+      icon: storage
+spec:
+  type: website
+  lifecycle: public
+  owner: fg_team
+  system: annotare
+  dependsOn:
+    - resource:default/annotare-mysql-prod
+    - resource:default/annotare-mysql-prod-readonly
+    - component:default/annotare-submission-status-poller
+    - component:default/annotare-submission-file-validation
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: annotare-submission-status-poller
+  title: Annotare — submission status poller
+  description: Jenkins / batch pipeline that polls Annotare submission status
+  tags:
+    - annotare
+    - pipeline
+spec:
+  type: service
+  lifecycle: production
+  owner: fg_team
+  system: annotare
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: annotare-submission-file-validation
+  title: Annotare — submission file validation
+  description: Jenkins / batch pipeline that validates Annotare submission files
+  tags:
+    - annotare
+    - pipeline
+spec:
+  type: service
+  lifecycle: production
+  owner: fg_team
+  system: annotare
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: annotare-mysql-prod
+  title: Annotare MySQL (PROD)
+  description: "host=mysql-annotare-prod.ebi.ac.uk port=4444 db=annotare2 user=annotare driver=MySQL (password in OpenBao / ops secrets)"
+  tags:
+    - annotare
+    - public
+    - mysql
+  annotations:
+    ebi.ac.uk/db-host: mysql-annotare-prod.ebi.ac.uk
+    ebi.ac.uk/db-port: "4444"
+    ebi.ac.uk/db-name: annotare2
+    ebi.ac.uk/db-user: annotare
+  links:
+    - url: mysql://mysql-annotare-prod.ebi.ac.uk:4444/annotare2
+      title: "mysql-annotare-prod.ebi.ac.uk:4444/annotare2"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: annotare
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: annotare-mysql-prod-readonly
+  title: Annotare MySQL (PROD read-only)
+  description: "host=mysql-annotare-prod.ebi.ac.uk port=4444 db=annotare2 user=readonly driver=MySQL (password in OpenBao / ops secrets)"
+  tags:
+    - annotare
+    - public
+    - mysql
+  annotations:
+    ebi.ac.uk/db-host: mysql-annotare-prod.ebi.ac.uk
+    ebi.ac.uk/db-port: "4444"
+    ebi.ac.uk/db-name: annotare2
+    ebi.ac.uk/db-user: readonly
+  links:
+    - url: mysql://mysql-annotare-prod.ebi.ac.uk:4444/annotare2
+      title: "mysql-annotare-prod.ebi.ac.uk:4444/annotare2 (readonly)"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: annotare
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: annotare-mysql-dev
+  title: Annotare MySQL (DEV)
+  description: "host=mysql-annotare-dev.ebi.ac.uk port=4420 db=ae_annotare2 user=annotare driver=MySQL (password in OpenBao / ops secrets)"
+  tags:
+    - annotare
+    - staging
+    - mysql
+  annotations:
+    ebi.ac.uk/db-host: mysql-annotare-dev.ebi.ac.uk
+    ebi.ac.uk/db-port: "4420"
+    ebi.ac.uk/db-name: ae_annotare2
+    ebi.ac.uk/db-user: annotare
+  links:
+    - url: mysql://mysql-annotare-dev.ebi.ac.uk:4420/ae_annotare2
+      title: "mysql-annotare-dev.ebi.ac.uk:4420/ae_annotare2"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: annotare
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: annotare-nfs-ftp-upload
+  title: Annotare NFS — FTP upload (dev)
+  description: FTP upload directory /nfs/ftp/private/annotare/dev
+  tags:
+    - annotare
+    - staging
+    - nfs
+  annotations:
+    ebi.ac.uk/nfs-path: /nfs/ftp/private/annotare/dev
+  links:
+    - url: file:///nfs/ftp/private/annotare/dev
+      title: "/nfs/ftp/private/annotare/dev"
+      icon: storage
+spec:
+  type: storage
+  owner: fg_team
+  system: annotare
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: annotare-nfs-upload
+  title: Annotare NFS — upload (dev)
+  description: Upload directory /nfs/public/rw/fg/annotare/an2dev_home/upload
+  tags:
+    - annotare
+    - staging
+    - nfs
+  annotations:
+    ebi.ac.uk/nfs-path: /nfs/public/rw/fg/annotare/an2dev_home/upload
+  links:
+    - url: file:///nfs/public/rw/fg/annotare/an2dev_home/upload
+      title: "/nfs/public/rw/fg/annotare/an2dev_home/upload"
+      icon: storage
+spec:
+  type: storage
+  owner: fg_team
+  system: annotare
