@@ -1,16 +1,97 @@
-# Maps Jenkins TARGET_ENVIRONMENT to Helm deploy settings.
+# GXA environment catalogue and Jenkins TARGET_ENVIRONMENT map.
+# Passwords stay in charts/gxa/.secrets-<env>.yaml / Jenkins credentials — never here.
 # GXA_SOURCE_JSON_URL and GXA_TARGET_JSON_URL live in .env — they must describe the same
 # target as TARGET_ENVIRONMENT (see .env.example).
 
 environments:
+  # --- Helm / k8s envs (primary catalogue) ---
+  ci:
+    description: GXA CI on fg-public (hh-wp-webadmin-35); Helm ENV=ci, namespace gxa-ci
+    helm_release: gxa
+    helm_env: ci
+    cluster: hh-wp-webadmin-35
+    kubectl_context: fg-public
+    namespace: gxa-ci
+    postgres:
+      # Shared with staging (external). Chart may still run in-cluster PG populated from this host.
+      host: pgsql-hlvm-147.ebi.ac.uk
+      port: 5432
+      database: gxpatlaspro
+      user: atlasprd3
+    solr:
+      namespace: gxa-ci-solrcloud
+      release: gxa-ci
+
+  staging:
+    description: GXA staging on fg-public (hh-wp-webadmin-35); Helm ENV=staging, namespace gxa-staging
+    helm_release: gxa
+    helm_env: staging
+    cluster: hh-wp-webadmin-35
+    kubectl_context: fg-public
+    namespace: gxa-staging
+    postgres:
+      host: pgsql-hlvm-147.ebi.ac.uk
+      port: 5432
+      database: gxpatlaspro
+      user: atlasprd3
+    solr:
+      namespace: gxa-staging-solrcloud
+      release: gxa-staging
+
+  public:
+    description: GXA public on fg-public (hh-wp-webadmin-35); Helm ENV=public, namespace gxa-public
+    helm_release: gxa
+    helm_env: public
+    cluster: hh-wp-webadmin-35
+    kubectl_context: fg-public
+    namespace: gxa-public
+    postgres:
+      host: pgsql-dlvmpub2-023.ebi.ac.uk
+      port: 5432
+      database: gxpatlaspro
+      user: atlasprd3
+    solr:
+      namespace: gxa-public-solrcloud
+      release: gxa-public
+
+  fallback:
+    description: GXA fallback on hx-wp-webadmin-121; Helm ENV=fallback, namespace gxa-fallback
+    helm_release: gxa
+    helm_env: fallback
+    cluster: hx-wp-webadmin-121
+    kubectl_context: fg-fallback
+    namespace: gxa-fallback
+    postgres:
+      host: pgsql-dlvmpubfall2-019.ebi.ac.uk
+      port: 5432
+      database: gxpatlaspro
+      user: atlasprd3
+    solr:
+      namespace: gxa-fallback-solrcloud
+      release: gxa-fallback
+
+  # --- Jenkins indexing TARGET_ENVIRONMENT aliases ---
   k8s_test:
     description: GXA on k8s (Helm ENV=test, namespace gxa-test)
     helm_release: gxa
     helm_env: test
+    cluster: hh-wp-webadmin-35
+    kubectl_context: fg-public
+    namespace: gxa-test
+    postgres:
+      host: pgsql-dlvm-078.ebi.ac.uk
+      port: 5432
+      database: gxpatlastst
+      user: atlasprd3
+    solr:
+      namespace: gxa-test-solrcloud
+      release: gxa-test
+
   test:
     description: Legacy wwwdev / non-k8s test (Codon environments/gxa/test.sh)
     helm_release: null
     helm_env: null
+
   production:
     description: EBI production (Codon environments/gxa/production.sh)
     helm_release: null
