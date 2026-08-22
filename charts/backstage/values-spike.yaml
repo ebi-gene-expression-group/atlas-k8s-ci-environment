@@ -1,0 +1,142 @@
+# Spike values for Backstage on fg-public (hh-wp-webadmin-35).
+# Demo community image — not for production catalog use.
+# Postgres passwords live in Secret backstage-postgresql (not committed).
+
+ingress:
+  enabled: false
+
+# NodePort hits nginx sidecar (strips HSTS); nginx proxies to Backstage :7007
+service:
+  type: NodePort
+  ports:
+    backend: 8080
+    name: http-backend
+    targetPort: http-proxy
+  nodePorts:
+    backend: 30707
+
+postgresql:
+  enabled: true
+  auth:
+    username: bn_backstage
+    existingSecret: backstage-postgresql
+    secretKeys:
+      userPasswordKey: user-password
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      storageClass: standard-nfs-production
+      size: 8Gi
+
+extraDeploy:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: backstage-nginx-strip-hsts
+      labels:
+        app.kubernetes.io/instance: backstage
+    data:
+      nginx.conf: |
+        worker_processes 1;
+        error_log /dev/stderr warn;
+        pid /tmp/nginx.pid;
+        events { worker_connections 64; }
+        http {
+          access_log /dev/stdout;
+          server {
+            listen 8080;
+            location / {
+              proxy_pass http://127.0.0.1:7007;
+              proxy_http_version 1.1;
+              proxy_set_header Host $host;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto http;
+              proxy_hide_header Strict-Transport-Security;
+            }
+          }
+        }
+
+backstage:
+  # :latest (1.42+) ships a notifications sidebar without a working API factory.
+  # Pin pre-1.42 until we build our own create-app image.
+  image:
+    registry: ghcr.io
+    repository: backstage/backstage
+    tag: "1.41.1"
+    pullPolicy: IfNotPresent
+  extraVolumeMounts:
+    # Required so the chart also emits extraVolumes (sidecar mounts the same volume).
+    - name: nginx-strip-hsts
+      mountPath: /tmp/nginx-strip-hsts.conf
+      subPath: nginx.conf
+      readOnly: true
+    - name: gxa-catalog
+      mountPath: /app/catalog
+      readOnly: true
+  extraContainers:
+    - name: nginx-strip-hsts
+      image: nginx:1.27-alpine
+      ports:
+        - name: http-proxy
+          containerPort: 8080
+      volumeMounts:
+        - name: nginx-strip-hsts
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+  extraVolumes:
+    - name: nginx-strip-hsts
+      configMap:
+        name: backstage-nginx-strip-hsts
+    - name: gxa-catalog
+      configMap:
+        name: backstage-gxa-catalog
+  appConfig:
+    app:
+      title: Functional Genomics
+      baseUrl: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30707
+    organization:
+      name: Functional Genomics
+    backend:
+      baseUrl: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30707
+      listen:
+        port: 7007
+      csp:
+        upgrade-insecure-requests: false
+        connect-src: ["'self'", "http:", "https:"]
+      # Chart only loads this ConfigMap (--config), so DB must be declared here.
+      database:
+        client: pg
+        connection:
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+    # Required by the baked app-config schema when Helm replaces image defaults.
+    techdocs:
+      builder: local
+      generator:
+        runIn: local
+      publisher:
+        type: local
+    auth:
+      environment: development
+      providers:
+        guest:
+          # Demo image runs with NODE_ENV=production; guest is blocked unless allowed.
+          dangerouslyAllowOutsideDevelopment: true
+          # So "Owned" works in the spike while signed in as Guest.
+          ownershipEntityRefs: [group:default/fg_team]
+    catalog:
+      orphanStrategy: delete
+      rules:
+        - allow: [Component, System, API, Resource, Location, Domain, Group, User]
+      locations:
+        - type: file
+          target: ./catalog/gxa-entities.yaml
+          rules:
+            - allow: [Component, System, API, Resource, Domain, Group, User]
+        - type: file
+          target: ./catalog/annotare-entities.yaml
+          rules:
+            - allow: [Component, System, API, Resource, Domain, Group, User]
