@@ -14,7 +14,9 @@ vars:
     sh: echo "${RELEASE:-gxa}"
   ENV: 
     sh: echo "${ENV:-test}"
-  SUPPORTED_ENVS: test staging
+  K8S_CONTEXT: 
+    sh: echo "${K8S_CONTEXT:-fg-public}"
+  SUPPORTED_ENVS: test staging public fallback
   APP_VERSION: 37.6.79
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
   ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
@@ -83,6 +85,7 @@ tasks:
             HELM_DEBUG_FLAGS=(--debug --dry-run)
             ;;
         esac
+      
         helm upgrade --install \
           "$RELEASE" \
           "charts/${RELEASE}" \
@@ -90,6 +93,7 @@ tasks:
           -f "$ENV_VALUES" \
           "${HELM_SET_ARGS[@]}" \
           "${HELM_DEBUG_FLAGS[@]}"
+        
 
   deploy-test:
     desc: Deploy to TEST (same as deploy with ENV=test)
@@ -580,3 +584,72 @@ tasks:
   nginx-cache-purge:build-push:
     desc: Build and push nginx-cache-purge (TAG defaults to 1.29.5)
     deps: [nginx-cache-purge:push]
+
+  deploy-infisical:
+    desc: |
+      Deploy Infisical (infisical-standalone) to namespace infisical on fg-public.
+      Requires charts/infisical/.secrets-public.yaml and Secret infisical-secrets.
+    cmds:
+      - |
+        set -euo pipefail
+        kubectx "${K8S_CONTEXT}"
+        SECRETS_FILE="charts/infisical/.secrets-public.yaml"
+        if [ ! -f "$SECRETS_FILE" ]; then
+          echo "Error: missing $SECRETS_FILE (gitignored Postgres/Redis passwords)" >&2
+          exit 1
+        fi
+        CHART_VERSION="${INFISICAL_CHART_VERSION:-1.10.0}"
+        helm upgrade --install infisical infisical-helm-charts/infisical-standalone \
+          --version "$CHART_VERSION" \
+          --kube-context "${K8S_CONTEXT}" \
+          -n infisical \
+          -f charts/infisical/values-public.yaml \
+          -f "$SECRETS_FILE" \
+          --timeout 10m \
+          --wait
+
+  deploy-openbao:
+    desc: |
+      Deploy OpenBao to namespace openbao on fg-public, then init/unseal if needed.
+      Unseal keys are written to charts/openbao/.secrets-init-public.yaml (gitignored).
+    cmds:
+      - |
+        set -euo pipefail
+        # values-public.yaml is for hh-wp-webadmin-35; do not follow .env K8S_CONTEXT.
+        CONTEXT="${OPENBAO_K8S_CONTEXT:-fg-public}"
+        NS=openbao
+        CHART_VERSION="${OPENBAO_CHART_VERSION:-0.29.0}"
+        kubectx "${CONTEXT}"
+        kubectl --context "${CONTEXT}" create namespace "${NS}" --dry-run=client -o yaml \
+          | kubectl --context "${CONTEXT}" apply -f -
+        helm repo add openbao https://openbao.github.io/openbao-helm >/dev/null 2>&1 || true
+        helm repo update openbao
+        CHART_DIR="$(mktemp -d)"
+        trap 'rm -rf "$CHART_DIR"' EXIT
+        helm pull openbao/openbao --version "$CHART_VERSION" --untar -d "$CHART_DIR"
+        # Packaged chart uses single quotes and requires Kubernetes 1.30+; fg-public is 1.23.8.
+        sed -i.bak "s/kubeVersion: '>= 1.30.0-0'/kubeVersion: \">= 1.23.0-0\"/" \
+          "$CHART_DIR/openbao/Chart.yaml"
+        grep kubeVersion "$CHART_DIR/openbao/Chart.yaml"
+        if grep -q '1.30' "$CHART_DIR/openbao/Chart.yaml"; then
+          echo "Error: failed to relax chart kubeVersion for Kubernetes 1.23" >&2
+          exit 1
+        fi
+        helm upgrade --install openbao "$CHART_DIR/openbao" \
+          --kube-context "${CONTEXT}" \
+          -n "${NS}" \
+          -f charts/openbao/values-public.yaml \
+          --disable-openapi-validation \
+          --timeout 10m
+        # StatefulSet updateStrategy is OnDelete; bounce the pod to pick up image/config.
+        # Wait until the old pod is gone so unseal does not race against the previous replica.
+        kubectl --context "${CONTEXT}" -n "${NS}" delete pod openbao-0 --wait=true --timeout=3m 2>/dev/null || true
+        K8S_CONTEXT="${CONTEXT}" OPENBAO_NAMESPACE="${NS}" ./scripts/openbao-init-unseal.sh
+
+  openbao-apply-acl:
+    desc: |
+      Apply OpenBao ACL catalog on fg-public (KV v2, Google OIDC allowlist, identity groups/roles).
+      Requires charts/openbao/.secrets-init-public.yaml and .secrets-oidc-public.yaml.
+    cmds:
+      - ./scripts/openbao-apply-acl.sh
+
