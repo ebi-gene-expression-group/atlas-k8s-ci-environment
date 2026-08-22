@@ -1,4 +1,4 @@
-# values for gxa fallback env (hx-wp-webadmin-25 / fg-fallback)
+# values for gxa fallback env (hx-wp-webadmin-121 / fg-fallback)
 environment: fallback
 
 tomcat:
@@ -24,6 +24,5 @@ nfs:
   server: "hx-isi-srv-vlan157.ebi.ac.uk"
   publicPath: /ifs/public-r
 
-# hpa not supported on k8s 1.18 (the version of cluster 25)
 autoscaling:
   enabled: false

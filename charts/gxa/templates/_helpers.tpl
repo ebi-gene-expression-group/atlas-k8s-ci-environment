@@ -105,6 +105,37 @@ Ingress annotations: user values plus optional ingress-nginx proxy cache.
 {{- end }}
 
 {{/*
+True when authenticated nginx cache purge endpoints are enabled.
+Renders "true" or empty (for use with eq (include ...) "true").
+*/}}
+{{- define "app.nginx.purgeOpsAuthEnabled" -}}
+{{- if and .Values.nginx.enabled .Values.nginx.cache.enabled .Values.nginx.cache.purge.enabled .Values.nginx.cache.purge.opsAuth.enabled }}true{{ end -}}
+{{- end }}
+
+{{/*
+Authenticated cache purge endpoints for ops/CI (ngx_cache_purge separate-location syntax).
+Paths under {{ contextPath }}/_ops/cache/ — Basic auth via /etc/nginx/purge.htpasswd.
+*/}}
+{{- define "app.nginx.cachePurgeOpsLocations" -}}
+{{- $ctx := .Values.nginx.contextPath }}
+        location = {{ $ctx }}/_ops/cache/purge-all {
+          auth_basic "GXA cache purge";
+          auth_basic_user_file /etc/nginx/purge.htpasswd;
+          proxy_cache_purge atlas "*";
+        }
+        location ~ ^{{ $ctx }}/_ops/cache/purge-prefix(/.*)$ {
+          auth_basic "GXA cache purge";
+          auth_basic_user_file /etc/nginx/purge.htpasswd;
+          proxy_cache_purge atlas "$1*";
+        }
+        location ~ ^{{ $ctx }}/_ops/cache/purge(/.*)$ {
+          auth_basic "GXA cache purge";
+          auth_basic_user_file /etc/nginx/purge.htpasswd;
+          proxy_cache_purge atlas "$1$is_args$args";
+        }
+{{- end }}
+
+{{/*
 http-snippet to merge into the ingress-nginx controller ConfigMap (not applied by this chart).
 */}}
 {{- define "app.ingress.controllerHttpSnippet" -}}

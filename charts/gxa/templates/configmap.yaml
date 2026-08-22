@@ -91,6 +91,9 @@ data:
           proxy_no_cache 1;
           add_header X-Cache-Status $upstream_cache_status;
         }
+        {{- if eq (include "app.nginx.purgeOpsAuthEnabled" .) "true" }}
+        {{- include "app.nginx.cachePurgeOpsLocations" . | nindent 8 }}
+        {{- end }}
         location / {
           proxy_pass http://127.0.0.1:{{ .Values.tomcat.httpPort }};
           proxy_http_version 1.1;
@@ -107,7 +110,7 @@ data:
           proxy_cache_valid 200 {{ .Values.nginx.cache.valid200 }};
           proxy_cache_use_stale error timeout updating;
           proxy_cache_methods GET HEAD;
-          {{- if .Values.nginx.cache.purge.enabled }}
+          {{- if and .Values.nginx.cache.purge.enabled (not .Values.nginx.cache.purge.opsAuth.enabled) }}
           proxy_cache_purge PURGE{{ if .Values.nginx.cache.purge.allowPurgeAll }} purge_all{{ end }} from {{ join " " .Values.nginx.cache.purge.allow }};
           {{- end }}
           add_header X-Cache-Status $upstream_cache_status;

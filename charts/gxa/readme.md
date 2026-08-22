@@ -178,7 +178,67 @@ Key | Default | Description
 `ingress.cache.valid200` | `60d` | TTL for cached 200 responses.
 `ingress.cache.controllerCachePath` | `/tmp/gxa-nginx-cache` | Disk path in controller `proxy_cache_path` snippet.
 
-**Ingress proxy cache** stores responses on the ingress-nginx controller, not in the GXA pod. Before enabling `ingress.cache.enabled`, merge `docs/ingress-nginx-values-gxa-cache.yaml` into the **ingress-nginx** Helm release (`ingress` namespace) — do not patch the ConfigMap by hand, or the next controller upgrade will revert it. Prefer `nginx.cache.enabled: false` when using ingress cache. Purge by clearing files under `controllerCachePath` on controller pods or restarting them.
+**Ingress proxy cache** stores responses on the ingress-nginx controller, not in the GXA pod. Before enabling `ingress.cache.enabled`, merge `docs/ingress-nginx-values-gxa-cache.yaml` into the **ingress-nginx** Helm release (`ingress` namespace) — do not patch the ConfigMap by hand, or the next controller upgrade will revert it. Prefer `nginx.cache.enabled: false` when using ingress cache. Purge by clearing files under `controllerCachePath` on ingress pods or restarting them.
+
+### Sidecar cache purge (ops / CI)
+
+When `nginx.cache.purge.opsAuth.enabled` is `true` (default), purge is **not** accepted on normal app URLs. Use authenticated endpoints under `{contextPath}/_ops/cache/` (HTTP Basic auth).
+
+Configure in Helm values + `.secrets-<env>.yaml`:
+
+```yaml
+# values-<env>.yaml (or shared values.yaml)
+nginx:
+  cache:
+    purge:
+      opsAuth:
+        username: cacheops
+
+# .secrets-<env>.yaml
+nginx:
+  cache:
+    purge:
+      opsAuth:
+        password: "..."   # in .secrets-<env>.yaml; chart builds nginx auth file at pod start
+```
+
+| Action | Request |
+|--------|---------|
+| **One URL** | `curl -u "${GXA_CACHE_PURGE_USER}:${GXA_CACHE_PURGE_PASS}" -X PURGE "${GXA_HOST}/gxa/_ops/cache/purge/gxa/json/experiments"` |
+| **Prefix** | `curl -u "${GXA_CACHE_PURGE_USER}:${GXA_CACHE_PURGE_PASS}" -X PURGE "${GXA_HOST}/gxa/_ops/cache/purge-prefix/gxa/json/experiments"` |
+| **Full zone** | `curl -u "${GXA_CACHE_PURGE_USER}:${GXA_CACHE_PURGE_PASS}" -X PURGE "${GXA_HOST}/gxa/_ops/cache/purge-all"` |
+
+Load credentials from the cluster (`{release}-secrets` holds `nginx-purge-user` and
+`nginx-purge-password`) or from OpenBao (`kv/data/gxa/<env>/ops/nginx-cache-purge`).
+Namespace is `{release}-{env}` (same as `task deploy`):
+
+```bash
+export K8S_CONTEXT="${K8S_CONTEXT:-fg-public}"
+export RELEASE="${RELEASE:-gxa}"
+export ENV="${ENV:-public}"
+export NAMESPACE="${NAMESPACE:-${RELEASE}-${ENV}}"
+export GXA_HOST="${GXA_HOST:-https://www.ebi.ac.uk}"   # or NodePort base URL, no trailing slash
+
+export GXA_CACHE_PURGE_USER="$(
+  kubectl --context "${K8S_CONTEXT}" -n "${NAMESPACE}" get secret "${RELEASE}-secrets" \
+    -o jsonpath='{.data.nginx-purge-user}' | base64 -d
+)"
+export GXA_CACHE_PURGE_PASS="$(
+  kubectl --context "${K8S_CONTEXT}" -n "${NAMESPACE}" get secret "${RELEASE}-secrets" \
+    -o jsonpath='{.data.nginx-purge-password}' | base64 -d
+)"
+
+curl -u "${GXA_CACHE_PURGE_USER}:${GXA_CACHE_PURGE_PASS}" \
+  -X PURGE \
+  "${GXA_HOST}/gxa/_ops/cache/purge-all"
+```
+
+Works through Ingress or NodePort (same host/path as normal app traffic). Expect **200**
+on success, **412** if nothing matched.
+
+**Manual wipe** (no HTTP auth): delete files under `/var/cache/nginx` in the nginx container (keep `proxy_temp/`), then `nginx -s reload`.
+
+Legacy unauthenticated `PURGE` on the cached URL is only available when `nginx.cache.purge.opsAuth.enabled: false`.
 
 ### Debugging
 

@@ -148,10 +148,16 @@ nginx:
     maxSize: 1g
     inactive: 7d
     valid200: 60d
-    # ngx_cache_purge: PURGE <cached-url> from allowed clients (same location as proxy_cache)
     purge:
       enabled: true
-      # Allow purge_all (PURGE any path clears entire zone) — off by default
+      # Authenticated ops/CI endpoints under {{ contextPath }}/_ops/cache/ (recommended).
+      opsAuth:
+        enabled: true
+        # Per-env override in values-<env>.yaml or .secrets-<env>.yaml; stored as gxa-secrets/nginx-purge-user.
+        username: cacheops
+        # Set password in .secrets-<env>.yaml; init container builds nginx htpasswd file at pod start.
+        password: ""
+      # Legacy unauthenticated PURGE on the same URL as GET (only when opsAuth.enabled=false).
       allowPurgeAll: false
       allow:
         - 127.0.0.1

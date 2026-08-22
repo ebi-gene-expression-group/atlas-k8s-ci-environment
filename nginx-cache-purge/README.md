@@ -18,30 +18,24 @@ task nginx-cache-purge:build-push
 
 ## Helm (GXA chart)
 
-Point the sidecar at this image:
+The chart loads the module and exposes authenticated purge endpoints when `nginx.cache.purge.opsAuth.enabled` is true.
 
 ```yaml
 nginx:
-  image:
-    repository: dockerhub.ebi.ac.uk/ebi-gene-expression/atlas-web-bulk/nginx-cache-purge
-    tag: "1.29.5"
+  cache:
+    purge:
+      opsAuth:
+        username: cacheops          # values.yaml
+        password: "..."               # .secrets-<env>.yaml
 ```
 
-The GXA chart loads the module (`load_module modules/ngx_http_cache_purge_module.so;` at the top of `nginx.conf`)
-and enables purge on the cached `location /` block (`proxy_cache_key "$uri$is_args$args"`).
-Allowed clients are set in `nginx.cache.purge.allow` (private RFC1918 ranges + localhost by default).
+| Action | curl example |
+|--------|----------------|
+| One cached URL | `curl -u <username>:$PASS -X PURGE "https://host/gxa/_ops/cache/purge/gxa/json/experiments"` |
+| Prefix (`*`) | `curl -u <username>:$PASS -X PURGE "https://host/gxa/_ops/cache/purge-prefix/gxa/json/experiments"` |
+| Entire sidecar zone | `curl -u <username>:$PASS -X PURGE "https://host/gxa/_ops/cache/purge-all"` |
 
-Purge one URL (from inside the pod):
-
-```bash
-curl -X PURGE "http://127.0.0.1:8081/gxa/json/experiments"
-```
-
-Purge entire zone (only if `nginx.cache.purge.allowPurgeAll: true` — any PURGE from an allowed client clears the zone):
-
-```bash
-curl -X PURGE "http://127.0.0.1:8081/gxa/json/health"
-```
+See `charts/gxa/readme.md` for full purge documentation.
 
 ## Verify module
 

@@ -190,6 +190,12 @@ spec:
               subPath: nginx.conf
             - name: nginx-cache
               mountPath: /var/cache/nginx
+            {{- if eq (include "app.nginx.purgeOpsAuthEnabled" .) "true" }}
+            - name: nginx-purge-auth
+              mountPath: /etc/nginx/purge.htpasswd
+              subPath: purge.htpasswd
+              readOnly: true
+            {{- end }}
           resources:
             {{- toYaml .Values.nginx.resources | nindent 12 }}
         {{- end }}
@@ -251,8 +257,32 @@ spec:
         - name: nginx-cache
           persistentVolumeClaim:
             claimName: nginx-cache
+        {{- if eq (include "app.nginx.purgeOpsAuthEnabled" .) "true" }}
+        - name: nginx-purge-auth
+          emptyDir: {}
+        {{- end }}
         {{- end }}
       initContainers:
+        {{- if eq (include "app.nginx.purgeOpsAuthEnabled" .) "true" }}
+        - name: nginx-purge-htpasswd
+          image: httpd:2.4-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              htpasswd -nbB "$HTPASSWD_USER" "$(cat /etc/nginx-purge-secret/nginx-purge-password)" > /shared/purge.htpasswd
+              chmod 644 /shared/purge.htpasswd
+          env:
+            - name: HTPASSWD_USER
+              value: {{ .Values.nginx.cache.purge.opsAuth.username | quote }}
+          volumeMounts:
+            - name: nginx-purge-auth
+              mountPath: /shared
+            - name: {{ include "app.name" . }}-secrets
+              mountPath: /etc/nginx-purge-secret
+              readOnly: true
+        {{- end }}
         - name: "init-experiments-snapshot"
           {{- with .Values.securityContext }}
           securityContext:
