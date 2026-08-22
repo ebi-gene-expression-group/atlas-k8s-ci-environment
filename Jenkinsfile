@@ -5,7 +5,8 @@ pipeline {
       choices: [
         'ci',
         'staging',
-        'prod'
+        'public',
+        'fallback'
       ],
       description: 'Target environment (namespace: gxa-<env>). Requires charts/gxa/values-<env>.yaml.'
     )
