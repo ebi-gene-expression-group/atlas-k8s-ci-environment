@@ -137,6 +137,8 @@ Push the change, then run **Build Now** once on the pipeline job so Jenkins refr
 
 The pipeline also requires `charts/gxa/values-<env>.yaml` to exist; it fails validation if missing.
 
+The agent pod is scheduled on Jenkins Kubernetes cloud **`hh-webadmin-35`**, except **`ENV=fallback`**, which uses **`hx-webadmin-121`**. Both clouds need namespace `gxa-jenkins` and the `jenkins-cloud` service account (see step 4).
+
 #### 4. Kubernetes deploy Role
 
 Jenkins deploys as service account **`jenkins-cloud`** in namespace **`gxa-jenkins`**. It needs a **Role** and **RoleBinding** in the target namespace **`gxa-<env>`**.

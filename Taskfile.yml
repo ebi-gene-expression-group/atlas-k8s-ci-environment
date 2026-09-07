@@ -10,12 +10,14 @@ dotenv:
   - .env
 
 vars:
-  RELEASE: 
-    sh: echo "${RELEASE:-gxa}"
-  ENV: 
-    sh: echo "${ENV:-test}"
-  K8S_CONTEXT: 
-    sh: echo "${K8S_CONTEXT:-fg-public}"
+  # Dotenv is not in the environment when Task vars are evaluated, and a var named
+  # ENV also shadows ${ENV}. Source .env in a subshell, then default.
+  RELEASE:
+    sh: 'set -a && [ -f .env ] && . ./.env; echo "${RELEASE:-gxa}"'
+  ENV:
+    sh: 'set -a && [ -f .env ] && . ./.env; echo "${ENV:-test}"'
+  K8S_CONTEXT:
+    sh: 'set -a && [ -f .env ] && . ./.env; echo "${K8S_CONTEXT:-fg-public}"'
   SUPPORTED_ENVS: test staging public fallback
   APP_VERSION: 37.6.79
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
@@ -123,17 +125,15 @@ tasks:
           echo "Error: namespace $NS does not exist. Create it via your platform team (team-admin cannot patch namespaces)." >&2
           exit 1
         fi
-        # NFS ZK/Solr PV+PVC must exist before the Solr operator creates StatefulSets;
+        # ZK NFS PV+PVC must exist before the Solr operator creates StatefulSets;
         # otherwise the operator creates PVCs without volumeName and they stay Pending.
-        for tmpl in zk-nfs-data-pv.yaml solr-nfs-data-pv.yaml; do
-          rendered="$(helm template "$SOLR_HELM_RELEASE" charts/solr-cloud \
-            --namespace "$NS" \
-            -f "$VALUES" \
-            -s "templates/${tmpl}" 2>/dev/null || true)"
-          if [ -n "$rendered" ]; then
-            echo "$rendered" | kubectl apply -f -
-          fi
-        done
+        rendered="$(helm template "$SOLR_HELM_RELEASE" charts/solr-cloud \
+          --namespace "$NS" \
+          -f "$VALUES" \
+          -s templates/zk-nfs-data-pv.yaml 2>/dev/null || true)"
+        if [ -n "$rendered" ]; then
+          echo "$rendered" | kubectl apply -f -
+        fi
         HELM_EXTRA=()
         case "${FORCE_CONFLICTS:-}" in
           1|true|yes) HELM_EXTRA+=(--force-conflicts) ;;
