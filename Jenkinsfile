@@ -33,47 +33,55 @@ pipeline {
     timeout(time: 10, unit: 'MINUTES')
   }
 
-  agent {
-    kubernetes {
-      cloud 'hh-webadmin-35'
-      defaultContainer 'helm'
-      yamlFile 'jenkins-k8s-pod-deploy.yaml'
-    }
-  }
+  // Choose the Jenkins Kubernetes cloud from ENV (params are not available on a
+  // top-level agent). fallback → hx-webadmin-121; ci/staging/public → hh-webadmin-35.
+  agent none
 
   stages {
-    stage('Validate parameters') {
-      steps {
-        script {
-          if (!params.IMAGE_TAG?.trim()) {
-            error('IMAGE_TAG is required (e.g. a version from atlas-web-bulk CI or "latest").')
-          }
-          def valuesFile = "charts/${params.RELEASE}/values-${params.ENV}.yaml"
-          if (!fileExists(valuesFile)) {
-            error("Missing ${valuesFile}. Add environment values before deploying to ${params.ENV}.")
-          }
+    stage('Deploy') {
+      agent {
+        kubernetes {
+          cloud "${params.ENV == 'fallback' ? 'hx-webadmin-121' : 'hh-webadmin-35'}"
+          defaultContainer 'helm'
+          yamlFile 'jenkins-k8s-pod-deploy.yaml'
         }
       }
-    }
+      stages {
+        stage('Validate parameters') {
+          steps {
+            script {
+              if (!params.IMAGE_TAG?.trim()) {
+                error('IMAGE_TAG is required (e.g. a version from atlas-web-bulk CI or "latest").')
+              }
+              def valuesFile = "charts/${params.RELEASE}/values-${params.ENV}.yaml"
+              if (!fileExists(valuesFile)) {
+                error("Missing ${valuesFile}. Add environment values before deploying to ${params.ENV}.")
+              }
+              echo "Jenkins Kubernetes cloud: ${params.ENV == 'fallback' ? 'hx-webadmin-121' : 'hh-webadmin-35'}"
+            }
+          }
+        }
 
-    stage('Approve production deploy') {
-      when { expression { params.ENV == 'prod' } }
-      steps {
-        input(
-          message: "Deploy ${params.RELEASE} image tag ${params.IMAGE_TAG} to PRODUCTION?",
-          ok: 'Deploy',
-        )
-      }
-    }
+        stage('Approve production deploy') {
+          when { expression { params.ENV == 'prod' } }
+          steps {
+            input(
+              message: "Deploy ${params.RELEASE} image tag ${params.IMAGE_TAG} to PRODUCTION?",
+              ok: 'Deploy',
+            )
+          }
+        }
 
-    stage('Deploy with Helm') {
-      steps {
-        script {
-          def secretsCredential = "gxa-secrets-${params.ENV}"
-          withCredentials([
-            file(credentialsId: secretsCredential, variable: 'SECRETS_SOURCE'),
-          ]) {
-            runHelmDeploy(params.RELEASE, params.ENV, params.IMAGE_TAG.trim(), params.DRY_RUN)
+        stage('Deploy with Helm') {
+          steps {
+            script {
+              def secretsCredential = "gxa-secrets-${params.ENV}"
+              withCredentials([
+                file(credentialsId: secretsCredential, variable: 'SECRETS_SOURCE'),
+              ]) {
+                runHelmDeploy(params.RELEASE, params.ENV, params.IMAGE_TAG.trim(), params.DRY_RUN)
+              }
+            }
           }
         }
       }
@@ -132,12 +140,13 @@ def recordDeployment(String release, String targetEnv, String imageTag) {
 
   // targetService must match an environment label in Jenkins → DevOps Portal → Manage Environments
   def targetService = "${release}-${targetEnv}"
+  def clusterTag = targetEnv == 'fallback' ? 'fg-fallback' : 'fg-public'
 
   reportDeployOperation(
     targetService: targetService,
     applicationName: release,
     applicationVersion: imageTag,
-    tags: 'helm,k8s,fg-public',
+    tags: "helm,k8s,${clusterTag}",
   )
   echo "Recorded deployment of ${release} ${imageTag} to ${targetService} (DevOps Portal)"
 }

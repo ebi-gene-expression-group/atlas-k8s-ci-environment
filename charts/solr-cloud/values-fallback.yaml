@@ -1,10 +1,21 @@
 # values for solr-cloud fallback env (hx-wp-webadmin-121 / fg-fallback)
 environment: fallback
 
+# Cluster 121 workers are 4 CPU / ~16Gi (public is 8/32Gi). Keep 4 replicas
+# for topology parity; drop heap so Solr can colocate with GXA.
 solr:
+  javaMem: "-Xms4096m -Xmx4096m"
   resources:
+    limits:
+      memory: 6Gi
+      cpu: "2"
     requests:
+      memory: 5Gi
       cpu: "1"
+  storage:
+    nfsData:
+      # Migrated Isilon symlinks are gxa-solrcloud-{n} (from release "gxa"), not gxa-fallback-solrcloud-{n}.
+      dataDirPrefix: gxa
 
 nfs:
   server: "hx-isi-srv-vlan157.ebi.ac.uk"

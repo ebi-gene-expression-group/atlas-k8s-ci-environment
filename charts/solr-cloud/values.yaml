@@ -37,16 +37,11 @@ solr:
       memory: 7Gi
       cpu: 2
   storage:
-    className: standard-nfs-production
-    size: 20Gi
-    reclaimPolicy: Retain
-    # NFS migration: mount Isilon data in the pod (mode: pod) or via PV+PVC (mode: pv).
-    # Pod mode matches gxa services-volume / backup NFS — required for direct Isilon exports.
-    # Folders under basePath: <pod-name>/ (may be symlinks). Init links entries into /var/solr/data.
+    # Solr data is always the Isilon solr_data folders (inline NFS + init symlinks).
+    # There is no cluster PVC for Solr. Folders under basePath: {dataDirPrefix}-solrcloud-{n}/
+    # (may themselves be symlinks). Init links entries into /var/solr/data.
     # Solr writes index updates through those symlinks — solr_data must be RW from K8s node IPs.
     nfsData:
-      enabled: true
-      mode: pod
       mountPath: /solr-data
       basePath: ""
       # Folder under solr_data: {dataDirPrefix}-solrcloud-{ordinal}. Defaults to Helm release name.
@@ -59,16 +54,13 @@ solr:
 zookeeper:
   replicas: 3
   storage:
-    className: standard-nfs-production
     size: 500Mi
     reclaimPolicy: Retain
-    # pv: NFS PV+PVC per replica mounted at /data (ZK must write version-2; symlinks do not work).
-    # pod: parent export at /zk-data, init links into ephemeral /data (Solr-style; not suitable for ZK).
+    # ZK data is always the Isilon zk_data folders (static NFS PV+PVC per replica at /data).
+    # ZK must write version-2; there is no cluster PVC and no symlink/pod mode.
     nfsData:
-      enabled: true
-      mode: pv
-      mountPath: /zk-data
       basePath: ""
+      # Folder under zk_data: {dataDirPrefix}-solrcloud-zookeeper-{ordinal}. Defaults to Helm release name.
       dataDirPrefix: ""
   resources:
     limits:
@@ -86,7 +78,7 @@ nfs:
   # /ifs/public/rw/fg/atlas/gxa/environments/<environment>/{solr_data,zk_data}/<pod-name>/
   publicPath: /ifs/public
   environmentsBase: rw/fg/atlas/gxa/environments
-  # Used only when nfsData.mode is pv (pod-mode NFS has no mountOptions in the pod spec).
+  # Used for ZK static NFS PVs (inline Solr NFS has no mountOptions in the pod spec).
   mountOptions:
     - hard
     - nfsvers=3

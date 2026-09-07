@@ -11,6 +11,7 @@ environments: [test, ci, staging, public, fallback]
 clusters:
   - hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
   - hx-wp-webadmin-25.wp-k8s.ebi.ac.uk
+  - hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk
 classes: [app, ops]
 
 # Per-service Kubernetes namespaces for each environment (where known).
@@ -56,7 +57,7 @@ groups:
       operator:
         grants:
           - { environments: [test, ci, staging, public, fallback], classes: [app, ops], access: [read, write] }
-          - { clusters: [hh-wp-webadmin-35.wp-k8s.ebi.ac.uk, hx-wp-webadmin-25.wp-k8s.ebi.ac.uk], classes: [ops], access: [read, write] }
+          - { clusters: [hh-wp-webadmin-35.wp-k8s.ebi.ac.uk, hx-wp-webadmin-25.wp-k8s.ebi.ac.uk, hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk], classes: [ops], access: [read, write] }
   its:
     display_name: ITS Applications
     services: []
@@ -152,5 +153,6 @@ secret_sets:
     clusters:
       - hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
       - hx-wp-webadmin-25.wp-k8s.ebi.ac.uk
+      - hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk
     secrets:
       - { class: ops, name: kubeconfig, description: "kubectl kubeconfig (multiline field config)" }

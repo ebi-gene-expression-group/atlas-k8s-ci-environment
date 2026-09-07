@@ -160,6 +160,9 @@ metadata:
     - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
       title: Jenkins — Deploy
       icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/secrets/kv/list/gxa/ci/
+      title: OpenBao — Secrets
+      icon: catalog
 spec:
   type: website
   lifecycle: ci
@@ -211,6 +214,9 @@ metadata:
       icon: catalog
     - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
       title: Jenkins — Deploy
+      icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/secrets/kv/list/gxa/staging/
+      title: OpenBao — Secrets
       icon: catalog
 spec:
   type: website
@@ -264,6 +270,9 @@ metadata:
     - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
       title: Jenkins — Deploy
       icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/secrets/kv/list/gxa/public/
+      title: OpenBao — Secrets
+      icon: catalog
 spec:
   type: website
   lifecycle: public
@@ -312,6 +321,9 @@ metadata:
       icon: catalog
     - url: https://wwwint.ebi.ac.uk/fg/jenkins/view/Expression%20Atlas%20web%20apps/job/gxa-deploy/
       title: Jenkins — Deploy
+      icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/secrets/kv/list/gxa/fallback/
+      title: OpenBao — Secrets
       icon: catalog
 spec:
   type: website

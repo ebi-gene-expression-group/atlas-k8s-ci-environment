@@ -2,26 +2,58 @@
 
 ## Install the CRDs (Custom Resource Definitions)
 
-   ```bash
-   kubectl create -f https://solr.apache.org/operator/downloads/crds/v0.9.1/all-with-dependencies.yaml
-   ```
-
 ## Install the Solr Operator via Helm
-
-   ```bash
-   # Add helm repo for apahce-solr
-   helm repo add apache-solr https://solr.apache.org/charts
-   helm repo update
-
-   # Installing solr-operator in a namespace
-   helm install solr-operator apache-solr/solr-operator --version 0.9.1 --namespace solr-operator --create-namespace
-   ```
 
 ## Verify the Installation
 
-   ```bash
-   kubectl get all
-   ```
+## Team RBAC for SolrCloud CRs
+
+Installing the operator and CRDs is not enough. Helm must **get/create/update**
+`solrclouds.solr.apache.org`. CRDs being listed (`kubectl api-resources | grep solr`)
+does **not** mean you can use them.
+
+On fg-public this is **cluster-wide** (a ClusterRole on `team-admin`), not a
+per-namespace Role — `auth can-i` is `yes` in every namespace. You do not set
+this per SolrCloud namespace.
+
+Check (expect `yes`):
+
+```bash
+kubectl auth can-i '*' solrclouds --all-namespaces
+```
+
+`no` is the Helm error `cannot get resource "solrclouds"`. `team-admin` cannot
+create ClusterRoles; ITS must grant this after installing the operator.
+
+Ask ITS to apply this ClusterRole + ClusterRoleBinding (same scope as fg-public).
+Subject is the CaaS team SA `default:team-admin`. Alternatively, add the
+`solr.apache.org` rules below to the team's existing ClusterRole:
+
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: solrcloud-admin
+rules:
+  - apiGroups: ["solr.apache.org"]
+    resources: ["solrclouds", "solrbackups", "solrprometheusexporters"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: solrcloud-admin
+subjects:
+  - kind: ServiceAccount
+    name: team-admin
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: solrcloud-admin
+EOF
+```
 
 ## Deploying a SolrCloud
 
@@ -33,49 +65,60 @@ With [Task](https://taskfile.dev/) (from repo root; set `K8S_CONTEXT` in `.env`)
 namespace must already exist (e.g. `gxa-staging-solrcloud`); `task deploy-solrcloud` does not
 create namespaces (requires cluster-admin).
 
-   ```bash
-   task deploy-solrcloud ENV=staging
-   # Helm 4 + solr-operator SSA conflicts:
-   FORCE_CONFLICTS=1 task deploy-solrcloud ENV=staging
-   ```
-
 Equivalent raw Helm:
-
-   ```bash
-   ENV=staging
-   APP=gxa
-   RELEASE=${APP}-${ENV}
-   NS=${APP}-${ENV}-solrcloud
-
-   kubectl create namespace ${NS} --dry-run=client -o yaml | kubectl apply -f -
-
-   helm upgrade --install ${RELEASE} charts/solr-cloud \
-         --namespace ${NS} \
-         --values charts/solr-cloud/values-${ENV}.yaml \
-         --create-namespace=false
-   ```
 
    Get the Solr admin password (created automatically by the operator):
 
-   ```bash
-   kubectl get secret ${RELEASE}-solrcloud-security-bootstrap -o jsonpath='{.data.admin}' -n ${NS} | base64 --decode;echo
-   ```
-
    Resulting names (example `ENV=staging`):
 
-   | Kind | Name |
-   |------|------|
-   | Namespace | `gxa-staging-solrcloud` |
-   | Helm release / SolrCloud CR | `gxa-staging` |
-   | Solr pods | `gxa-staging-solrcloud-0` … |
-   | ZK pods | `gxa-staging-solrcloud-zookeeper-0` … |
-   | Solr service | `gxa-staging-solrcloud-common` |
-   | NodePort | `gxa-staging-solrcloud-nodeport` |
-   | ZK PVs | `gxa-staging-zk-data-0` … |
+
+| Kind                        | Name                                  |
+| --------------------------- | ------------------------------------- |
+| Namespace                   | `gxa-staging-solrcloud`               |
+| Helm release / SolrCloud CR | `gxa-staging`                         |
+| Solr pods                   | `gxa-staging-solrcloud-0` …           |
+| ZK pods                     | `gxa-staging-solrcloud-zookeeper-0` … |
+| Solr service                | `gxa-staging-solrcloud-common`        |
+| NodePort                    | `gxa-staging-solrcloud-nodeport`      |
+| ZK PVs                      | `gxa-staging-zk-data-0` …             |
+
+
+### Fallback cluster (`fg-fallback`)
+
+Fallback SolrCloud runs on **hx-wp-webadmin-121**. Use context `fg-fallback` and `ENV=fallback`. The namespace `gxa-fallback-solrcloud` must already exist.
+
+```bash
+K8S_CONTEXT=fg-fallback ENV=fallback FORCE_CONFLICTS=1 task deploy-solrcloud
+```
+
+Equivalent raw Helm (`RELEASE=gxa-fallback`, `NS=gxa-fallback-solrcloud`):
+
+```bash
+ENV=fallback
+APP=gxa
+RELEASE=${APP}-${ENV}
+NS=${APP}-${ENV}-solrcloud
+
+helm upgrade --install ${RELEASE} charts/solr-cloud \
+      --kube-context fg-fallback \
+      --namespace ${NS} \
+      --values charts/solr-cloud/values-${ENV}.yaml \
+      --create-namespace=false \
+      --force-conflicts
+```
+
+NFS is vlan157: `hx-isi-srv-vlan157.ebi.ac.uk:/ifs/public-r/rw/fg/atlas/gxa/environments/fallback/{solr_data,zk_data}/`. Solr folders are `gxa-solrcloud-{n}` (`dataDirPrefix: gxa` in `values-fallback.yaml`). ZK folders must be `gxa-fallback-solrcloud-zookeeper-{n}`. After rsync from Hinxton the tree still uses **staging** ZK names — rewrite before deploy (Codon, dest ZK stopped):
+
+```bash
+BASE=/nfs/ebi/public/rw/fg/atlas/gxa/environments SRC=staging DST=fallback \
+  ./scripts/slurm/rewrite-gxa-zk-env-names.sh
+```
+
+Resulting names (`ENV=fallback`): namespace `gxa-fallback-solrcloud`, release/CR `gxa-fallback`, Solr service `gxa-fallback-solrcloud-common`, ZK PVs `gxa-fallback-zk-data-0` …
 
 ### ZooKeeper PVC stuck Pending
 
-ZK uses static NFS PVs (`zookeeper.storage.nfsData.mode: pv`). Helm must create
+ZK always uses static NFS PVs. Helm must create
 `data-{release}-solrcloud-zookeeper-{n}` PVCs with `volumeName` set **before** the Solr
 operator's StatefulSet creates them. If the operator wins the race, PVCs stay Pending
 (no `volumeName`, no storage class) while the NFS PVs remain Available.
@@ -104,11 +147,16 @@ FORCE_CONFLICTS=1 task deploy-solrcloud ENV=staging
 task deploy ENV=staging   # GXA webapp — picks up gxa-staging-solrcloud-* service DNS
 ```
 
-## NFS migration storage
+## NFS storage
 
-With `solr.storage.nfsData.enabled` and `zookeeper.storage.nfsData.enabled` (default in
-`values.yaml`), migrated data is read from Isilon exports under
-`/ifs/public/rw/fg/atlas/gxa/environments/<environment>/{solr_data,zk_data}/<pod-name>/`.
+Solr and ZooKeeper data are **always** the Isilon `{solr_data,zk_data}` folders.
+There is no cluster PVC (`standard-nfs-production`) and no `nfsData.enabled` switch.
+
+Paths:
+
+`{nfs.publicPath}/{nfs.environmentsBase}/{environment}/{solr_data,zk_data}/`
+
+Default: `/ifs/public/rw/fg/atlas/gxa/environments/<environment>/{solr_data,zk_data}/<pod-name>/`, and `/ifs/public-r` on the fallback site (HL2)
 
 ### Write access required
 
@@ -118,54 +166,28 @@ from Kubernetes node IPs**, not only from codon/VM clients.
 
 From a pod, `mount` may show `(rw)` while `touch` on the export returns `Read-only file system`
 — that means the Isilon export ACL does not grant write to the cluster yet. Until that is fixed,
-Solr can read migrated cores via symlinks but cannot index new data; ZK cannot run with pv mode.
-
-**At migration scale (~1TB Solr index), copying into cluster NFS (`standard-nfs-production`) is
-not practical.** Solr must stay on Isilon via symlinks (pod mode) — there is no copy-based
-workaround for the index. The required fix is **Isilon export ACL: grant read-write to Kubernetes
+Solr can read migrated cores via symlinks but cannot index new data, and ZK cannot persist
+`version-2` logs. The required fix is **Isilon export ACL: grant read-write to Kubernetes
 node IPs/subnets** on both `solr_data` and `zk_data` under the environment path.
 
-ZK data is small (MB); a one-time copy to ephemeral `/data` is a possible interim workaround
-only for ZK while waiting for ACL — not for Solr.
+**Solr** — NFS is declared on the SolrCloud pod spec (same pattern as gxa `services-volume`
+and the Solr backup mount). The parent export is mounted once per pod so symlinks resolve.
+The init container **symlinks** each entry from `{dataDirPrefix}-solrcloud-{n}/` into
+`/var/solr/data` on first start — no data copy. It runs **after** `cp-solr-xml` (which
+creates a placeholder `solr.xml`); linking is gated on `.nfs-seeded`, not on `solr.xml`
+being absent. Per-pod NFS entries are often themselves symlinks (e.g.
+`gxa-staging-solrcloud-0` → `0/solrdata.<timestamp>`); the init resolves the folder with
+`readlink -f`, then `ln -sfn` each top-level entry.
 
-**Default (`nfsData.mode: pod`)** — NFS is declared on the SolrCloud / Zookeeper pod spec
-(same pattern as gxa `services-volume` and the Solr backup mount). The parent export is
-mounted once per pod (Solr and ZK containers keep the NFS mount so symlinks resolve). Init
-containers **symlink** each entry from the resolved `<pod-name>/` folder into `/var/solr/data`
-(Solr) or `/data` (ZK) on first start — no data copy. The Solr link init runs **after**
-`cp-solr-xml` (which creates a placeholder `solr.xml`); linking is gated on `.nfs-seeded`,
-not on `solr.xml` being absent. Per-pod NFS entries are often symlinks (e.g.
-`gxa-staging-solrcloud-0` → `0/solrdata.<timestamp>`); the init resolves the pod folder with
-`readlink -f`, then `ln -sfn` each top-level entry into the operator data path.
+To force re-linking from NFS, delete Solr pods (and their ephemeral data volumes).
 
-To force re-linking from NFS, delete Solr/ZK pods (and their ephemeral data volumes).
+**ZooKeeper** — static NFS PV + pre-bound PVC per replica, mounted at `/data`. ZK must write
+`version-2` into the export; Solr-style symlinks into ephemeral `/data` do not work.
 
-**Zookeeper (`zookeeper.storage.nfsData.mode: pv`)** — default. Static NFS PVs + pre-bound PVCs
-per replica mount migrated data directly at `/data` (ZK must write `version-2`; symlinks into
-ephemeral `/data` do not work).
-
-**Solr (`solr.storage.nfsData.mode: pod`)** — parent export mounted at `/solr-data`, init
-symlinks cores into `/var/solr/data`.
-
-**Alternative (`nfsData.mode: pv` for Solr too)** — only if pod-mode NFS fails on your cluster.
-
-After switching from PV mode, delete old migration PVs/PVCs before reinstalling:
+Verify Solr NFS mounts:
 
 ```bash
-APP=gxa
-ENV=staging
-RELEASE=${APP}-${ENV}
-NS=${APP}-${ENV}-solrcloud
-kubectl delete solrcloud ${RELEASE} -n ${NS}
-kubectl delete pvc -n ${NS} -l app.kubernetes.io/instance=${RELEASE}
-kubectl delete pv ${RELEASE}-solr-data-{0,1,2,3} ${RELEASE}-zk-data-{0,1,2} 2>/dev/null || true
-helm upgrade --install ${RELEASE} charts/solr-cloud --namespace ${NS} --set environment=${ENV}
-```
-
-Verify pod NFS mounts:
-
-```bash
-kubectl describe pod ${RELEASE}-solrcloud-0 -n ${NS} | grep -A3 'solr-data-nfs\|zk-data-nfs'
+kubectl describe pod ${RELEASE}-solrcloud-0 -n ${NS} | grep -A3 solr-data-nfs
 ```
 
 ### NFS permissions
@@ -181,7 +203,3 @@ without overriding the Solr/ZK image users.
 Symlinks are supported (e.g. `gxa-staging-solrcloud-0 -> 0/solrdata...`). Do **not** use
 Kubernetes `subPath` for them — mount the parent `solr_data/` or `zk_data/` export and
 resolve paths by pod name instead.
-
-If PVCs still show `storageClassName: standard-nfs-production`, the cluster was deployed
-before NFS mode or old PVCs were retained. Delete the SolrCloud and its data PVCs, then
-reinstall (pvcTemplate cannot change on an existing StatefulSet).

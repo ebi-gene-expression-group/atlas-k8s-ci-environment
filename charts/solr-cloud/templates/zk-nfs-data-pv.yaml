@@ -1,5 +1,4 @@
 {{- $nfsData := .Values.zookeeper.storage.nfsData | default dict -}}
-{{- if and $nfsData.enabled (eq (default "pod" $nfsData.mode) "pv") }}
 {{- $zkBasePath := include "solr-cloud.zkNfsDataBasePath" . }}
 {{- range $i := until (int .Values.zookeeper.replicas) }}
 {{- $dataDirPrefix := default $.Release.Name $nfsData.dataDirPrefix }}
@@ -46,6 +45,5 @@ spec:
   resources:
     requests:
       storage: {{ $.Values.zookeeper.storage.size }}
-{{- end }}
 {{- end }}
 {{- end }}

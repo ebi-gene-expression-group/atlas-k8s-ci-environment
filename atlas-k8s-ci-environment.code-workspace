@@ -20,7 +20,6 @@
 		{
 			"path": "../wf-bulk-indexing"
 		},
-
 		{
 			"path": "../annotare-ng"
 		},
@@ -48,7 +47,6 @@
 		"openctx.enable": false,
 		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
 		"sqltools.connections": [
-			
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
@@ -100,24 +98,23 @@
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
-				"server": "pgsql-dlvmpubfall2-019.ebi.ac.uk",
-				"port": 5432,
-				"driver": "PostgreSQL",
-				"name": "gxa fallback r/o",
-				"group": "gxa k8s",
-				"database": "gxpatlaspro",
-				"username": "atlasprd3",
-				"usePassword": "SQLTools Driver Credentials"
-			},	
-			{
-				"ssh": "Disabled",
-				"previewLimit": 50,
 				"server": "pgsql-hlvm-147",
 				"port": 5432,
 				"driver": "PostgreSQL",
 				"name": "gxa staging r/o",
 				"group": "gxa k8s",
 				"database": "gxpatlaspro",
+				"username": "atlasprd3"
+			},	
+			{
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "pgsql-dlvmpubfall2-019.ebi.ac.uk",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"name": "gxa fallback r/o",
+				"group": "gxa k8s",
+				"database": "gxpatlaspub",
 				"username": "atlasprd3"
 			}
 		],

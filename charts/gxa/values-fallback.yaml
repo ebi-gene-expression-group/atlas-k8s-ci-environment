@@ -9,7 +9,7 @@ tomcat:
 loggingLevel: INFO
 
 jdbc:
-  url: "jdbc:postgresql://pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspro"
+  url: "jdbc:postgresql://pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspub"
   user: atlasprd3
   pool: gxa
   createSecret: true
@@ -23,6 +23,3 @@ solr:
 nfs:
   server: "hx-isi-srv-vlan157.ebi.ac.uk"
   publicPath: /ifs/public-r
-
-autoscaling:
-  enabled: false
