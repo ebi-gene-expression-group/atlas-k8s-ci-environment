@@ -12,6 +12,8 @@ environments:
     cluster: hh-wp-webadmin-35
     kubectl_context: fg-public
     namespace: gxa-ci
+    # Live JSON API root (no trailing slash). Used by task test-system / Jenkinsfile.system-test.
+    base_url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31463/gxa
     postgres:
       # Shared with staging (external). Chart may still run in-cluster PG populated from this host.
       host: pgsql-hlvm-147.ebi.ac.uk
@@ -29,6 +31,7 @@ environments:
     cluster: hh-wp-webadmin-35
     kubectl_context: fg-public
     namespace: gxa-staging
+    base_url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30932/gxa
     postgres:
       host: pgsql-hlvm-147.ebi.ac.uk
       port: 5432
@@ -45,6 +48,7 @@ environments:
     cluster: hh-wp-webadmin-35
     kubectl_context: fg-public
     namespace: gxa-public
+    base_url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa
     postgres:
       host: pgsql-dlvmpub2-023.ebi.ac.uk
       port: 5432
@@ -61,6 +65,7 @@ environments:
     cluster: hx-wp-webadmin-121
     kubectl_context: fg-fallback
     namespace: gxa-fallback
+    base_url: http://hx-rke-wp-webadmin-25-worker-1.caas.ebi.ac.uk:31622/gxa
     postgres:
       host: pgsql-dlvmpubfall2-019.ebi.ac.uk
       port: 5432

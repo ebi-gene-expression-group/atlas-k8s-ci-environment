@@ -94,6 +94,22 @@ pipeline {
       }
     }
 
+    stage('Trigger JSON system tests') {
+      when { expression { !params.DRY_RUN } }
+      agent none
+      steps {
+        script {
+          try {
+            build job: 'gxa-json-system', wait: false, propagate: false, parameters: [
+              string(name: 'ENV', value: params.ENV),
+            ]
+          } catch (err) {
+            echo "Skipping gxa-json-system trigger (create the job pointing at Jenkinsfile.system-test): ${err}"
+          }
+        }
+      }
+    }
+
     // DevOps Portal persists deployment records on the controller; run off the K8s agent.
     stage('Record deployment') {
       when { expression { !params.DRY_RUN } }

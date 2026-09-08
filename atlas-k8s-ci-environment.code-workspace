@@ -30,6 +30,10 @@
 		{
 			"name": "fenix-schema",
 			"path": "../fenix-schema"
+		},
+		{
+			"name": "ebi-python-rest",
+			"path": "../ebi-python-rest"
 		}
 	],
 	"settings": {

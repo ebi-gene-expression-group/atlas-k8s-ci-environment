@@ -294,6 +294,25 @@ tasks:
         echo "Opening $URL"
         open "$URL"
 
+  test-system:
+    desc: Live Tavern GXA JSON journey (GXA_SYSTEM_BASE or ENV=ci|staging|public|fallback)
+    cmds:
+      - |
+        set -euo pipefail
+        if [ ! -x tests/system/.venv/bin/python ]; then
+          python3 -m venv tests/system/.venv
+        fi
+        tests/system/.venv/bin/pip install -q -r tests/system/requirements.txt
+        if [ -z "${GXA_SYSTEM_BASE:-}" ]; then
+          TARGET_ENV="${GXA_ENV:-{{.ENV}}}"
+          export GXA_SYSTEM_BASE="$(tests/system/.venv/bin/python tests/system/resolve_base.py "${TARGET_ENV}")"
+        fi
+        export GXA_SYSTEM_BASE="${GXA_SYSTEM_BASE%/}"
+        echo "GXA_SYSTEM_BASE=${GXA_SYSTEM_BASE}"
+        mkdir -p reports
+        PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \
+          --junitxml=reports/system-junit.xml
+
   gxa-print-urls:
     desc: Print GXA_SOURCE_JSON_URL, GXA_TARGET_JSON_URL, and TARGET_ENVIRONMENT from .env
     cmds:

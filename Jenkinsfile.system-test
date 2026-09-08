@@ -1,0 +1,69 @@
+// GXA JSON system tests (Tavern). Jenkins job e.g. gxa-json-system, Script Path = Jenkinsfile.system-test.
+//
+// Option D schedules (Jenkins UI, staggered). Parameterized Scheduler plugin if available:
+//   H 0,6,12,18 * * * % ENV=ci
+//   H 0,6,12,18 * * * % ENV=staging
+//   H 1,7,13,19 * * * % ENV=public
+//   H 1,7,13,19 * * * % ENV=fallback
+// Without that plugin: four thin jobs that call this one with a fixed ENV.
+
+pipeline {
+  parameters {
+    choice(
+      name: 'ENV',
+      choices: [
+        'ci',
+        'staging',
+        'public',
+        'fallback'
+      ],
+      description: 'GXA environment from config/gxa-environments.yaml (base_url).'
+    )
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '40'))
+    timeout(time: 40, unit: 'MINUTES')
+  }
+
+  agent none
+
+  stages {
+    stage('update title') {
+      steps {
+        script {
+          currentBuild.displayName = "#${env.BUILD_NUMBER} json-system → ${params.ENV}"
+        }
+      }
+    }
+
+    stage('Tavern GXA JSON journey') {
+      agent {
+        kubernetes {
+          cloud "${params.ENV == 'fallback' ? 'hx-webadmin-121' : 'hh-webadmin-35'}"
+          defaultContainer 'python'
+          yamlFile 'jenkins-k8s-pod-system-test.yaml'
+        }
+      }
+      steps {
+        sh """
+          set -euo pipefail
+          python3 -m venv tests/system/.venv
+          tests/system/.venv/bin/pip install -q --upgrade pip
+          tests/system/.venv/bin/pip install -q -r tests/system/requirements.txt
+          export GXA_SYSTEM_BASE="\$(tests/system/.venv/bin/python tests/system/resolve_base.py '${params.ENV}')"
+          echo "GXA_SYSTEM_BASE=\${GXA_SYSTEM_BASE}"
+          mkdir -p reports
+          PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \\
+            --junitxml=reports/system-junit.xml
+        """
+      }
+      post {
+        always {
+          junit testResults: 'reports/system-junit.xml', allowEmptyResults: false
+          archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
+        }
+      }
+    }
+  }
+}

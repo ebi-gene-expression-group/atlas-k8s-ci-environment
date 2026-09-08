@@ -12,4 +12,7 @@
 overrides/
 k8s_staging.sh
 __pycache__/
+.pytest_cache/
+reports/
+tests/system/.venv/
 .vscode/task-history.ndjson

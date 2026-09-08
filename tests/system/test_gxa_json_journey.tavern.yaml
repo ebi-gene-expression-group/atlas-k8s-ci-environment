@@ -1,0 +1,60 @@
+---
+test_name: gxa_json_journey
+
+strict: false
+
+stages:
+  - name: health
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/health"
+      method: GET
+      timeout: 60
+    response:
+      status_code: 200
+      json:
+        solr: UP
+        db: UP
+
+  - name: list_experiments
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/experiments"
+      method: GET
+      timeout: 180
+    response:
+      status_code: 200
+      save:
+        $ext:
+          function: helpers:save_accession
+
+  - name: one_experiment
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/experiments/{accession}"
+      method: GET
+      timeout: 600
+    response:
+      status_code: 200
+      save:
+        $ext:
+          function: helpers:save_gene_id
+
+  - name: search
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/search/baseline_facets"
+      method: GET
+      timeout: 180
+      params:
+        geneQuery: "{gene_id}"
+    response:
+      status_code: 200
+      verify_response_with:
+        function: helpers:assert_search_facets
+
+  - name: gene
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/bioentity-information/{gene_id}"
+      method: GET
+      timeout: 180
+    response:
+      status_code: 200
+      verify_response_with:
+        function: helpers:assert_bioentity
