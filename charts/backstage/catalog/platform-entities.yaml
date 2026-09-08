@@ -1,0 +1,104 @@
+# Shared platform entities — OpenBao + Kubernetes clusters used by FG services.
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: openbao
+  title: OpenBao
+  description: >
+    Self-hosted OpenBao (secrets management) on fg-public —
+    KV for GXA and other FG services; OIDC login via EMBL-EBI.
+  links:
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+      title: OpenBao UI
+      icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health
+      title: Health
+      icon: catalog
+  annotations:
+    backstage.io/view-url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+spec:
+  owner: fg_team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openbao
+  title: OpenBao (public)
+  description: >
+    OpenBao instance in namespace openbao on hh-wp-webadmin-35 (fg-public).
+    UI/API at https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+  tags:
+    - openbao
+    - secrets
+    - public
+  annotations:
+    backstage.io/view-url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+  links:
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+      title: UI
+      icon: dashboard
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health
+      title: Health
+      icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/secrets/kv/list
+      title: KV secrets
+      icon: catalog
+spec:
+  type: service
+  lifecycle: public
+  owner: fg_team
+  system: openbao
+  dependsOn:
+    - resource:default/hh-wp-webadmin-35
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: hh-wp-webadmin-35
+  title: Kubernetes — hh-wp-webadmin-35 (public)
+  description: >
+    Public FG Kubernetes cluster hh-wp-webadmin-35 (context fg-public).
+    Hosts GXA ci/staging/public, OpenBao, Backstage, and related services.
+  tags:
+    - kubernetes
+    - public
+    - fg-public
+  annotations:
+    ebi.ac.uk/k8s-context: fg-public
+    ebi.ac.uk/k8s-cluster: hh-wp-webadmin-35
+    kubernetes.io/api-server: https://hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+  links:
+    - url: https://hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+      title: Cluster API / ingress host
+      icon: catalog
+    - url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+      title: OpenBao UI
+      icon: catalog
+spec:
+  type: kubernetes-cluster
+  owner: fg_team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: hx-wp-webadmin-121
+  title: Kubernetes — hx-wp-webadmin-121 (fallback)
+  description: >
+    Fallback FG Kubernetes cluster hx-wp-webadmin-121 (context fg-fallback).
+    Hosts GXA fallback and related services.
+  tags:
+    - kubernetes
+    - fallback
+    - fg-fallback
+  annotations:
+    ebi.ac.uk/k8s-context: fg-fallback
+    ebi.ac.uk/k8s-cluster: hx-wp-webadmin-121
+    kubernetes.io/api-server: https://hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk:6443
+  links:
+    - url: https://hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk:6443
+      title: Cluster API server
+      icon: catalog
+spec:
+  type: kubernetes-cluster
+  owner: fg_team

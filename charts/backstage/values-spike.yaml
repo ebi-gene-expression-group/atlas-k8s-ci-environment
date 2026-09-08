@@ -140,3 +140,7 @@ backstage:
           target: ./catalog/annotare-entities.yaml
           rules:
             - allow: [Component, System, API, Resource, Domain, Group, User]
+        - type: file
+          target: ./catalog/platform-entities.yaml
+          rules:
+            - allow: [Component, System, API, Resource, Domain, Group, User]

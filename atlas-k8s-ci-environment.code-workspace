@@ -26,6 +26,10 @@
 		{
 			"name": "fenix-submissions-ui",
 			"path": "../fenix-submissions-ui"
+		},
+		{
+			"name": "fenix-schema",
+			"path": "../fenix-schema"
 		}
 	],
 	"settings": {
@@ -94,7 +98,7 @@
 				"database": "gxpatlaspub",
 				"username": "atlasdataload",
 				"usePassword": "SQLTools Driver Credentials"
-			},	
+			},
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
@@ -105,7 +109,7 @@
 				"group": "gxa k8s",
 				"database": "gxpatlaspro",
 				"username": "atlasprd3"
-			},	
+			},
 			{
 				"ssh": "Disabled",
 				"previewLimit": 50,
