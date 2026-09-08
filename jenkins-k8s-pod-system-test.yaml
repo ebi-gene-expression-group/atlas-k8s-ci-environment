@@ -3,6 +3,7 @@ kind: Pod
 metadata:
   namespace: gxa-jenkins
 spec:
+  serviceAccountName: jenkins-cloud
   securityContext:
     fsGroup: 1000
   containers:
@@ -17,6 +18,20 @@ spec:
     - name: python
       image: python:3.12-bookworm
       command: ["/bin/sh", "-c", "sleep 2h"]
+      env:
+        # pip → PyPI via EBI wwwcache; NO_PROXY keeps GXA NodePorts direct.
+        - name: HTTP_PROXY
+          value: http://hh-wwwcache.ebi.ac.uk:3128
+        - name: HTTPS_PROXY
+          value: http://hh-wwwcache.ebi.ac.uk:3128
+        - name: http_proxy
+          value: http://hh-wwwcache.ebi.ac.uk:3128
+        - name: https_proxy
+          value: http://hh-wwwcache.ebi.ac.uk:3128
+        - name: NO_PROXY
+          value: localhost,127.0.0.1,.ebi.ac.uk,.cluster.local,.svc
+        - name: no_proxy
+          value: localhost,127.0.0.1,.ebi.ac.uk,.cluster.local,.svc
       resources:
         requests:
           memory: "512Mi"

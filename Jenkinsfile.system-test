@@ -46,21 +46,23 @@ pipeline {
         }
       }
       steps {
-        sh """
-          set -euo pipefail
-          python3 -m venv tests/system/.venv
-          tests/system/.venv/bin/pip install -q --upgrade pip
-          tests/system/.venv/bin/pip install -q -r tests/system/requirements.txt
-          export GXA_SYSTEM_BASE="\$(tests/system/.venv/bin/python tests/system/resolve_base.py '${params.ENV}')"
-          echo "GXA_SYSTEM_BASE=\${GXA_SYSTEM_BASE}"
-          mkdir -p reports
-          PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \\
-            --junitxml=reports/system-junit.xml
-        """
+        // Jenkins `sh` runs /bin/sh (dash on python:3.12-bookworm). dash rejects `set -o pipefail`.
+        sh '''
+          bash -euo pipefail -c '
+            python3 -m venv tests/system/.venv
+            tests/system/.venv/bin/pip install -q --upgrade pip
+            tests/system/.venv/bin/pip install -q -r tests/system/requirements.txt
+            export GXA_SYSTEM_BASE="$(tests/system/.venv/bin/python tests/system/resolve_base.py "$ENV")"
+            echo "GXA_SYSTEM_BASE=${GXA_SYSTEM_BASE}"
+            mkdir -p reports
+            PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \
+              --junitxml=reports/system-junit.xml
+          '
+        '''
       }
       post {
         always {
-          junit testResults: 'reports/system-junit.xml', allowEmptyResults: false
+          junit testResults: 'reports/system-junit.xml', allowEmptyResults: true
           archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
         }
       }
