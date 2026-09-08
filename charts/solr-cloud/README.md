@@ -1,10 +1,32 @@
 # Installation Guide for Solr Operator v0.9.1
 
+Full sequence on a **new cluster** (operator, NFS, chart, Jenkins): [docs/new-cluster-setup.md](../../docs/new-cluster-setup.md).
+
 ## Install the CRDs (Custom Resource Definitions)
+
+Needs cluster-admin. Includes ZooKeeper operator CRDs (Helm does not install dependency CRDs):
+
+```bash
+kubectl create -f https://solr.apache.org/operator/downloads/crds/v0.9.1/all-with-dependencies.yaml
+```
 
 ## Install the Solr Operator via Helm
 
+```bash
+helm repo add apache-solr https://solr.apache.org/charts
+helm repo update apache-solr
+helm upgrade --install solr-operator apache-solr/solr-operator \
+  --version 0.9.1 \
+  --namespace solr-operator \
+  --create-namespace
+```
+
 ## Verify the Installation
+
+```bash
+kubectl api-resources | grep solr
+kubectl -n solr-operator get deploy,pods
+```
 
 ## Team RBAC for SolrCloud CRs
 
