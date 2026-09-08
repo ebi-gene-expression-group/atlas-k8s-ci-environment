@@ -6,6 +6,9 @@ metadata:
     {{- include "app.labels" . | nindent 4 }}
     app.kubernetes.io/component: webapp
 spec:
+  # Must exceed readiness timeout (10 min) plus Tomcat startup, or the rollout
+  # hits ProgressDeadlineExceeded while the first /json/experiments is still running.
+  progressDeadlineSeconds: 900
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
@@ -72,13 +75,16 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
-          # readinessProbe:
-          #   httpGet:
-          #     path: /gxa/json/experiments
-          #     port: http
-          #   periodSeconds: 30
-          #   timeoutSeconds: 300
-          #   failureThreshold: 1
+          # First GET /json/experiments loads experiments from the DB (several minutes).
+          # Keep the pod out of the Service until that cache is warm; health is
+          # already OK during the load so must not be used as readiness.
+          readinessProbe:
+            httpGet:
+              path: /gxa/json/experiments
+              port: http
+            periodSeconds: 60
+            timeoutSeconds: 600
+            failureThreshold: 3
           env:
             # From Secret (sensitive credentials)
             - name: SOLR_USER

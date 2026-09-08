@@ -130,13 +130,13 @@ data:
       <root level="INFO">
         <appender-ref ref="STDOUT" />
       </root>
-      <logger name="uk.ac.ebi.atlas" level="DEBUG" additivity="false">
+      <logger name="uk.ac.ebi.atlas" level="INFO" additivity="false">
         <appender-ref ref="STDOUT"/>
       </logger>
-      <logger name="org.springframework.web" level="DEBUG" additivity="false">
+      <logger name="org.springframework.web" level="INFO" additivity="false">
         <appender-ref ref="STDOUT"/>
       </logger>
-      <logger name="org.springframework.jdbc" level="DEBUG" additivity="false">
+      <logger name="org.springframework.jdbc" level="INFO" additivity="false">
         <appender-ref ref="STDOUT"/>
       </logger>
     </configuration>

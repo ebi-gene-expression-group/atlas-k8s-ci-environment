@@ -30,7 +30,7 @@ pipeline {
   options {
     buildDiscarder(logRotator(numToKeepStr: '40'))
     disableConcurrentBuilds()
-    timeout(time: 10, unit: 'MINUTES')
+    timeout(time: 15, unit: 'MINUTES')
   }
 
   // Choose the Jenkins Kubernetes cloud from ENV (params are not available on a
@@ -135,7 +135,7 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
   if (!dryRun) {
     sh """
       set -euo pipefail
-      kubectl rollout status deployment/${release} --namespace='${namespace}' --timeout=600s
+      kubectl rollout status deployment/${release} --namespace='${namespace}' --timeout=900s
     """
   }
 }
