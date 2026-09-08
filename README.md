@@ -153,7 +153,7 @@ kubectl --context=fg-public apply -f jenkins/fg-public-agent-rbac.yaml
 # new cluster: kubectl --context=<context> apply -f jenkins/<cluster>-agent-rbac.yaml
 ```
 
-See [New cluster setup — Jenkins deploy Role](docs/new-cluster-setup.md#6-jenkins-kubernetes-cloud-and-deploy-role).
+See [New cluster setup — Jenkins deploy Role](docs/new-cluster-setup.md#7-jenkins-deploy-role).
 
 Verify:
 
