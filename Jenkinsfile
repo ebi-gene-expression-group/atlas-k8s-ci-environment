@@ -38,6 +38,13 @@ pipeline {
   agent none
 
   stages {
+    stage('update title') {
+      steps {
+        script {
+          currentBuild.displayName = "#${env.BUILD_NUMBER} ${params.RELEASE}:${params.IMAGE_TAG} → ${params.ENV}"
+        }
+      }
+    }
     stage('Deploy') {
       agent {
         kubernetes {
@@ -134,10 +141,6 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
 }
 
 def recordDeployment(String release, String targetEnv, String imageTag) {
-  def namespace = "${release}-${targetEnv}"
-  currentBuild.displayName = "#${env.BUILD_NUMBER} ${release}:${imageTag} → ${targetEnv}"
-  currentBuild.description = "Deployed ${release} ${imageTag} to namespace ${namespace}"
-
   // targetService must match an environment label in Jenkins → DevOps Portal → Manage Environments
   def targetService = "${release}-${targetEnv}"
   def clusterTag = targetEnv == 'fallback' ? 'fg-fallback' : 'fg-public'
