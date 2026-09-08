@@ -62,6 +62,8 @@ Other useful examples: `task deploy-test`, `task open-solr ENV=staging`, `task p
 
 ### Adding a new deploy environment
 
+For a **new CaaS cluster** (operator, NFS, SolrCloud, Postgres firewall, Jenkins cloud/RBAC/secrets), follow **[New cluster setup](docs/new-cluster-setup.md)** first.
+
 Use a short environment name (e.g. `ci`, `staging`, `prod`). The Helm release deploys to namespace **`gxa-<env>`** (e.g. `gxa-ci`). SolrCloud, if used, lives in **`gxa-<env>-solrcloud`**.
 
 Scaffold chart values locally first:
@@ -144,11 +146,14 @@ The agent pod is scheduled on Jenkins Kubernetes cloud **`hh-webadmin-35`**, exc
 
 Jenkins deploys as service account **`jenkins-cloud`** in namespace **`gxa-jenkins`**. It needs a **Role** and **RoleBinding** in the target namespace **`gxa-<env>`**.
 
-Copy the `jenkins-gxa-deploy` Role + RoleBinding block for an existing environment in [`jenkins/fg-public-agent-rbac.yaml`](jenkins/fg-public-agent-rbac.yaml) (see `gxa-staging` or `gxa-ci`), change the namespace and `atlas.ebi.ac.uk/target-namespace` label to `gxa-<env>`, then apply:
+Copy the `jenkins-gxa-deploy` Role + RoleBinding block for an existing environment in [`jenkins/fg-public-agent-rbac.yaml`](jenkins/fg-public-agent-rbac.yaml) (see `gxa-staging` or `gxa-ci`), change the namespace and `atlas.ebi.ac.uk/target-namespace` label to `gxa-<env>`, then apply on **the cluster that will run the agent** (Helm lists Secrets as `gxa-jenkins:jenkins-cloud`):
 
 ```bash
 kubectl --context=fg-public apply -f jenkins/fg-public-agent-rbac.yaml
+# new cluster: kubectl --context=<context> apply -f jenkins/<cluster>-agent-rbac.yaml
 ```
+
+See [New cluster setup — Jenkins deploy Role](docs/new-cluster-setup.md#6-jenkins-kubernetes-cloud-and-deploy-role).
 
 Verify:
 

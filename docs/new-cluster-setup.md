@@ -1,203 +1,292 @@
-# New Kubernetes cluster setup (GXA)
+# New cluster setup (GXA)
 
-Use this when GXA moves to a **new CaaS cluster** (example: fallback on `hx-wp-webadmin-121` / kubectl context `fg-fallback`). Adding another environment on an **existing** cluster (`ci` / `staging` / `public` on `hh-wp-webadmin-35`) is [README — Adding a new deploy environment](../README.md#adding-a-new-deploy-environment).
+Use this when GXA moves onto a **new Kubernetes cluster** (for example `hx-wp-webadmin-121` / `fg-fallback`), not when you only add another environment on **fg-public**. For a new env on an existing cluster, see [Adding a new deploy environment](../README.md#adding-a-new-deploy-environment).
 
-Recommended order (Solr NFS must exist before the SolrCloud chart):
+Worked example throughout: `ENV=fallback`, context `fg-fallback`, app `gxa`. Substitute the new cluster’s context, NFS server, Postgres host, and Jenkins cloud name.
 
-1. [Solr CRDs and operator](#1-solr-crds-and-operator)
-2. [Solr data directory (NFS)](#2-solr-data-directory-nfs)
-3. [SolrCloud chart](#3-solrcloud-chart)
-4. [PostgreSQL firewall](#4-postgresql-firewall)
-5. [GXA webapp Helm chart](#5-gxa-webapp-helm-chart)
-6. [Jenkins Kubernetes cloud and deploy Role](#6-jenkins-kubernetes-cloud-and-deploy-role)
-7. [Jenkins secrets credential](#7-jenkins-secrets-credential)
+Recommended order:
 
-Placeholders: `<env>` (e.g. `fallback`), `<context>` (e.g. `fg-fallback`), Jenkins cloud name (e.g. `hx-webadmin-121`). Helm release for SolrCloud is `gxa-<env>`; webapp release is `gxa` in namespace `gxa-<env>`.
+1. Prerequisites (namespaces, kubeconfig, Jenkins cloud)
+2. Solr CRDs and operator
+3. Solr / ZK data directories on NFS
+4. SolrCloud Helm chart
+5. Database firewall
+6. Webapp Helm chart
+7. Jenkins deploy Role
+8. Jenkins secrets credential
 
-`team-admin` cannot create namespaces or ClusterRoles. Ask ITS for those.
+Solr data (step 3) must exist **before** the SolrCloud chart (step 4). Jenkins Role + secret (steps 7–8) can be done in parallel with 2–6, but Helm from Jenkins will fail until both exist.
 
-## Prerequisites
+## 1. Prerequisites
 
-- kubectl context for the new cluster (store in `.env` as `K8S_CONTEXT`).
-- ITS-created namespaces:
-  - `gxa-jenkins` (Jenkins agent pods)
-  - `gxa-<env>` (webapp)
-  - `gxa-<env>-solrcloud` (Solr + ZooKeeper)
-- Isilon NFS reachable from **worker node IPs** (read-write on `{solr_data,zk_data}`; see [NFS storage](../charts/solr-cloud/README.md#nfs-storage)). Fallback uses `hx-isi-srv-vlan157.ebi.ac.uk` and `/ifs/public-r` ([KB0011170](https://embl.service-now.com/esc?id=kb_article&sysparm_article=KB0011170)).
-- Chart values: `charts/gxa/values-<env>.yaml` and `charts/solr-cloud/values-<env>.yaml` (NFS server, `jdbc.url`, `solr.namespace`).
+Ask ITS / CaaS for:
 
-## 1. Solr CRDs and operator
+- A kubeconfig (or Jenkins Kubernetes cloud) that can schedule into this cluster
+- Namespaces (team-admin typically **cannot** create them):
+  - `gxa-jenkins` — Jenkins agent pods (`jenkins-k8s-pod-deploy.yaml`)
+  - `gxa-<env>` — webapp (e.g. `gxa-fallback`)
+  - `gxa-<env>-solrcloud` — SolrCloud (e.g. `gxa-fallback-solrcloud`)
+- The cluster’s **writable** Isilon export and NFS server (Hinxton public uses `hh-isi-srv-vlan1496.ebi.ac.uk:/ifs/public`; HL2 fallback uses `hx-isi-srv-vlan157.ebi.ac.uk:/ifs/public-r`)
+- Worker/pod CIDRs (needed for Postgres firewall and Isilon export ACLs)
 
-Install **Solr Operator v0.9.1** once per cluster (CRDs are cluster-scoped). Needs cluster-admin.
+Chart values live in `charts/gxa/values-<env>.yaml` and `charts/solr-cloud/values-<env>.yaml`. Scaffold the webapp values with `scripts/create-env.sh <env>` if they do not exist.
+
+Set `.env` (or the shell) to the new cluster:
 
 ```bash
-kubectl --context <context> create -f \
-  https://solr.apache.org/operator/downloads/crds/v0.9.1/all-with-dependencies.yaml
+RELEASE=gxa
+ENV=fallback
+K8S_CONTEXT=fg-fallback
+```
 
+Confirm:
+
+```bash
+kubectl --context "$K8S_CONTEXT" get ns gxa-jenkins gxa-${ENV} gxa-${ENV}-solrcloud
+```
+
+### Jenkins Kubernetes cloud
+
+The deploy pipeline (`Jenkinsfile`) picks the **Jenkins Kubernetes plugin cloud name** from `ENV`:
+
+- `fallback` → `hx-webadmin-121`
+- everything else → `hh-webadmin-35`
+
+A new cluster needs a cloud of that name (or a `Jenkinsfile` change). The cloud must:
+
+- Use a kubeconfig for **this** cluster
+- Default / restrict agents to namespace `gxa-jenkins`
+- Use service account `jenkins-cloud`
+
+On the cluster, create `gxa-jenkins`, SA `jenkins-cloud`, and the `jenkins-agent-pods` Role/RoleBinding from [`jenkins/fg-public-agent-rbac.yaml`](../jenkins/fg-public-agent-rbac.yaml) (copy, retarget labels/context). Without that, Jenkins cannot even start the helm agent pod.
+
+## 2. Solr CRDs and operator
+
+Cluster-wide, once per cluster. Version used here: **Solr Operator 0.9.1** (includes the ZooKeeper operator). Official docs: [Running the Solr Operator](https://solr.apache.org/guide/operator/latest/getting-started/running-the-operator.html).
+
+CRDs (Solr **and** `ZookeeperCluster` — Helm does not install dependency CRDs):
+
+```bash
+kubectl --context "$K8S_CONTEXT" create -f \
+  https://solr.apache.org/operator/downloads/crds/v0.9.1/all-with-dependencies.yaml
+```
+
+Operator:
+
+```bash
 helm repo add apache-solr https://solr.apache.org/charts
 helm repo update apache-solr
-
 helm upgrade --install solr-operator apache-solr/solr-operator \
   --version 0.9.1 \
-  --kube-context <context> \
+  --kube-context "$K8S_CONTEXT" \
   --namespace solr-operator \
   --create-namespace
 ```
 
-`all-with-dependencies.yaml` includes the ZooKeeper operator CRDs. Helm alone does not.
+`--create-namespace` may need cluster-admin. If it fails, ask ITS to create `solr-operator` first.
 
 Verify:
 
 ```bash
-kubectl --context <context> api-resources | grep solr
-kubectl --context <context> -n solr-operator get deploy,pods
+kubectl --context "$K8S_CONTEXT" api-resources | grep -E 'solr|zookeeper'
+kubectl --context "$K8S_CONTEXT" -n solr-operator get deploy,pods
 ```
 
-Then ITS must grant `team-admin` access to `solrclouds.solr.apache.org`. Listing CRDs is not enough. Helm error `cannot get resource "solrclouds"` means this step is missing.
+### Team RBAC for SolrCloud CRs
+
+CRDs being listed does **not** mean `team-admin` can create `SolrCloud` objects. Expect Helm error `cannot get resource "solrclouds"` otherwise.
 
 ```bash
-kubectl --context <context> auth can-i '*' solrclouds --all-namespaces
+kubectl --context "$K8S_CONTEXT" auth can-i '*' solrclouds --all-namespaces
 ```
 
-Expect `yes`. ClusterRole + ClusterRoleBinding to apply: [charts/solr-cloud/README.md — Team RBAC](../charts/solr-cloud/README.md#team-rbac-for-solrcloud-crs).
+Must print `yes`. `team-admin` cannot create ClusterRoles; **ITS** applies the ClusterRole + ClusterRoleBinding in [`charts/solr-cloud/README.md`](../charts/solr-cloud/README.md) (subject `default:team-admin`).
 
-## 2. Solr data directory (NFS)
+## 3. Solr / ZK data directories
 
-Solr and ZooKeeper **always** use Isilon folders, not cluster PVCs.
+Solr and ZooKeeper always use Isilon folders. There is no cluster PVC for Solr data. Detail: [`charts/solr-cloud/README.md`](../charts/solr-cloud/README.md) (NFS storage).
 
-Path:
+Layout:
 
-`{nfs.publicPath}/{nfs.environmentsBase}/<env>/{solr_data,zk_data}/`
+```text
+{nfs.publicPath}/{nfs.environmentsBase}/{environment}/{solr_data,zk_data}/
+```
 
-Example (Hinxton public): `/ifs/public/rw/fg/atlas/gxa/environments/<env>/{solr_data,zk_data}/`  
-Example (fallback / HL2): `/ifs/public-r/rw/fg/atlas/gxa/environments/fallback/{solr_data,zk_data}/`
+Example (HL2 fallback):
 
-Layout the chart expects:
+```text
+hx-isi-srv-vlan157.ebi.ac.uk:/ifs/public-r/rw/fg/atlas/gxa/environments/fallback/solr_data/
+hx-isi-srv-vlan157.ebi.ac.uk:/ifs/public-r/rw/fg/atlas/gxa/environments/fallback/zk_data/
+```
 
-| Path under the env dir | Folder names |
-| --- | --- |
-| `solr_data/` | `{dataDirPrefix}-solrcloud-{0..3}` (default prefix = Helm release `gxa-<env>`; override in values, e.g. `dataDirPrefix: gxa`) |
-| `zk_data/` | `{release}-solrcloud-zookeeper-{0..2}` (must match the SolrCloud release, e.g. `gxa-fallback-solrcloud-zookeeper-0`) |
+Set `nfs.server` / `nfs.publicPath` in `charts/solr-cloud/values-<env>.yaml` (and the same server on the GXA chart).
 
-Copy from another env with a Codon **datamover** job (login nodes often do not mount `/nfs/public`). Scripts: [`scripts/slurm/README.md`](../scripts/slurm/README.md).
+### Populate the tree
 
-After rsync, ZooKeeper directories and `zoo.cfg*` often still name the **source** env. Rewrite **before** deploy, with destination ZK stopped:
+Copy from an existing env (Codon datamover, as `fg_atlas`). See [`scripts/slurm/README.md`](../scripts/slurm/README.md).
+
+If you rsync **staging → fallback**, ZK directory names and `zoo.cfg` FQDNs still say `gxa-staging-…`. Rewrite **before** deploy, with destination ZK stopped:
 
 ```bash
 BASE=/nfs/ebi/public/rw/fg/atlas/gxa/environments SRC=staging DST=fallback \
   ./scripts/slurm/rewrite-gxa-zk-env-names.sh
 ```
 
-Confirm from a probe pod that the export is **writable** from this cluster (`touch` must succeed; `mount` showing `(rw)` is not enough). Ownership is `fg_atlas` (`uid 2921` / `gid 1146`).
+Folder names the chart expects:
 
-## 3. SolrCloud chart
+| Kind | Path under `solr_data` / `zk_data` |
+| ---- | ---------------------------------- |
+| Solr | `{dataDirPrefix}-solrcloud-{0..3}/` (often `gxa-solrcloud-n` when `dataDirPrefix: gxa`) |
+| ZK   | `{release}-solrcloud-zookeeper-{0..2}/` (e.g. `gxa-fallback-solrcloud-zookeeper-n`) |
 
-```bash
-K8S_CONTEXT=<context> ENV=<env> FORCE_CONFLICTS=1 task deploy-solrcloud
-```
+`dataDirPrefix` is in `values-<env>.yaml` when NFS names predate the Helm release rename.
 
-`task deploy-solrcloud` applies ZK NFS PV/PVCs **before** the operator creates StatefulSets (avoids Pending PVCs). It does **not** create the namespace.
+### Write access from Kubernetes
 
-Wait until 4 Solr + 3 ZK pods are Ready. Copy the operator-generated admin password into the webapp secrets (gitignored; also Jenkins in step 7):
+Isilon must grant **read-write** on both `solr_data` and `zk_data` to **Kubernetes node IPs**, uid `fg_atlas` (2921) / gid 1146. `mount` can show `(rw)` while `touch` still returns `Read-only file system`.
 
-```bash
-kubectl --context <context> -n gxa-<env>-solrcloud \
-  get secret gxa-<env>-solrcloud-security-bootstrap \
-  -o jsonpath='{.data.password}' | base64 -d; echo
-```
+NFS KB used for CaaS/Isilon: [KB0011170](https://embl.service-now.com/esc?id=kb_article&sysparm_article=KB0011170).
 
-Put that value in `charts/gxa/.secrets-<env>.yaml` under `solr.password`. Details and recovery: [charts/solr-cloud/README.md](../charts/solr-cloud/README.md).
+## 4. SolrCloud Helm chart
 
-## 4. PostgreSQL firewall
-
-The webapp uses an **external** Postgres (`jdbc.url` in `charts/gxa/values-<env>.yaml`), not in-cluster PG. Cluster **worker / pod networks** must be allowed to that host:5432.
-
-Ask ITS (firewall / DB ACL). Include:
-
-- JDBC host, port, database, and role from `values-<env>.yaml` / [`config/gxa-environments.yaml`](../config/gxa-environments.yaml)
-- New cluster worker node CIDRs (and pod CIDR if different from workers)
-
-Check TCP from a pod in `gxa-<env>` (chart test `templates/tests/test-jdbc.yaml`):
+Namespace `gxa-<env>-solrcloud` must already exist.
 
 ```bash
-helm test gxa -n gxa-<env> --kube-context <context> --filter name=gxa-test-jdbc
-# or: kubectl run ... --image=busybox -- nc -z -w 5 <pg-host> 5432
+K8S_CONTEXT=fg-fallback ENV=fallback FORCE_CONFLICTS=1 task deploy-solrcloud
 ```
 
-`connection refused` / timeout is firewall. `database does not exist` is the DB name/role, not the firewall.
+Helm 4 on these clusters often needs `FORCE_CONFLICTS=1`. The task applies ZK NFS PV/PVCs **before** the operator creates StatefulSets (otherwise PVCs stay Pending).
 
-## 5. GXA webapp Helm chart
-
-Local first (`.env`: `K8S_CONTEXT`, `RELEASE=gxa`, `ENV=<env>`):
+Wait until 4 Solr + 3 ZK pods are Ready. Copy the Solr admin password the operator creates (needed by the webapp):
 
 ```bash
-task deploy
+kubectl --context "$K8S_CONTEXT" -n gxa-${ENV}-solrcloud \
+  get secret ${RELEASE}-${ENV}-solrcloud-security-bootstrap \
+  -o jsonpath='{.data.admin}' | base64 -d; echo
 ```
 
-Equivalent:
+Put that value in gitignored `charts/gxa/.secrets-<env>.yaml` under `solr.password`, and in the Jenkins credential (step 8). Default `changeme` will not talk to a real operator-managed Solr.
+
+If ZK PVCs are Pending with no `volumeName`: `task fix-solrcloud-zk-pvcs ENV=<env>`. More in [`charts/solr-cloud/README.md`](../charts/solr-cloud/README.md).
+
+## 5. Database firewall
+
+The webapp uses an **external** Postgres (`jdbc.url` in `charts/gxa/values-<env>.yaml`), not in-cluster Postgres.
+
+ITS must allow **TCP 5432** from this cluster’s worker (and if different, pod) networks to that host. Fallback example: `pgsql-dlvmpubfall2-019.ebi.ac.uk:5432` / database in `values-fallback.yaml`.
+
+Check from a pod on the new cluster (Helm test or a throwaway probe):
+
+```bash
+# After the webapp chart exists, or with charts/gxa/templates/tests/test-jdbc.yaml:
+helm test gxa -n gxa-${ENV} --filter name=gxa-test-jdbc
+```
+
+Or:
+
+```bash
+kubectl --context "$K8S_CONTEXT" -n gxa-${ENV} run pg-tcp --rm -it --restart=Never \
+  --image=busybox:1.36 -- \
+  nc -z -w 5 pgsql-dlvmpubfall2-019.ebi.ac.uk 5432
+```
+
+`FAIL: host:port is not reachable` is a firewall/network-policy problem, not a Helm values typo. Database name/user must also exist (`gxpatlaspub` vs `gxpatlaspro` has already bitten fallback).
+
+## 6. Webapp Helm chart
+
+Local (after `.secrets-<env>.yaml` has jdbc, solr, tomcat, image pull):
+
+```bash
+K8S_CONTEXT=fg-fallback ENV=fallback task deploy
+```
+
+Or Helm:
 
 ```bash
 helm upgrade --install gxa charts/gxa \
-  --kube-context <context> \
-  --namespace gxa-<env> \
+  --kube-context "$K8S_CONTEXT" \
+  --namespace gxa-${ENV} \
   --create-namespace \
-  -f charts/gxa/values-<env>.yaml \
-  -f charts/gxa/.secrets-<env>.yaml \
-  --set appVersion=<image-tag> \
-  --set image.tag=<image-tag>
+  -f charts/gxa/values-${ENV}.yaml \
+  -f charts/gxa/.secrets-${ENV}.yaml \
+  --set appVersion=<tag> \
+  --set image.tag=<tag>
 ```
 
-`--create-namespace` fails if `team-admin` cannot create namespaces — create `gxa-<env>` with ITS first.
+`--create-namespace` may fail for `team-admin`; create `gxa-<env>` beforehand.
 
-The first Ready gate is `/gxa/json/experiments` (experiment cache from the DB). Startup/liveness stay on `/gxa/json/health`. Chart details: [charts/gxa/readme.md](../charts/gxa/readme.md).
+The first Ready wait includes `/gxa/json/experiments` (readiness probe, up to 10 minutes) so experiment cache is warm before the Service takes traffic. `kubectl rollout status` uses a 15 minute timeout.
 
-## 6. Jenkins Kubernetes cloud and deploy Role
+Point `solr.namespace` at `gxa-<env>-solrcloud`. Chart details: [`charts/gxa/readme.md`](../charts/gxa/readme.md).
 
-The deploy pipeline (`Jenkinsfile`) runs Helm **inside** an agent pod on the **target** cluster. `ENV=fallback` uses Jenkins Kubernetes cloud `hx-webadmin-121`; other envs use `hh-webadmin-35`. A new cluster needs a matching cloud name (add it to the `Jenkinsfile` ternary).
+## 7. Jenkins deploy Role
 
-### Agent namespace (once per cluster)
-
-On the new cluster, apply the `gxa-jenkins` Namespace, `jenkins-cloud` ServiceAccount, `jenkins-agent-pods` Role, and RoleBinding from [`jenkins/fg-public-agent-rbac.yaml`](../jenkins/fg-public-agent-rbac.yaml) (copy the file, retarget labels/context). Point the Jenkins Kubernetes plugin at that kubeconfig. Agent pod spec: [`jenkins-k8s-pod-deploy.yaml`](../jenkins-k8s-pod-deploy.yaml) (`namespace: gxa-jenkins`, `serviceAccountName: jenkins-cloud`).
-
-### Deploy Role (once per target namespace)
-
-Helm lists **Secrets** in `gxa-<env>` for release history (`sh.helm.release.v1.gxa.*`). Without a Role, you get:
+The agent runs as `system:serviceaccount:gxa-jenkins:jenkins-cloud` **on this cluster**. Helm lists Secrets in `gxa-<env>` to find `sh.helm.release.v1.*`. Without a Role there you get:
 
 ```text
 secrets is forbidden: User "system:serviceaccount:gxa-jenkins:jenkins-cloud"
-cannot list resource "secrets" in the namespace "gxa-<env>"
+cannot list resource "secrets" in API group "" in the namespace "gxa-<env>"
 ```
 
-Copy the `jenkins-gxa-deploy` Role + RoleBinding for `gxa-staging` or `gxa-ci` in [`jenkins/fg-public-agent-rbac.yaml`](../jenkins/fg-public-agent-rbac.yaml). Set `metadata.namespace` and `atlas.ebi.ac.uk/target-namespace` to `gxa-<env>`. Apply **on the new cluster**:
+Copy the `jenkins-gxa-deploy` Role + RoleBinding for `gxa-staging` or `gxa-ci` from [`jenkins/fg-public-agent-rbac.yaml`](../jenkins/fg-public-agent-rbac.yaml). Change:
 
-```bash
-kubectl --context <context> apply -f jenkins/<cluster>-agent-rbac.yaml
+- `metadata.namespace`
+- label `atlas.ebi.ac.uk/target-namespace`
+- apply **on the new cluster** (`--context fg-fallback`, not `fg-public`)
+
+The binding subject stays:
+
+```yaml
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-cloud
+    namespace: gxa-jenkins
 ```
 
-Verify:
+Apply and check:
 
 ```bash
-kubectl --context <context> get role,rolebinding -n gxa-<env> \
+kubectl --context "$K8S_CONTEXT" apply -f jenkins/<this-cluster>-agent-rbac.yaml
+
+kubectl --context "$K8S_CONTEXT" get role,rolebinding -n gxa-${ENV} \
   -l atlas.ebi.ac.uk/jenkins-role=deploy
 
-kubectl --context <context> auth can-i list secrets \
-  --namespace gxa-<env> \
+kubectl --context "$K8S_CONTEXT" auth can-i list secrets \
+  --namespace gxa-${ENV} \
   --as system:serviceaccount:gxa-jenkins:jenkins-cloud
 ```
 
-Expect `yes`. Optional: the same Role in `gxa-<env>-solrcloud` if Jenkins will deploy SolrCloud.
+The last command must print `yes`. Repeat the same Role/RoleBinding in `gxa-<env>-solrcloud` if Jenkins will install SolrCloud.
 
-## 7. Jenkins secrets credential
+Also add `ENV` to the `Jenkinsfile` choice list and map it to this cluster’s Kubernetes cloud name (see Prerequisites).
 
-The pipeline mounts credential **`gxa-secrets-<env>`** as a Helm `-f` values file ([`Jenkinsfile`](../Jenkinsfile)).
+## 8. Jenkins secrets credential
+
+Pipeline credential id: **`gxa-secrets-<env>`** (see `Jenkinsfile`).
 
 **Manage Jenkins → Credentials → Secret file:**
 
 | Field | Value |
-| --- | --- |
-| ID | `gxa-secrets-<env>` (e.g. `gxa-secrets-fallback`) |
-| File | Same shape as gitignored `charts/gxa/.secrets-<env>.yaml` |
+| ----- | ----- |
+| ID | `gxa-secrets-fallback` (or `gxa-secrets-<env>`) |
+| File | Same YAML as `charts/gxa/.secrets-<env>.yaml` |
 
-Typical keys: `jdbc.password`, `solr.password` (from the Solr bootstrap secret), `tomcat.deployerPassword` / `curatorPassword`, `imagePullSecret`, nginx cache purge password if used. Copy from an existing env’s local `.secrets-*.yaml`. Do not commit secrets.
+Typical keys (only what that env’s values file needs):
 
-Also add `gxa-<env>` in **Jenkins → DevOps Portal → Manage Environments** before the first non–dry-run deploy, and add `<env>` to the `Jenkinsfile` `ENV` choice list. Then run **Build Now** once so Jenkins refreshes parameters.
+```yaml
+jdbc:
+  password: "..."
+solr:
+  password: "..."   # from solrcloud-security-bootstrap, not changeme
+tomcat:
+  deployerPassword: "..."
+  curatorPassword: "..."
+imagePullSecret:
+  create: yes
+  username: "..."
+  password: "..."
+```
+
+Do not commit `.secrets-*.yaml`. Copy from an existing env’s local file as a template.
+
+Optional: add DevOps Portal environment label `gxa-<env>` before the first non–dry-run so `reportDeployOperation` succeeds ([README](../README.md#1-devops-portal-environment)).
