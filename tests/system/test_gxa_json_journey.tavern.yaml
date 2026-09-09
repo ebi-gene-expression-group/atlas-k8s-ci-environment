@@ -8,12 +8,50 @@ stages:
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/health"
       method: GET
-      timeout: 60
+      timeout: 5
     response:
       status_code: 200
       json:
         solr: UP
         db: UP
+
+---
+test_name: build
+
+strict: false
+
+stages:
+  - name: build
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/build"
+      method: GET
+      timeout: 5
+    response:
+      status_code: 200
+      json:
+        "Build version": !anystr
+        "Git branch": !anystr
+        "Latest commit ID": !anystr
+        "Latest commit message": !anystr
+
+---
+test_name: suggestions
+
+strict: false
+
+stages:
+  - name: suggestions
+    request:
+      url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/suggestions"
+      method: GET
+      timeout: 5
+      params:
+        query: REG
+        species: ""
+    response:
+      status_code: 200
+      verify_response_with:
+        function: helpers:assert_non_empty_array
 
 ---
 test_name: list_experiments
@@ -25,7 +63,7 @@ stages:
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/experiments"
       method: GET
-      timeout: 180
+      timeout: 5
     response:
       status_code: 200
       save:
@@ -42,7 +80,7 @@ stages:
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/experiments/{accession}"
       method: GET
-      timeout: 600
+      timeout: 5
     response:
       status_code: 200
       save:
@@ -59,7 +97,7 @@ stages:
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/search/baseline_facets"
       method: GET
-      timeout: 180
+      timeout: 5
       params:
         geneQuery: "{gene_id}"
     response:
@@ -77,7 +115,7 @@ stages:
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/bioentity-information/{gene_id}"
       method: GET
-      timeout: 180
+      timeout: 5
     response:
       status_code: 200
       verify_response_with:

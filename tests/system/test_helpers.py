@@ -6,10 +6,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from helpers import assert_bioentity, assert_search_facets, save_accession, save_gene_id
+from helpers import (
+    assert_bioentity,
+    assert_non_empty_array,
+    assert_search_facets,
+    save_accession,
+    save_gene_id,
+)
 
 
-def _json_response(payload: dict) -> SimpleNamespace:
+def _json_response(payload: object) -> SimpleNamespace:
     return SimpleNamespace(json=lambda: payload)
 
 
@@ -55,3 +61,11 @@ def test_save_gene_id() -> None:
 def test_assert_search_facets_and_bioentity() -> None:
     assert_search_facets(_json_response({"homo sapiens": {"ORGANISM_PART": ["liver"]}}))
     assert_bioentity(_json_response({"bioentityProperties": [{"type": "symbol"}]}))
+
+
+def test_assert_non_empty_array() -> None:
+    assert_non_empty_array(_json_response(["REG1A"]))
+    with pytest.raises(AssertionError):
+        assert_non_empty_array(_json_response([]))
+    with pytest.raises(AssertionError):
+        assert_non_empty_array(_json_response({"query": "REG"}))

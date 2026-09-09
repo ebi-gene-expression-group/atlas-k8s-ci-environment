@@ -45,3 +45,10 @@ def assert_bioentity(response: Any) -> None:
     body = response.json()
     props = body.get("bioentityProperties") or []
     assert props, "bioentityProperties missing or empty"
+
+
+def assert_non_empty_array(response: Any) -> None:
+    """Response JSON is a non-empty array (e.g. GET /json/suggestions)."""
+    body = response.json()
+    assert isinstance(body, list), f"expected array, got {type(body)}"
+    assert body, "expected a non-empty array"
