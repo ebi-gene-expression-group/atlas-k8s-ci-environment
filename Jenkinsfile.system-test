@@ -59,7 +59,7 @@ H 1,7,13,19 * * * % ENV=fallback
             echo "GXA_SYSTEM_BASE=${GXA_SYSTEM_BASE}"
             mkdir -p reports
             PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \
-              --junitxml=reports/system-junit.xml
+              --junitxml=reports/system-junit.xml -o junit_logging=all
           '
         '''
       }

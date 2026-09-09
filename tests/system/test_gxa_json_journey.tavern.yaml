@@ -1,5 +1,5 @@
 ---
-test_name: gxa_json_journey
+test_name: health
 
 strict: false
 
@@ -15,6 +15,12 @@ stages:
         solr: UP
         db: UP
 
+---
+test_name: list_experiments
+
+strict: false
+
+stages:
   - name: list_experiments
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/experiments"
@@ -26,6 +32,12 @@ stages:
         $ext:
           function: helpers:save_accession
 
+---
+test_name: one_experiment
+
+strict: false
+
+stages:
   - name: one_experiment
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/experiments/{accession}"
@@ -37,6 +49,12 @@ stages:
         $ext:
           function: helpers:save_gene_id
 
+---
+test_name: search
+
+strict: false
+
+stages:
   - name: search
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/search/baseline_facets"
@@ -49,6 +67,12 @@ stages:
       verify_response_with:
         function: helpers:assert_search_facets
 
+---
+test_name: gene
+
+strict: false
+
+stages:
   - name: gene
     request:
       url: "{tavern.env_vars.GXA_SYSTEM_BASE}/json/bioentity-information/{gene_id}"

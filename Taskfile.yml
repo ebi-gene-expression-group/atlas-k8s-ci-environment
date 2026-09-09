@@ -311,7 +311,7 @@ tasks:
         echo "GXA_SYSTEM_BASE=${GXA_SYSTEM_BASE}"
         mkdir -p reports
         PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \
-          --junitxml=reports/system-junit.xml
+          --junitxml=reports/system-junit.xml -o junit_logging=all
 
   gxa-print-urls:
     desc: Print GXA_SOURCE_JSON_URL, GXA_TARGET_JSON_URL, and TARGET_ENVIRONMENT from .env

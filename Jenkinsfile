@@ -100,11 +100,11 @@ pipeline {
       steps {
         script {
           try {
-            build job: 'gxa-json-system', wait: false, propagate: false, parameters: [
+            build job: 'GXA system tests', wait: false, propagate: false, parameters: [
               string(name: 'ENV', value: params.ENV),
             ]
           } catch (err) {
-            echo "Skipping gxa-json-system trigger (create the job pointing at Jenkinsfile.system-test): ${err}"
+            echo "Skipping GXA system tests trigger (create the job pointing at Jenkinsfile.system-test): ${err}"
           }
         }
       }
