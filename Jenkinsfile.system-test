@@ -1,4 +1,4 @@
-// GXA JSON system tests (Tavern). Jenkins job e.g. gxa-json-system, Script Path = Jenkinsfile.system-test.
+// GXA system tests
 
 pipeline {
   parameters {
@@ -35,7 +35,7 @@ H 1,7,13,19 * * * % ENV=fallback
     stage('update job title') {
       steps {
         script {
-          currentBuild.displayName = "#${env.BUILD_NUMBER} json-system → ${params.ENV}"
+          currentBuild.displayName = "#${env.BUILD_NUMBER} GXA system tests → ${params.ENV}"
         }
       }
     }
