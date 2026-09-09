@@ -1,11 +1,4 @@
 // GXA JSON system tests (Tavern). Jenkins job e.g. gxa-json-system, Script Path = Jenkinsfile.system-test.
-//
-// Option D schedules (Jenkins UI, staggered). Parameterized Scheduler plugin if available:
-//   H 0,6,12,18 * * * % ENV=ci
-//   H 0,6,12,18 * * * % ENV=staging
-//   H 1,7,13,19 * * * % ENV=public
-//   H 1,7,13,19 * * * % ENV=fallback
-// Without that plugin: four thin jobs that call this one with a fixed ENV.
 
 pipeline {
   parameters {
@@ -26,10 +19,20 @@ pipeline {
     timeout(time: 40, unit: 'MINUTES')
   }
 
+  triggers {
+    parameterizedCron('''
+TZ=Europe/London
+H 0,6,12,18 * * * % ENV=ci
+H 0,6,12,18 * * * % ENV=staging
+H 1,7,13,19 * * * % ENV=public
+H 1,7,13,19 * * * % ENV=fallback
+    ''')
+  }
+
   agent none
 
   stages {
-    stage('update title') {
+    stage('update job title') {
       steps {
         script {
           currentBuild.displayName = "#${env.BUILD_NUMBER} json-system → ${params.ENV}"
