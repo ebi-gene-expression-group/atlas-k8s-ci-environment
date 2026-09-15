@@ -4,6 +4,7 @@
 #
 # KV path: kv/data/<service>/<environment>/<class>/<name>  (apps)
 #          kv/data/<service>/<cluster-server>/<class>/<name>  (cluster-scoped, e.g. kubeconfig)
+#          kv/data/<service>/<environment>/<name>  (env-scoped, no class, e.g. fenix/dev/ebi-storage)
 # Cluster server = kubeconfig clusters[].cluster.server host (no scheme/port).
 
 environments: [test, ci, staging, public, fallback]
@@ -90,7 +91,7 @@ users:
   sands:
     email: sands@ebi.ac.uk
     memberships:
-      - { group: fg, role: developer, services: [gxa] }
+      - { group: fg, role: developer, services: [gxa, fenix] }
   haber:
     email: haber@ebi.ac.uk
     memberships:
@@ -103,9 +104,13 @@ users:
   schellhaass:
     email: schellhaass@ebi.ac.uk
     memberships:
-      - { group: fg, role: developer, services: [gxa] }
+      - { group: fg, role: developer, services: [gxa, fenix] }
   irisyu:
     email: irisyu@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [gxa] }
+  jmiguel:
+    email: jmiguel@ebi.ac.uk
     memberships:
       - { group: fg, role: operator, services: [gxa] }
   jcmarca:
@@ -124,8 +129,13 @@ users:
     email: portert@ebi.ac.uk
     memberships:
       - { group: its, role: admin }
+  hails:
+    email: hails@ebi.ac.uk
+    memberships:
+      - { group: its, role: admin }
 
 # Expanded by the apply script into kv/data/<service>/<environment>/<class>/<name>
+# or kv/data/<service>/<environment>/<name> when class is omitted.
 secret_sets:
   - service: gxa
     environments: [test, ci, staging, public, fallback]
@@ -156,3 +166,16 @@ secret_sets:
       - hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk
     secrets:
       - { class: ops, name: kubeconfig, description: "kubectl kubeconfig (multiline field config)" }
+  # LivingObjects buckets (FG-231). Passwords are set in the OpenBao UI, not git.
+  # Paths: kv/data/fenix/<env>/ebi-storage/<bucket>/<role>
+  - service: fenix
+    environments: [dev]
+    secrets:
+      - name: ebi-storage
+        description: "EBI Storage (LivingObjects S3)"
+        fields: [access_key, secret_key, endpoint]
+        defaults:
+          endpoint: https://livingobjects-int.ebi.ac.uk
+        buckets:
+          - name: fenix-data-dev
+            roles: [ReadWrite, ReadOnly]

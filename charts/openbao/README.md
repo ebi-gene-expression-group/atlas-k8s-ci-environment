@@ -110,9 +110,10 @@ kubectl --context fg-public -n openbao exec -ti openbao-0 -- bao operator unseal
 ## ACL catalog (groups, roles, KV paths)
 
 Source of truth: [`acl/catalog.yaml`](acl/catalog.yaml). Paths are
-`kv/data/<service>/<environment>/<class>/<secret>` for apps, or
+`kv/data/<service>/<environment>/<class>/<secret>` for apps,
 `kv/data/<service>/<cluster-server>/<class>/<secret>` for cluster-scoped
-items such as kubeconfigs. `cluster-server` is the kubeconfig API host
+items such as kubeconfigs, or `kv/data/<service>/<environment>/<secret>` for
+class-less secrets (e.g. `fenix/dev/ebi-storage`). `cluster-server` is the kubeconfig API host
 (no `https://` or port), e.g. `hh-wp-webadmin-35.wp-k8s.ebi.ac.uk`. `class`
 is `app` (runtime) or `ops` (deploy/data-load/kubeconfig). Kubernetes
 namespaces (`gxa-public`, …) live under `services.<id>.namespaces` (KV
