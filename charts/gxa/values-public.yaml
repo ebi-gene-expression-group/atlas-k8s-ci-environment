@@ -21,16 +21,6 @@ jdbc:
 postgresql:
   populate:
     enabled: false
-    source:
-      host: pgsql-hlvm-147.ebi.ac.uk
-      port: 5432
-      database: gxpatlaspro
-      user: atlasprd3
-    target:
-      host: pgsql-dlvmpub2-023.ebi.ac.uk
-      port: 5432
-      database: gxpatlaspro
-      user: atlasdataload
 
 solr:
   namespace: gxa-public-solrcloud

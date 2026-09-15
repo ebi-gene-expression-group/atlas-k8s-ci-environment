@@ -45,6 +45,8 @@ Confirm:
 kubectl --context "$K8S_CONTEXT" get ns gxa-jenkins gxa-${ENV} gxa-${ENV}-solrcloud
 ```
 
+
+
 ### Jenkins Kubernetes cloud
 
 The deploy pipeline (`Jenkinsfile`) picks the **Jenkins Kubernetes plugin cloud name** from `ENV`:
@@ -58,7 +60,7 @@ A new cluster needs a cloud of that name (or a `Jenkinsfile` change). The cloud 
 - Default / restrict agents to namespace `gxa-jenkins`
 - Use service account `jenkins-cloud`
 
-On the cluster, create `gxa-jenkins`, SA `jenkins-cloud`, and the `jenkins-agent-pods` Role/RoleBinding from [`jenkins/fg-public-agent-rbac.yaml`](../jenkins/fg-public-agent-rbac.yaml) (copy, retarget labels/context). Without that, Jenkins cannot even start the helm agent pod.
+On the cluster, create `gxa-jenkins`, SA `jenkins-cloud`, and the `jenkins-agent-pods` Role/RoleBinding from `[jenkins/fg-public-agent-rbac.yaml](../jenkins/fg-public-agent-rbac.yaml)` (copy, retarget labels/context). Without that, Jenkins cannot even start the helm agent pod.
 
 ## 2. Solr CRDs and operator
 
@@ -92,6 +94,8 @@ kubectl --context "$K8S_CONTEXT" api-resources | grep -E 'solr|zookeeper'
 kubectl --context "$K8S_CONTEXT" -n solr-operator get deploy,pods
 ```
 
+
+
 ### Team RBAC for SolrCloud CRs
 
 CRDs being listed does **not** mean `team-admin` can create `SolrCloud` objects. Expect Helm error `cannot get resource "solrclouds"` otherwise.
@@ -100,11 +104,11 @@ CRDs being listed does **not** mean `team-admin` can create `SolrCloud` objects.
 kubectl --context "$K8S_CONTEXT" auth can-i '*' solrclouds --all-namespaces
 ```
 
-Must print `yes`. `team-admin` cannot create ClusterRoles; **ITS** applies the ClusterRole + ClusterRoleBinding in [`charts/solr-cloud/README.md`](../charts/solr-cloud/README.md) (subject `default:team-admin`).
+Must print `yes`. `team-admin` cannot create ClusterRoles; **ITS** applies the ClusterRole + ClusterRoleBinding in `[charts/solr-cloud/README.md](../charts/solr-cloud/README.md)` (subject `default:team-admin`).
 
 ## 3. Solr / ZK data directories
 
-Solr and ZooKeeper always use Isilon folders. There is no cluster PVC for Solr data. Detail: [`charts/solr-cloud/README.md`](../charts/solr-cloud/README.md) (NFS storage).
+Solr and ZooKeeper always use Isilon folders. There is no cluster PVC for Solr data. Detail: `[charts/solr-cloud/README.md](../charts/solr-cloud/README.md)` (NFS storage).
 
 Layout:
 
@@ -123,7 +127,7 @@ Set `nfs.server` / `nfs.publicPath` in `charts/solr-cloud/values-<env>.yaml` (an
 
 ### Populate the tree
 
-Copy from an existing env (Codon datamover, as `fg_atlas`). See [`scripts/slurm/README.md`](../scripts/slurm/README.md).
+Copy from an existing env (Codon datamover, as `fg_atlas`). See `[scripts/slurm/README.md](../scripts/slurm/README.md)`.
 
 If you rsync **staging → fallback**, ZK directory names and `zoo.cfg` FQDNs still say `gxa-staging-…`. Rewrite **before** deploy, with destination ZK stopped:
 
@@ -134,10 +138,12 @@ BASE=/nfs/ebi/public/rw/fg/atlas/gxa/environments SRC=staging DST=fallback \
 
 Folder names the chart expects:
 
-| Kind | Path under `solr_data` / `zk_data` |
-| ---- | ---------------------------------- |
+
+| Kind | Path under `solr_data` / `zk_data`                                                      |
+| ---- | --------------------------------------------------------------------------------------- |
 | Solr | `{dataDirPrefix}-solrcloud-{0..3}/` (often `gxa-solrcloud-n` when `dataDirPrefix: gxa`) |
-| ZK   | `{release}-solrcloud-zookeeper-{0..2}/` (e.g. `gxa-fallback-solrcloud-zookeeper-n`) |
+| ZK   | `{release}-solrcloud-zookeeper-{0..2}/` (e.g. `gxa-fallback-solrcloud-zookeeper-n`)     |
+
 
 `dataDirPrefix` is in `values-<env>.yaml` when NFS names predate the Helm release rename.
 
@@ -167,7 +173,7 @@ kubectl --context "$K8S_CONTEXT" -n gxa-${ENV}-solrcloud \
 
 Put that value in gitignored `charts/gxa/.secrets-<env>.yaml` under `solr.password`, and in the Jenkins credential (step 8). Default `changeme` will not talk to a real operator-managed Solr.
 
-If ZK PVCs are Pending with no `volumeName`: `task fix-solrcloud-zk-pvcs ENV=<env>`. More in [`charts/solr-cloud/README.md`](../charts/solr-cloud/README.md).
+If ZK PVCs are Pending with no `volumeName`: `task fix-solrcloud-zk-pvcs ENV=<env>`. More in `[charts/solr-cloud/README.md](../charts/solr-cloud/README.md)`.
 
 ## 5. Database firewall
 
@@ -217,18 +223,18 @@ helm upgrade --install gxa charts/gxa \
 
 The first Ready wait includes `/gxa/json/experiments` (readiness probe, up to 10 minutes) so experiment cache is warm before the Service takes traffic. `kubectl rollout status` uses a 15 minute timeout.
 
-Point `solr.namespace` at `gxa-<env>-solrcloud`. Chart details: [`charts/gxa/readme.md`](../charts/gxa/readme.md).
+Point `solr.namespace` at `gxa-<env>-solrcloud`. Chart details: `[charts/gxa/readme.md](../charts/gxa/readme.md)`.
 
 ## 7. Jenkins deploy Role
 
-The agent runs as `system:serviceaccount:gxa-jenkins:jenkins-cloud` **on this cluster**. Helm lists Secrets in `gxa-<env>` to find `sh.helm.release.v1.*`. Without a Role there you get:
+The agent runs as `system:serviceaccount:gxa-jenkins:jenkins-cloud` **on this cluster**. Helm lists Secrets in `gxa-<env>` to find `sh.helm.release.v1.`*. Without a Role there you get:
 
 ```text
 secrets is forbidden: User "system:serviceaccount:gxa-jenkins:jenkins-cloud"
 cannot list resource "secrets" in API group "" in the namespace "gxa-<env>"
 ```
 
-Copy the `jenkins-gxa-deploy` Role + RoleBinding for `gxa-staging` or `gxa-ci` from [`jenkins/fg-public-agent-rbac.yaml`](../jenkins/fg-public-agent-rbac.yaml). Change:
+Copy the `jenkins-gxa-deploy` Role + RoleBinding for `gxa-staging` or `gxa-ci` from `[jenkins/fg-public-agent-rbac.yaml](../jenkins/fg-public-agent-rbac.yaml)`. Change:
 
 - `metadata.namespace`
 - label `atlas.ebi.ac.uk/target-namespace`
@@ -262,14 +268,16 @@ Also add `ENV` to the `Jenkinsfile` choice list and map it to this cluster’s K
 
 ## 8. Jenkins secrets credential
 
-Pipeline credential id: **`gxa-secrets-<env>`** (see `Jenkinsfile`).
+Pipeline credential id: `gxa-secrets-<env>` (see `Jenkinsfile`).
 
 **Manage Jenkins → Credentials → Secret file:**
 
-| Field | Value |
-| ----- | ----- |
-| ID | `gxa-secrets-fallback` (or `gxa-secrets-<env>`) |
-| File | Same YAML as `charts/gxa/.secrets-<env>.yaml` |
+
+| Field | Value                                           |
+| ----- | ----------------------------------------------- |
+| ID    | `gxa-secrets-fallback` (or `gxa-secrets-<env>`) |
+| File  | Same YAML as `charts/gxa/.secrets-<env>.yaml`   |
+
 
 Typical keys (only what that env’s values file needs):
 
