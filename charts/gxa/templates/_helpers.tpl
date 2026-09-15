@@ -202,7 +202,7 @@ Root directory for data mounts
 {{- end }}
 
 {{- define "app.expdesignDir" -}}
-{{ include "app.dataDir" . }}/expdesign
+{{ include "app.servicesDir" . }}/fg/atlas/environments/{{- .Values.environment -}}/expdesign
 {{- end }}
 
 {{- define "app.servicesDir" -}}

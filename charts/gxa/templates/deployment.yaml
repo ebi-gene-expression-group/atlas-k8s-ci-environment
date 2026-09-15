@@ -140,8 +140,6 @@ spec:
               mountPath: {{ include "app.dataDir" . }}/bioentity_properties
               subPath: fg/atlas/bioentity_properties/gxa
               readOnly: true
-            - name: expdesign-volume
-              mountPath: {{ include "app.expdesignDir" . }}
             - name: services-volume
               mountPath: {{ include "app.servicesDir" . }}
             - name: services-volume
@@ -214,12 +212,6 @@ spec:
           nfs:
             server: {{ .Values.nfs.server }}
             path: {{ .Values.nfs.publicPath }}/services
-        - name: expdesign-volume
-          nfs:
-            server: {{ .Values.nfs.server }}
-            {{- /* Override with nfs.expdesignPath when env dir name differs (e.g. public has expdesigns). */}}
-            path: {{ .Values.nfs.expdesignPath | default (printf "%s/services/fg/atlas/environments/%s/expdesign" .Values.nfs.publicPath .Values.environment) }}
-            readOnly: true
         - name: experiments-snapshot
           emptyDir: {}
         - name: admin-volume

@@ -4,7 +4,7 @@ pipeline {
       name: 'ENV',
       choices: [
         'ci',
-        'test'
+        'test',
         'staging',
         'public',
         'fallback'
