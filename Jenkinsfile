@@ -137,23 +137,18 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
   def namespace = "${release}-${env}"
   def valuesFile = "charts/${release}/values-${env}.yaml"
   def dryRunFlags = dryRun ? '--debug --dry-run' : ''
+  // Jenkins `sh` is /bin/sh (ash/dash on the helm agent). No bash arrays.
+  // --set beats a stale secrets file with imagePullSecret.create: true.
+  def extraSet = (env != 'fallback') ? "--set 'imagePullSecret.create=false'" : ''
 
   echo "Deploying ${release} to ${namespace} with image tag ${imageTag}"
 
   sh """
-    set -euo pipefail
+    set -eu
 
     if [ ! -f "\${SECRETS_SOURCE}" ]; then
       echo "Missing secrets file from Jenkins credential gxa-secrets-${env}" >&2
       exit 1
-    fi
-
-    # fg-public namespaces already have gxa-registry from platform-secrets-propagate.
-    # --set beats a stale Jenkins secrets file with imagePullSecret.create: true, which
-    # makes Helm try to import that Secret and fail ownership checks.
-    extra_set=()
-    if [ '${env}' != 'fallback' ]; then
-      extra_set+=(--set 'imagePullSecret.create=false')
     fi
 
     helm upgrade --install '${release}' 'charts/${release}' \\
@@ -163,13 +158,13 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       -f "\${SECRETS_SOURCE}" \\
       --set 'appVersion=${imageTag}' \\
       --set 'image.tag=${imageTag}' \\
-      "\${extra_set[@]}" \\
+      ${extraSet} \\
       ${dryRunFlags}
   """
 
   if (!dryRun) {
     sh """
-      set -euo pipefail
+      set -eu
       kubectl rollout status deployment/${release} --namespace='${namespace}' --timeout=900s
     """
   }
