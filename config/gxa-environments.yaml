@@ -83,6 +83,7 @@ environments:
     cluster: hh-wp-webadmin-35
     kubectl_context: fg-public
     namespace: gxa-test
+    base_url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31708/gxa
     postgres:
       host: pgsql-dlvm-078.ebi.ac.uk
       port: 5432

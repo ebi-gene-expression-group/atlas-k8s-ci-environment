@@ -105,19 +105,28 @@ pipeline {
               string(name: 'ENV', value: params.ENV),
             ]
           } catch (err) {
-            echo "Skipping GXA system tests trigger (create the job pointing at Jenkinsfile.system-test): ${err}"
+            echo "Skipping GXA system tests trigger (job must allow ENV=${params.ENV}; see Jenkinsfile.system-test): ${err}"
           }
         }
       }
     }
 
-    // DevOps Portal persists deployment records on the controller; run off the K8s agent.
+    // DevOps Portal persists on the controller. agent none has no node, so
+    // reportDeployOperation fails with "requires a node context".
     stage('Record deployment') {
       when { expression { !params.DRY_RUN } }
-      agent none
+      agent { label 'built-in || master' }
       steps {
-        script {
-          recordDeployment(params.RELEASE, params.ENV, params.IMAGE_TAG.trim())
+        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+          script {
+            try {
+              recordDeployment(params.RELEASE, params.ENV, params.IMAGE_TAG.trim())
+            } catch (err) {
+              echo "DevOps Portal record failed for gxa-${params.ENV}: ${err}"
+              echo "Add environment label gxa-${params.ENV} in Jenkins → DevOps Portal → Manage Environments."
+              throw err
+            }
+          }
         }
       }
     }
@@ -139,6 +148,14 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       exit 1
     fi
 
+    # fg-public namespaces already have gxa-registry from platform-secrets-propagate.
+    # --set beats a stale Jenkins secrets file with imagePullSecret.create: true, which
+    # makes Helm try to import that Secret and fail ownership checks.
+    extra_set=()
+    if [ '${env}' != 'fallback' ]; then
+      extra_set+=(--set 'imagePullSecret.create=false')
+    fi
+
     helm upgrade --install '${release}' 'charts/${release}' \\
       --namespace '${namespace}' \\
       --create-namespace \\
@@ -146,6 +163,7 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       -f "\${SECRETS_SOURCE}" \\
       --set 'appVersion=${imageTag}' \\
       --set 'image.tag=${imageTag}' \\
+      "\${extra_set[@]}" \\
       ${dryRunFlags}
   """
 

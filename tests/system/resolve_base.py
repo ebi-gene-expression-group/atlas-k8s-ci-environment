@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print GXA_SYSTEM_BASE for a catalogue ENV (ci|staging|public|fallback)."""
+"""Print GXA_SYSTEM_BASE for a catalogue ENV (ci|test|staging|public|fallback)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,9 @@ CATALOGUE = Path(__file__).resolve().parents[2] / "config" / "gxa-environments.y
 
 def base_url_for(env: str) -> str:
     data = yaml.safe_load(CATALOGUE.read_text())
+    # Helm / gxa-deploy ENV=test is k8s_test; environments.test is legacy wwwdev.
+    if env == "test":
+        env = "k8s_test"
     block = (data.get("environments") or {}).get(env)
     if not isinstance(block, dict):
         raise SystemExit(f"Unknown environment {env!r} in {CATALOGUE}")

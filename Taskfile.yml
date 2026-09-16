@@ -26,7 +26,7 @@ vars:
   WAR_FILE_DIR: charts/{{.RELEASE}}/war
   # Jenkins — set JENKINS_USER and JENKINS_TOKEN in .env
   JENKINS_URL:
-    sh: echo "${JENKINS_URL:-http://45.88.80.151:30004/jenkins}"
+    sh: 'set -a && [ -f .env ] && . ./.env; echo "${JENKINS_URL%/}"'
   JENKINS_JOB: Loading_bulk_using_indexing_pipeline_slurm
   JENKINS_BIOENTITIES_JOB: H_bioentities_loading_pipeline_bulk_and_sc
   # WAR_FILE_NAME: override via .env or env var (default: $RELEASE.war)
@@ -79,6 +79,10 @@ tasks:
         if [ -f "$SECRETS_FILE" ]; then
           echo "Using secrets file: $SECRETS_FILE"
           HELM_SET_ARGS+=(-f "$SECRETS_FILE")
+        fi
+        if [ "$ENV" != "fallback" ]; then
+          # platform-secrets-propagate owns gxa-registry on fg-public
+          HELM_SET_ARGS+=(--set "imagePullSecret.create=false")
         fi
         HELM_DEBUG_FLAGS=()
         case "${DEBUG:-}" in
@@ -350,6 +354,18 @@ tasks:
         [ "{{.PER_SPECIES}}" != "0" ] && ARGS+=(--per-species "{{.PER_SPECIES}}")
         [ "{{.COMMA_LIST}}" = "true" ] && ARGS+=(--comma-list)
         python3 scripts/gxa_experiments_gap.py "${ARGS[@]}"
+
+  jenkins-upsert-secrets:
+    desc: |
+      Create or update Jenkins Secret file {{.RELEASE}}-secrets-{{.ENV}} from charts/{{.RELEASE}}/.secrets-{{.ENV}}.yaml
+      Usage: task jenkins-upsert-secrets
+      Override: ENV=public FILE=... ID=... JENKINS_CREDENTIALS_STORE=...
+    cmds:
+      - |
+        set -euo pipefail
+        export ENV="{{.ENV}}" RELEASE="{{.RELEASE}}"
+        export JENKINS_URL="{{.JENKINS_URL}}"
+        exec "{{.ROOT_DIR}}/scripts/jenkins-upsert-gxa-secrets.sh"
 
   jenkins-params:
     desc: List parameters accepted by the indexing pipeline job

@@ -200,7 +200,33 @@ kubectl --context "$K8S_CONTEXT" -n gxa-${ENV} run pg-tcp --rm -it --restart=Nev
 
 ## 6. Webapp Helm chart
 
-Local (after `.secrets-<env>.yaml` has jdbc, solr, tomcat, image pull):
+On **fg-public**, do not set `imagePullSecret.create: true` (in values or in the Jenkins `gxa-secrets-<env>` file). Copy the existing `gxa-registry` Secret from another GXA namespace (it is mirrored by platform-secrets). If Helm tries to create that Secret, upgrade fails with `exists and cannot be imported` (`managed-by: platform-secrets-propagate`). A GitLab token in `.secrets-<env>.yaml` also overwrites the working pull secret and causes `unauthorized: HTTP Basic: Access denied` on `dockerhub.ebi.ac.uk`. After editing the local secrets file, run `task jenkins-upsert-secrets ENV=<env>` so Jenkins does not keep `create: true`. `gxa-deploy` and `task deploy` force `imagePullSecret.create=false` on every env except `fallback`.
+
+```bash
+SRC_NS=gxa-ci
+DST_NS=gxa-${ENV}
+export DST_NS
+kubectl --context fg-public get secret gxa-registry -n "$SRC_NS" -o json \
+  | python3 -c '
+import json, os, sys
+s = json.load(sys.stdin)
+labels = {k: v for k, v in s["metadata"].get("labels", {}).items()
+          if k.startswith("app") or k.startswith("atlas")}
+s["metadata"] = {"name": "gxa-registry", "namespace": os.environ["DST_NS"], "labels": labels}
+s.pop("status", None)
+json.dump(s, sys.stdout)
+' | kubectl --context fg-public apply -f -
+```
+
+In `values-<env>.yaml`:
+
+```yaml
+imagePullSecret:
+  create: false
+  name: gxa-registry
+```
+
+Local (after `.secrets-<env>.yaml` has jdbc, solr, tomcat; nginx opsAuth if enabled):
 
 ```bash
 K8S_CONTEXT=fg-fallback ENV=fallback task deploy
@@ -289,12 +315,45 @@ solr:
 tomcat:
   deployerPassword: "..."
   curatorPassword: "..."
-imagePullSecret:
-  create: yes
-  username: "..."
-  password: "..."
+nginx:
+  cache:
+    purge:
+      opsAuth:
+        password: "..."
 ```
 
+On fg-public leave `imagePullSecret.create: false` and copy `gxa-registry` (step 6). Do not put a GitLab token in this file or Helm will replace the working pull secret.
+
 Do not commit `.secrets-*.yaml`. Copy from an existing env’s local file as a template.
+
+### Create or update the credential
+
+Create and update use different endpoints; POSTing `config.xml` 404s when the id does not exist yet. One command GETs the credential, then POSTs `createCredentials` or `config.xml`.
+
+From the repo (loads `JENKINS_URL`, `JENKINS_USER`, `JENKINS_TOKEN` from `.env`):
+
+```bash
+task jenkins-upsert-secrets ENV=fallback
+```
+
+Equivalent:
+
+```bash
+ENV=fallback ./scripts/jenkins-upsert-gxa-secrets.sh
+```
+
+That script:
+
+- strips a trailing slash on `JENKINS_URL` (otherwise the path becomes `jenkins//credentials` and Jenkins 404s)
+- sends the CSRF crumb **and** session cookie
+- uses id `gxa-secrets-<ENV>` and file `charts/gxa/.secrets-<ENV>.yaml`
+- prints `Action: create` or `Action: update`
+
+If GET returns 404 on the system store but the job only sees folder credentials:
+
+```bash
+JENKINS_CREDENTIALS_STORE="${JENKINS_URL%/}/job/<folder>/credentials/store/folder/domain/_" \
+  task jenkins-upsert-secrets ENV=fallback
+```
 
 Optional: add DevOps Portal environment label `gxa-<env>` before the first non–dry-run so `reportDeployOperation` succeeds ([README](../README.md#1-devops-portal-environment)).

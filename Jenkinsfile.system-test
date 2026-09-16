@@ -6,11 +6,12 @@ pipeline {
       name: 'ENV',
       choices: [
         'ci',
+        'test',
         'staging',
         'public',
         'fallback'
       ],
-      description: 'GXA environment from config/gxa-environments.yaml (base_url).'
+      description: 'GXA environment from config/gxa-environments.yaml (base_url). Helm ENV=test is catalogue k8s_test.'
     )
   }
 
