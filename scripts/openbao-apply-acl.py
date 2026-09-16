@@ -97,23 +97,91 @@ class Bao:
             raise SystemExit(f"{method} {path}: HTTP {exc.code}\n{err}") from exc
 
 
+def _secret_item(service: str, secret: dict, environment: str = "", cls: str = "", **extra) -> dict:
+    item = {
+        "service": service,
+        "environment": environment,
+        "class": cls or secret.get("class") or "",
+        "name": extra.get("name") or secret["name"],
+        "root_name": extra.get("root_name") or secret["name"],
+        "description": extra.get("description") or secret.get("description", ""),
+        "fields": list(secret.get("fields") or []),
+        "defaults": dict(secret.get("defaults") or {}),
+        "bucket": extra.get("bucket") or "",
+        "role": extra.get("role") or "",
+    }
+    return item
+
+
+def _expand_secret(service: str, secret: dict, environment: str = "", cls: str = "") -> list[dict]:
+    buckets = secret.get("buckets") or []
+    if not buckets:
+        return [_secret_item(service, secret, environment=environment, cls=cls)]
+    out: list[dict] = []
+    base_desc = secret.get("description") or secret["name"]
+    for bucket in buckets:
+        bname = str(bucket.get("name") or bucket)
+        roles = [str(r) for r in (bucket.get("roles") or ["ReadWrite", "ReadOnly"])]
+        for role in roles:
+            out.append(
+                _secret_item(
+                    service,
+                    secret,
+                    environment=environment,
+                    cls=cls,
+                    name=f"{secret['name']}/{bname}/{role}",
+                    root_name=secret["name"],
+                    bucket=bname,
+                    role=role,
+                    description=f"{base_desc} bucket {bname} ({role})",
+                )
+            )
+    return out
+
+
 def expand_secrets(catalog: dict) -> list[dict]:
     out: list[dict] = []
     for sset in catalog.get("secret_sets") or []:
         keys = sset.get("clusters") or sset.get("environments") or []
+        if not keys:
+            for secret in sset["secrets"]:
+                out.extend(_expand_secret(sset["service"], secret))
+            continue
         for env in keys:
             for secret in sset["secrets"]:
-                out.append(
-                    {
-                        "service": sset["service"],
-                        "environment": env,
-                        "class": secret["class"],
-                        "name": secret["name"],
-                        "description": secret.get("description", ""),
-                    }
+                out.extend(
+                    _expand_secret(
+                        sset["service"],
+                        secret,
+                        environment=env,
+                        cls=secret.get("class") or "",
+                    )
                 )
     out.extend(catalog.get("secrets") or [])
     return out
+
+
+def kv_path(item: dict) -> str:
+    if item.get("environment") and item.get("class"):
+        return f"{item['service']}/{item['environment']}/{item['class']}/{item['name']}"
+    if item.get("environment"):
+        return f"{item['service']}/{item['environment']}/{item['name']}"
+    return f"{item['service']}/{item['name']}"
+
+
+def service_secret_prefix(item: dict) -> str:
+    """Folder path for class-less secrets (fenix/dev/ebi-storage), including nested buckets."""
+    root = item.get("root_name") or item["name"].split("/")[0]
+    if item.get("environment"):
+        return f"{item['service']}/{item['environment']}/{root}"
+    return f"{item['service']}/{root}"
+
+
+def legacy_kv_path(item: dict) -> str:
+    """Previous class-less path without environment (fenix/ebi-storage/...)."""
+    if item.get("environment") and not item.get("class"):
+        return f"{item['service']}/{item['name']}"
+    return ""
 
 
 def owner_group_for(catalog: dict, service: str) -> str:
@@ -279,6 +347,33 @@ def policy_hcl(group_id: str, group: dict, catalog: dict | None = None) -> str:
                         add(f"kv/metadata/{svc}/{env}/{cls}", ["list"])
                         add(f"kv/data/{svc}/{env}/{cls}/*", caps)
                         add(f"kv/metadata/{svc}/{env}/{cls}/*", meta_caps)
+    # Class-less secrets (kv/data/<service>/<env>/<name>) match env grants.
+    # LivingObjects "dev" uses the same ACL as test.
+    group_services = set(group.get("services") or [])
+    for item in expand_secrets(catalog or {}):
+        if item.get("class") or item["service"] not in group_services:
+            continue
+        secret_env = item.get("environment") or "public"
+        grant_env = "test" if secret_env == "dev" else secret_env
+        if item.get("environment"):
+            add(f"kv/metadata/{item['service']}/{item['environment']}", ["list"])
+        for role in (group.get("roles") or {}).values():
+            for grant in role.get("grants") or []:
+                if grant.get("all_kv") or grant_env not in (grant.get("environments") or []):
+                    continue
+                caps = access_caps(grant.get("access") or ["read"])
+                meta_caps = ["read", "list"] + (
+                    ["create", "update", "delete"] if "write" in (grant.get("access") or []) else []
+                )
+                prefix = service_secret_prefix(item)
+                add(f"kv/metadata/{prefix}", ["list"])
+                if item.get("bucket"):
+                    add(f"kv/data/{prefix}/*", caps)
+                    add(f"kv/metadata/{prefix}/*", meta_caps)
+                    add(f"kv/metadata/{prefix}/{item['bucket']}", ["list"])
+                else:
+                    add(f"kv/data/{prefix}", caps)
+                    add(f"kv/metadata/{prefix}", meta_caps)
     if not any(p.startswith("kv/data/") for p in paths):
         return ""
     blocks = [f"# group {group_id} ({group.get('display_name', group_id)})"]
@@ -288,9 +383,16 @@ def policy_hcl(group_id: str, group: dict, catalog: dict | None = None) -> str:
     return "\n\n".join(blocks) + "\n"
 
 
-def lookup_values(values: dict | None, service: str, env: str, cls: str, name: str):
+def lookup_values(values: dict | None, item: dict):
     cur: object = values or {}
-    for key in (service, env, cls, name):
+    keys = [item["service"]]
+    if item.get("environment") and item.get("class"):
+        keys.extend([item["environment"], item["class"], item["name"]])
+    elif item.get("environment"):
+        keys.extend([item["environment"], item["name"]])
+    else:
+        keys.append(item["name"])
+    for key in keys:
         if not isinstance(cur, dict) or key not in cur:
             return None
         cur = cur[key]
@@ -555,43 +657,100 @@ def sync_identity(bao: Bao, catalog: dict, accessor: str) -> dict[str, str]:
     return ids
 
 
-def seed_kv(bao: Bao, catalog: dict, values: dict | None) -> None:
-    if not values:
-        print("No local Helm .secrets-*.yaml (or .secrets-kv-public.yaml); skipping KV seed")
+def write_kv_metadata(bao: Bao, catalog: dict, item: dict, path: str, source: str) -> None:
+    meta = bao.request("GET", f"kv/metadata/{path}", ok_404=True) or {}
+    custom = dict((meta.get("data") or {}).get("custom_metadata") or {})
+    created_by = custom.get("created_by") or ACTOR
+    custom.update(
+        {
+            "description": item.get("description") or "",
+            "owner_group": owner_group_for(catalog, item["service"]),
+            "service": item["service"],
+            "environment": item.get("environment") or "",
+            "class": item.get("class") or "",
+            "bucket": item.get("bucket") or "",
+            "role": item.get("role") or "",
+            "created_by": created_by,
+            "updated_by": ACTOR,
+        }
+    )
+    if source:
+        custom["source"] = source
+    ns = kubernetes_namespace(catalog, item["service"], item.get("environment") or "")
+    if ns:
+        custom["kubernetes_namespace"] = ns
+    # KV v2 rejects empty custom_metadata values (must be 1–512 chars).
+    custom = {k: v for k, v in custom.items() if isinstance(v, str) and v}
+    bao.request("POST", f"kv/metadata/{path}", {"custom_metadata": custom})
+
+
+def kv_secret_data(resp: dict | None) -> dict | None:
+    if not resp:
+        return None
+    body = resp.get("data") if isinstance(resp.get("data"), dict) else {}
+    inner = body.get("data")
+    return inner if isinstance(inner, dict) else None
+
+
+def delete_kv_path(bao: Bao, path: str) -> None:
+    existing = bao.request("GET", f"kv/data/{path}", ok_404=True)
+    if existing is None:
         return
-    seeded = 0
-    missing: list[str] = []
-    for item in expand_secrets(catalog):
-        data = lookup_values(values, item["service"], item["environment"], item["class"], item["name"])
-        path = f"{item['service']}/{item['environment']}/{item['class']}/{item['name']}"
-        if not data:
-            missing.append(path)
+    print(f"KV delete kv/metadata/{path}")
+    bao.request("DELETE", f"kv/metadata/{path}", ok_404=True)
+
+
+def delete_replaced_parent_leaves(bao: Bao, items: list[dict]) -> None:
+    """Remove a folder leaf once it has been replaced by bucket/role children."""
+    parents = {service_secret_prefix(item) for item in items if item.get("bucket")}
+    child_paths = {kv_path(item) for item in items}
+    for parent in sorted(parents):
+        if parent in child_paths:
             continue
-        print(f"KV put kv/data/{path}")
-        bao.request("POST", f"kv/data/{path}", {"data": data})
-        meta = bao.request("GET", f"kv/metadata/{path}", ok_404=True) or {}
-        custom = dict((meta.get("data") or {}).get("custom_metadata") or {})
-        created_by = custom.get("created_by") or ACTOR
-        custom.update(
-            {
-                "description": item.get("description") or "",
-                "owner_group": owner_group_for(catalog, item["service"]),
-                "service": item["service"],
-                "environment": item["environment"],
-                "class": item["class"],
-                "created_by": created_by,
-                "updated_by": ACTOR,
-                "source": "helm-or-kv-seed",
-            }
-        )
-        ns = kubernetes_namespace(catalog, item["service"], item["environment"])
-        if ns:
-            custom["kubernetes_namespace"] = ns
-        # KV v2 rejects empty custom_metadata values (must be 1–512 chars).
-        custom = {k: v for k, v in custom.items() if isinstance(v, str) and v}
-        bao.request("POST", f"kv/metadata/{path}", {"custom_metadata": custom})
-        seeded += 1
-    print(f"KV seed: {seeded} written")
+        delete_kv_path(bao, parent)
+
+
+def seed_kv(bao: Bao, catalog: dict, values: dict | None) -> None:
+    seeded = 0
+    placeholders = 0
+    migrated = 0
+    missing: list[str] = []
+    values = values or {}
+    items = expand_secrets(catalog)
+    if not values:
+        print("No local Helm .secrets-*.yaml (or .secrets-kv-public.yaml); seeding catalog placeholders only")
+    for item in items:
+        path = kv_path(item)
+        legacy = legacy_kv_path(item)
+        data = lookup_values(values, item)
+        if data:
+            print(f"KV put kv/data/{path}")
+            bao.request("POST", f"kv/data/{path}", {"data": data})
+            write_kv_metadata(bao, catalog, item, path, "helm-or-kv-seed")
+            seeded += 1
+        else:
+            fields = item.get("fields") or []
+            existing = bao.request("GET", f"kv/data/{path}", ok_404=True)
+            legacy_resp = bao.request("GET", f"kv/data/{legacy}", ok_404=True) if legacy and legacy != path else None
+            if existing is not None:
+                write_kv_metadata(bao, catalog, item, path, "")
+            elif kv_secret_data(legacy_resp) is not None:
+                print(f"KV migrate kv/data/{legacy} -> kv/data/{path}")
+                bao.request("POST", f"kv/data/{path}", {"data": kv_secret_data(legacy_resp)})
+                write_kv_metadata(bao, catalog, item, path, "migrated")
+                migrated += 1
+            elif not fields:
+                missing.append(path)
+            else:
+                placeholder = {field: str((item.get("defaults") or {}).get(field) or "") for field in fields}
+                print(f"KV create placeholder kv/data/{path}")
+                bao.request("POST", f"kv/data/{path}", {"data": placeholder})
+                write_kv_metadata(bao, catalog, item, path, "catalog-placeholder")
+                placeholders += 1
+        if legacy and legacy != path:
+            delete_kv_path(bao, legacy)
+    delete_replaced_parent_leaves(bao, items)
+    print(f"KV seed: {seeded} written, {placeholders} placeholders, {migrated} migrated")
     if missing:
         print("KV seed skipped (not in local .secrets files):")
         for path in missing:

@@ -144,3 +144,7 @@ backstage:
           target: ./catalog/platform-entities.yaml
           rules:
             - allow: [Component, System, API, Resource, Domain, Group, User]
+        - type: file
+          target: ./catalog/fenix-entities.yaml
+          rules:
+            - allow: [Component, System, API, Resource, Domain, Group, User]

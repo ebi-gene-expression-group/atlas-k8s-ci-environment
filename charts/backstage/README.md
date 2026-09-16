@@ -33,6 +33,7 @@ kubectl --context fg-public -n backstage create configmap backstage-gxa-catalog 
   --from-file=gxa-entities.yaml=charts/backstage/catalog/gxa-entities.yaml \
   --from-file=annotare-entities.yaml=charts/backstage/catalog/annotare-entities.yaml \
   --from-file=platform-entities.yaml=charts/backstage/catalog/platform-entities.yaml \
+  --from-file=fenix-entities.yaml=charts/backstage/catalog/fenix-entities.yaml \
   --dry-run=client -o yaml \
   | kubectl --context fg-public apply -f -
 
@@ -61,6 +62,7 @@ Catalog YAML under `catalog/` is mounted from ConfigMap `backstage-gxa-catalog`
 - `gxa-entities.yaml` — Gene Expression Atlas
 - `annotare-entities.yaml` — Annotare (staging/public, MySQL, NFS, pipelines)
 - `platform-entities.yaml` — OpenBao system + public (35) / fallback (121) clusters
+- `fenix-entities.yaml` — FENIX (test: submissions UI, explorer, fg-search, MongoDB, zarr-store)
 
 DB **passwords are not** in catalog files (host/user/db only; secrets in OpenBao).
 
@@ -71,6 +73,7 @@ kubectl --context fg-public -n backstage create configmap backstage-gxa-catalog 
   --from-file=gxa-entities.yaml=charts/backstage/catalog/gxa-entities.yaml \
   --from-file=annotare-entities.yaml=charts/backstage/catalog/annotare-entities.yaml \
   --from-file=platform-entities.yaml=charts/backstage/catalog/platform-entities.yaml \
+  --from-file=fenix-entities.yaml=charts/backstage/catalog/fenix-entities.yaml \
   --dry-run=client -o yaml \
   | kubectl --context fg-public apply -f -
 kubectl --context fg-public -n backstage rollout restart deploy/backstage

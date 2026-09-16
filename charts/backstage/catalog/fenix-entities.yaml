@@ -1,0 +1,212 @@
+# FENIX — Backstage catalog (spike).
+# Test-env webapps and APIs on fg-public (hh-wp-webadmin-35).
+# Mongo passwords are not committed here (in-cluster service only).
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: fenix
+  title: FENIX
+  description: >
+    FENIX submissions UI, explorer, dataset portal/API (fg-search),
+    MongoDB, and zarr-store — test namespace on fg-public.
+spec:
+  owner: fg_team
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fenix-submissions-ui
+  title: FENIX submissions UI (test)
+  description: >
+    Submissions UI in namespace fenix-test, Kubernetes service fenix-submissions-ui
+    on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - fenix
+    - test
+    - ui
+  annotations:
+    backstage.io/kubernetes-namespace: fenix-test
+    ebi.ac.uk/k8s-service: fenix-submissions-ui
+    backstage.io/view-url: https://fenix-submissions-ui.hh-webadmin-35.wp-k8s.ebi.ac.uk
+  links:
+    - url: https://fenix-submissions-ui.hh-webadmin-35.wp-k8s.ebi.ac.uk
+      title: Webapp (ingress)
+      icon: dashboard
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:32332
+      title: Webapp (NodePort 32332)
+      icon: dashboard
+spec:
+  type: website
+  lifecycle: test
+  owner: fg_team
+  system: fenix
+  dependsOn:
+    - resource:default/hh-wp-webadmin-35
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fenix-dataset-portal
+  title: FENIX dataset portal (test)
+  description: >
+    Dataset portal (fg-search admin UI) in namespace fenix-test,
+    Kubernetes service fg-search on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - fenix
+    - test
+    - fg-search
+    - portal
+  annotations:
+    backstage.io/kubernetes-namespace: fenix-test
+    ebi.ac.uk/k8s-service: fg-search
+    backstage.io/view-url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/admin/
+  links:
+    - url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/admin/
+      title: Portal (admin UI)
+      icon: dashboard
+    - url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/
+      title: Portal (home)
+      icon: dashboard
+spec:
+  type: website
+  lifecycle: test
+  owner: fg_team
+  system: fenix
+  dependsOn:
+    - component:default/fenix-dataset-api
+    - resource:default/fenix-mongodb
+    - resource:default/hh-wp-webadmin-35
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fenix-dataset-api
+  title: FENIX dataset API (test)
+  description: >
+    Dataset search API (fg-search HAL) in namespace fenix-test,
+    Kubernetes service fg-search on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - fenix
+    - test
+    - fg-search
+    - api
+  annotations:
+    backstage.io/kubernetes-namespace: fenix-test
+    ebi.ac.uk/k8s-service: fg-search
+    backstage.io/view-url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/api/collections
+  links:
+    - url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/api/collections
+      title: API — /api/collections
+      icon: catalog
+    - url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/health
+      title: Health
+      icon: catalog
+    - url: https://fg-search.hh-webadmin-35.wp-k8s.ebi.ac.uk/fenix/docs
+      title: OpenAPI docs
+      icon: catalog
+spec:
+  type: service
+  lifecycle: test
+  owner: fg_team
+  system: fenix
+  dependsOn:
+    - resource:default/fenix-mongodb
+    - component:default/fenix-zarr-store
+    - resource:default/hh-wp-webadmin-35
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: fenix-mongodb
+  title: FENIX MongoDB (test)
+  description: >
+    In-cluster MongoDB in namespace fenix-test, Kubernetes service fg-search-mongodb
+    (ClusterIP :27017). NodePort via fg-search-mongodb-nodeport :32017.
+  tags:
+    - fenix
+    - test
+    - mongodb
+  annotations:
+    backstage.io/kubernetes-namespace: fenix-test
+    ebi.ac.uk/k8s-service: fg-search-mongodb
+    ebi.ac.uk/db-host: fg-search-mongodb.fenix-test.svc
+    ebi.ac.uk/db-port: "27017"
+  links:
+    - url: mongodb://fg-search-mongodb.fenix-test.svc:27017
+      title: "In-cluster — fg-search-mongodb.fenix-test.svc:27017"
+      icon: storage
+    - url: mongodb://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:32017
+      title: "NodePort — worker-1:32017"
+      icon: storage
+spec:
+  type: database
+  owner: fg_team
+  system: fenix
+  dependsOn:
+    - resource:default/hh-wp-webadmin-35
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fenix-zarr-store
+  title: FENIX zarr store API (test)
+  description: >
+    Zarr store API in namespace zarr-store-test, Kubernetes service zarr-store-server
+    on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - fenix
+    - test
+    - zarr
+    - api
+  annotations:
+    backstage.io/kubernetes-namespace: zarr-store-test
+    ebi.ac.uk/k8s-service: zarr-store-server
+    backstage.io/view-url: https://zarr-store.hh-webadmin-35.wp-k8s.ebi.ac.uk
+  links:
+    - url: https://zarr-store.hh-webadmin-35.wp-k8s.ebi.ac.uk
+      title: API (ingress)
+      icon: catalog
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30927
+      title: API (NodePort 30927)
+      icon: catalog
+spec:
+  type: service
+  lifecycle: test
+  owner: fg_team
+  system: fenix
+  dependsOn:
+    - resource:default/hh-wp-webadmin-35
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: fenix-explorer
+  title: FENIX explorer (test)
+  description: >
+    FENIX explorer in namespace fenix-test, Kubernetes service fenix
+    on hh-wp-webadmin-35 (fg-public).
+  tags:
+    - fenix
+    - test
+    - explorer
+  annotations:
+    backstage.io/kubernetes-namespace: fenix-test
+    ebi.ac.uk/k8s-service: fenix
+    backstage.io/view-url: https://hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+  links:
+    - url: https://hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+      title: Webapp (ingress)
+      icon: dashboard
+    - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:32292
+      title: Webapp (NodePort 32292)
+      icon: dashboard
+spec:
+  type: website
+  lifecycle: test
+  owner: fg_team
+  system: fenix
+  dependsOn:
+    - component:default/fenix-dataset-api
+    - component:default/fenix-zarr-store
+    - resource:default/hh-wp-webadmin-35
