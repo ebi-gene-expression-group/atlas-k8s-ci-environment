@@ -21,17 +21,6 @@
 			"path": "../wf-bulk-indexing"
 		},
 		{
-			"path": "../annotare-ng"
-		},
-		{
-			"name": "fenix-submissions-ui",
-			"path": "../fenix-submissions-ui"
-		},
-		{
-			"name": "fenix-schema",
-			"path": "../fenix-schema"
-		},
-		{
 			"name": "ebi-python-rest",
 			"path": "../ebi-python-rest"
 		}

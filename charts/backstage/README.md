@@ -1,8 +1,8 @@
 # Backstage (spike)
 
 Spike deploy of the community Backstage Helm chart onto **fg-public**
-(`hh-wp-webadmin-35`), namespace `backstage`. Demo image + guest auth — not a
-production IdP or catalog ownership model.
+(`hh-wp-webadmin-35`), namespace `backstage`. It uses the official Backstage
+release image plus guest auth — not a production IdP or catalog ownership model.
 
 ## Prerequisites
 
@@ -21,6 +21,8 @@ recreate it on upgrade:
 kubectl --context fg-public -n backstage annotate secret backstage-postgresql \
   helm.sh/resource-policy=keep --overwrite
 ```
+
+
 
 ## Install / upgrade
 
@@ -41,18 +43,15 @@ helm upgrade --install backstage backstage/backstage --version 2.8.2 \
   --kube-context fg-public \
   -n backstage \
   -f charts/backstage/values-spike.yaml \
-  --timeout 10m \
-  --wait
+  -f charts/backstage/.secrets-spike.yaml \
+  --timeout 20m \
+  --wait \
+  --rollback-on-failure
+
+kubectl --context fg-public -n backstage rollout status deployment/backstage --timeout=10m
 ```
 
-## Access
 
-- Service: NodePort **30707** (nginx sidecar strips HSTS, proxies to Backstage `:7007`)
-- URL: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30707
-- Sign in: **Guest → Enter**
-
-Image is pinned to `ghcr.io/backstage/backstage:1.41.1` (see comments in
-`values-spike.yaml`).
 
 ## Catalog
 
@@ -78,3 +77,4 @@ kubectl --context fg-public -n backstage create configmap backstage-gxa-catalog 
   | kubectl --context fg-public apply -f -
 kubectl --context fg-public -n backstage rollout restart deploy/backstage
 ```
+

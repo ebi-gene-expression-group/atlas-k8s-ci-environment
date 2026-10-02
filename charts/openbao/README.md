@@ -13,11 +13,72 @@ are disabled: team-admin cannot create cluster-scoped webhooks or ClusterRoles.
 
 ## Access
 
-- UI / API: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
-- Health: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health
+### Web/REST
+
+- UI / API: [https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk](https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk)
+- Health: [https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health](https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health)
 - Human login: **EMBL-EBI Login** (Google OIDC, catalog email allowlist). Root token is for `task deploy-openbao` / `task openbao-apply-acl` only. The UI tab is the mount path `embl-ebi` (spaces are not allowed).
 
 TLS is terminated in front of the cluster. Ingress stays HTTP.
+
+### CLI
+
+CLI is done using using the `bao` tool. Install using a [package manager](https://openbao.org/docs/install/#package-manager) or a [precompiled binary](https://openbao.org/downloads/)
+
+On an interactive shell that allows opening a browser, use: 
+
+  ```bash
+  export BAO_ADDR='https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk'  
+  # This is required until the TLS signature is properly configured on the EBI Traffic Manager
+  export BAO_SKIP_VERIFY=true
+  # this will open a browser with the Google login page
+  bao login -method=oidc -path=embl-ebi
+  # This gets a secret
+  bao kv get -mount=kv -format yaml -field password annotare/public/app/jdbc-readonly
+  ```
+
+In a non-interactive shell, e.g. SLURM job:
+
+1. admin will create a role with the requirement access policy and relevant ttl values
+
+```bash
+bao write auth/approle/role/fg-cli-dev \
+    token_policies=group-fg-role-developer-annotare
+```
+
+1. admin will get the role id and a fresh secret
+
+```bash
+bao read auth/approle/role/fg-cli-dev/role-id
+bao write -f -field=secret_id auth/approle/role/fg-cli-dev/secret-id
+```
+
+1. obtain role id and secret from the admin as a json file:
+
+  ```json
+  {
+    "role_id": "your-role-id",
+    "secret_id": "your-secret-id"
+  }
+  ```
+
+1. save in a safe location e.g. $HOME/.config/bao/slurm-login.json" and protect with `chmod 600`.
+
+1. obtain a token
+
+  ```bash
+  export BAO_TOKEN=$(bao write -field=token \
+    auth/approle/login @"$HOME/.config/bao/slurm-login.json")
+  ```
+
+1. get a secret
+
+```bash
+bao kv get kv/annotare/test/app/jdbc
+```
+
+
+## App version & Helm Chart
 
 Image is pinned to `quay.io/openbao/openbao:2.6.1` (see `values-public.yaml`).
 The chart `appVersion` is `v2.6.1`; container tags do **not** use the `v` prefix.
@@ -25,10 +86,8 @@ Helm chart `openbao` **0.29.0**.
 
 ## Google Workspace OIDC
 
-OAuth client lives in GCP project
-[`prj-int-dev-atlas-app-intg`](https://console.cloud.google.com/auth/branding?project=prj-int-dev-atlas-app-intg)
-(consent screen / branding). Client:
-[`openbao fg client`](https://console.cloud.google.com/auth/clients/837544769791-uiiiurk404d83s208ebrk4gnnla71djr.apps.googleusercontent.com?project=prj-int-dev-atlas-app-intg).
+OAuth client lives in GCP project [prj-int-dev-atlas-app-intg](https://console.cloud.google.com/auth/branding?project=prj-int-dev-atlas-app-intg)
+(consent screen / branding). Client: [openbao fg client](https://console.cloud.google.com/auth/clients/837544769791-uiiiurk404d83s208ebrk4gnnla71djr.apps.googleusercontent.com?project=prj-int-dev-atlas-app-intg).
 
 Client id and secret: `charts/openbao/.secrets-oidc-public.yaml` (gitignored).
 
@@ -45,11 +104,13 @@ fetch Google’s discovery document and exchange the OIDC code, so
 `http://hh-wwwcache.ebi.ac.uk:3128` (same as GXA). Without that, apply fails
 with `error checking oidc discovery URL`.
 
-Allowed users are emails in [`charts/openbao/acl/catalog.yaml`](acl/catalog.yaml), not everyone in the Workspace. A membership is `{ group, role }` (role applies to every service in that group) or `{ group, role, services: [gxa] }` to limit it. After editing the catalog:
+Allowed users are emails in `[charts/openbao/acl/catalog.yaml](acl/catalog.yaml)`, not everyone in the Workspace. A membership is `{ group, role }` (role applies to every service in that group) or `{ group, role, services: [gxa] }` to limit it. After editing the catalog:
 
 ```bash
 task openbao-apply-acl
 ```
+
+
 
 ## Prerequisites
 
@@ -62,6 +123,8 @@ helm repo update
 kubectl --context fg-public create namespace openbao --dry-run=client -o yaml \
   | kubectl --context fg-public apply -f -
 ```
+
+
 
 ## Install / upgrade
 
@@ -89,6 +152,8 @@ kubectl --context fg-public -n openbao exec openbao-0 -- bao status
 curl -fsS https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health
 ```
 
+
+
 ## After a pod restart (sealed)
 
 If `.secrets-init-public.yaml` exists locally:
@@ -107,9 +172,11 @@ Manual unseal:
 kubectl --context fg-public -n openbao exec -ti openbao-0 -- bao operator unseal
 ```
 
+
+
 ## ACL catalog (groups, roles, KV paths)
 
-Source of truth: [`acl/catalog.yaml`](acl/catalog.yaml). Paths are
+Source of truth: `[acl/catalog.yaml](acl/catalog.yaml)`. Paths are
 `kv/data/<service>/<environment>/<class>/<secret>` for apps,
 `kv/data/<service>/<cluster-server>/<class>/<secret>` for cluster-scoped
 items such as kubeconfigs, or `kv/data/<service>/<environment>/<secret>` for

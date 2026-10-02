@@ -1,5 +1,5 @@
-# Spike values for Backstage on fg-public (hh-wp-webadmin-35).
-# Demo community image — not for production catalog use.
+# Spike values for the official Backstage image on fg-public (hh-wp-webadmin-35).
+# This is a demo/community deployment, not a production Backstage application.
 # Postgres passwords live in Secret backstage-postgresql (not committed).
 
 ingress:
@@ -57,12 +57,17 @@ extraDeploy:
         }
 
 backstage:
-  # :latest (1.42+) ships a notifications sidebar without a working API factory.
-  # Pin pre-1.42 until we build our own create-app image.
+  # Official, version-pinned Backstage release image. Do not use :latest.
+  # If this image displays the notifications API error, it cannot be corrected
+  # through Helm appConfig because the missing API implementation is frontend
+  # code compiled into the upstream image.
   image:
     registry: ghcr.io
     repository: backstage/backstage
-    tag: "1.41.1"
+    # The existing PostgreSQL migration history includes migrations created
+    # after Backstage 1.50. Pin to a newer official release rather than
+    # downgrading or deleting that database.
+    tag: "1.55.2"
     pullPolicy: IfNotPresent
   extraVolumeMounts:
     # Required so the chart also emits extraVolumes (sidecar mounts the same volume).
@@ -101,6 +106,8 @@ backstage:
       baseUrl: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30707
       listen:
         port: 7007
+      cors:
+        origin: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:30707
       csp:
         upgrade-insecure-requests: false
         connect-src: ["'self'", "http:", "https:"]
@@ -136,6 +143,7 @@ backstage:
           target: ./catalog/gxa-entities.yaml
           rules:
             - allow: [Component, System, API, Resource, Domain, Group, User]
+        # these files are coming from the config map volumn and mounted
         - type: file
           target: ./catalog/annotare-entities.yaml
           rules:
@@ -148,3 +156,10 @@ backstage:
           target: ./catalog/fenix-entities.yaml
           rules:
             - allow: [Component, System, API, Resource, Domain, Group, User]
+
+# github integration defined in the secrets file
+# add a group token from an github app: https://github.com/organizations/ebi-gene-expression-group/settings/apps/backstage-auth-github-app
+# integrations:
+#   github:
+#     - host: github.com
+#       token: ${GITHUB_TOKEN}

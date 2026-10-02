@@ -1,0 +1,40 @@
+classes: [app, ops]
+
+services:
+  svc1: {}
+
+groups:
+  its:  
+    display_name: ITS Applications
+    services: [svc]
+    roles:
+      viewer:
+        grants:
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read] }
+      developer:
+        grants: 
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read] }
+      operator:
+        grants: 
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read, write] }
+      admin:
+        grants:
+          - { all_kv: true, access: [read, write] }
+
+users:
+  docana:
+    email: docana@ebi.ac.uk
+    memberships:
+      - { group: its, role: admin }
+  portert:
+    email: portert@ebi.ac.uk
+    memberships:
+      - { group: its, role: admin }
+  hails:
+    email: hails@ebi.ac.uk
+    memberships:
+      - { group: its, role: admin }
+
+
+
+secret_sets:

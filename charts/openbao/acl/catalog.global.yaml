@@ -1,0 +1,14 @@
+auth:
+  oidc:
+    # UI tab label is the mount path (spaces are not allowed). Description is EMBL-EBI Login.
+    path: embl-ebi
+    display_name: EMBL-EBI Login
+    provider: google
+    hosted_domains: [ebi.ac.uk]
+    ui_url: https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+    redirect_uris:
+      - https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/ui/vault/auth/embl-ebi/oidc/callback
+      - http://localhost:8250/oidc/callback
+
+
+environments: [test, ci, staging, public, fallback]

@@ -1,0 +1,35 @@
+groups:
+  bia:
+    display_name: Bio Image Archive Applications
+    services: []
+    roles:
+      viewer:
+        grants: 
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read] }
+      developer:
+        grants: 
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read] }
+      operator:
+        grants: 
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read, write] }
+      admin:
+        grants:
+          - { all_kv: true, access: [read] }
+
+users:
+  matthewh:
+    email: matthewh@ebi.ac.uk
+    memberships:
+      - { group: bia, role: admin }
+
+# kubeconfig clusters[].cluster.server host, no scheme/port (more than one "public" cluster).
+clusters: {}
+  # - hh-wp-webadmin-nn.wp-k8s.ebi.ac.uk
+
+services:
+  svc1: {}
+  svc2: {}
+
+secret_sets:
+  svc1: {}
+  svc2:

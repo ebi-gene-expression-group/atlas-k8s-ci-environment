@@ -1,0 +1,149 @@
+# OpenBao ACL catalog (no secret values). Applied by: task openbao-apply-acl
+# Values: charts/gxa/.secrets-<env>.yaml (and optional .secrets-kv-public.yaml)
+# OIDC client: charts/openbao/.secrets-oidc-public.yaml (gitignored)
+#
+# KV path: kv/data/<service>/<environment>/<class>/<name>  (apps)
+#          kv/data/<service>/<cluster-server>/<class>/<name>  (cluster-scoped, e.g. kubeconfig)
+#          kv/data/<service>/<environment>/<name>  (env-scoped, no class, e.g. fenix/dev/ebi-storage)
+# Cluster server = kubeconfig clusters[].cluster.server host (no scheme/port).
+
+# This catalog currently contains ACL definitions for all groups in a single file.
+# To split per group:
+#   - Create a separate YAML file for each group (e.g. acl/catalog.fg.yaml, acl/catalog.othergroup.yaml).
+#   - Move the `groups:` section for each group into its respective file.
+#   - Keep shared/global structure (environments, clusters, classes, services, auth) in a base or template file
+#     (e.g. acl/catalog.base.yaml), or repeat in each group file if necessary.
+#   - Each per-group file should have the same context keys but only the relevant group under `groups:`.
+# Reference/merge logic may be needed in your tooling or CI to combine them before applying.
+
+# kubeconfig clusters[].cluster.server host, no scheme/port (more than one "public" cluster).
+clusters:
+  - hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+  - hx-wp-webadmin-25.wp-k8s.ebi.ac.uk
+  - hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk
+classes: [app, ops]
+
+# Per-service Kubernetes namespaces for each environment (where known).
+services:
+  gxa:
+    namespaces:
+      test: gxa-test
+      ci: gxa-ci
+      staging: gxa-staging
+      public: gxa-public
+      fallback: gxa-fallback
+  fenix: {}
+  annotare: {}
+  fg-search: {}
+  boarding-pass: {}
+  k8s:
+    scope: cluster
+
+groups:
+  fg:
+    display_name: Functional Genomics
+    services: [gxa, fenix, annotare, fg-search, boarding-pass, k8s]
+    roles:
+      viewer:
+        grants:
+          - { environments: [test, ci, staging, public, fallback], classes: [app], access: [read] }
+      developer:
+        grants:
+          - { environments: [test, ci, staging], classes: [app, ops], access: [read, write] }
+          - { environments: [public, fallback], classes: [app], access: [read] }
+      operator:
+        grants:
+          - { environments: [test, ci, staging, public, fallback], classes: [app, ops], access: [read, write] }
+          - { clusters: [hh-wp-webadmin-35.wp-k8s.ebi.ac.uk, hx-wp-webadmin-25.wp-k8s.ebi.ac.uk, hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk], classes: [ops], access: [read, write] }
+
+# Memberships without services apply the role to every service in the group.
+# Optional services: restrict that role to named services (gxa vs annotare, etc.).
+users:
+  amnon:
+    email: amnon@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator }
+  cernst:
+    email: cernst@ebi.ac.uk
+    memberships:
+      - { group: fg, role: viewer }
+  haber:
+    email: haber@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa] }
+  irisyu:
+    email: irisyu@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [gxa] }
+  jcmarca:
+    email: jcmarca@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [annotare] }
+  jmiguel:
+    email: jmiguel@ebi.ac.uk
+    memberships:
+      - { group: fg, role: operator, services: [gxa, fenix, annotare] }
+  sandeepkurri:
+    email: sandeepkurri@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa] }
+      - { group: fg, role: operator, services: [annotare] }
+  sands:
+    email: sands@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa, fenix] }
+  schellhaass:
+    email: schellhaass@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [gxa, fenix] }
+  sfexova:
+    email: sfexova@ebi.ac.uk
+    memberships:
+      - { group: fg, role: developer, services: [annotare] }
+
+
+# Expanded by the apply script into kv/data/<service>/<environment>/<class>/<name>
+# or kv/data/<service>/<environment>/<name> when class is omitted.
+secret_sets:
+  - service: gxa
+    environments: [test, ci, staging, public, fallback]
+    secrets:
+      - { class: app, name: jdbc, description: "Webapp DB user atlasprd3" }
+      - { class: app, name: solr, description: "Webapp Solr" }
+      - { class: ops, name: tomcat-deployer, description: "Tomcat manager-script" }
+      - { class: ops, name: tomcat-curator, description: "Tomcat admin" }
+      - { class: ops, name: nginx-cache-purge, description: "Sidecar nginx cache purge (Basic auth)" }
+      - { class: ops, name: postgres-atlasdataload, description: "Data-load DB user + password" }
+  - service: gxa
+    environments: [ci]
+    secrets:
+      - { class: ops, name: postgres-superuser, description: "In-cluster Postgres superuser" }
+  - service: annotare
+    environments: [public]
+    secrets:
+      - { class: app, name: jdbc, description: "Annotare PROD MySQL annotare2 (user annotare)" }
+      - { class: app, name: jdbc-readonly, description: "Annotare PROD MySQL annotare2 (user readonly)" }
+  - service: annotare
+    environments: [test]
+    secrets:
+      - { class: app, name: jdbc, description: "Annotare DEV MySQL ae_annotare2 (user annotare)" }
+  - service: k8s
+    clusters:
+      - hh-wp-webadmin-35.wp-k8s.ebi.ac.uk
+      - hx-wp-webadmin-25.wp-k8s.ebi.ac.uk
+      - hx-rke-wp-webadmin-121-master-3.caas.ebi.ac.uk
+    secrets:
+      - { class: ops, name: kubeconfig, description: "kubectl kubeconfig (multiline field config)" }
+  # LivingObjects buckets (FG-231). Passwords are set in the OpenBao UI, not git.
+  # Paths: kv/data/fenix/<env>/ebi-storage/<bucket>/<role>
+  - service: fenix
+    environments: [dev]
+    secrets:
+      - name: ebi-storage
+        description: "EBI Storage (LivingObjects S3)"
+        fields: [access_key, secret_key, endpoint]
+        defaults:
+          endpoint: https://livingobjects-int.ebi.ac.uk
+        buckets:
+          - name: fenix-data-dev
+            roles: [ReadWrite, ReadOnly]

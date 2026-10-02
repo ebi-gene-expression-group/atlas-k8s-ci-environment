@@ -47,6 +47,13 @@ spec:
       title: GXA JSON API
       version: "1.0"
       description: Gene Expression Atlas endpoints (served under context path /gxa).
+    tags:
+      - name: App resources
+        description: Public application endpoints for GXA experiment data and downloads.
+      - name: Operations resources
+        description: Health, build, and authenticated cache-management endpoints for operations and CI.
+      - name: Cache resources
+        description: Authenticated sidecar cache-purge endpoints.
     servers:
       - url: http://hh-rke-wp-webadmin-35-worker-1.caas.ebi.ac.uk:31506/gxa
         description: public (hh-wp-webadmin-35)
@@ -61,6 +68,8 @@ spec:
         get:
           summary: List experiments
           operationId: listExperiments
+          tags:
+            - App resources
           responses:
             "200":
               description: Experiment list JSON
@@ -68,6 +77,8 @@ spec:
         get:
           summary: Experiment by accession
           operationId: getExperiment
+          tags:
+            - App resources
           parameters:
             - name: accession
               in: path
@@ -81,6 +92,8 @@ spec:
         get:
           summary: Download experiments as zip
           operationId: downloadExperimentsZip
+          tags:
+            - App resources
           description: >
             Download one or more experiments as a zip archive.
             Repeat the accession query parameter for each accession
@@ -109,16 +122,89 @@ spec:
         get:
           summary: Health check
           operationId: health
+          tags:
+            - Operations resources
           responses:
             "200":
               description: Healthy
       /json/build:
         get:
           summary: Build / version info
+          tags:
+            - Operations resources
           operationId: build
           responses:
             "200":
               description: Build metadata JSON
+      /_ops/cache/purge/{cachePath}:
+        post:
+          x-http-method: PURGE
+          summary: Purge one cached URL
+          operationId: purgeCachedUrl
+          tags:
+            - Operations resources
+            - Cache resources
+          description: >
+            Purge the cached response for one application path. The cachePath is
+            relative to the host, without a leading slash (for example,
+            gxa/json/experiments). Requires HTTP Basic credentials configured
+            for the GXA cache-purge operations endpoint.
+          parameters:
+            - name: cachePath
+              in: path
+              required: true
+              description: Application path to purge, without a leading slash.
+              schema:
+                type: string
+          responses:
+            "200":
+              description: Cached URL purged
+            "401":
+              description: Cache-purge authentication required or rejected
+            "412":
+              description: No matching cached URL
+      /_ops/cache/purge-prefix/{cachePath}:
+        post:
+          x-http-method: PURGE
+          summary: Purge cached URLs by prefix
+          operationId: purgeCachedUrlPrefix
+          tags:
+            - Operations resources
+            - Cache resources
+          description: "Purge cached responses whose application paths match the supplied prefix. The cachePath is relative to the host, without a leading slash (for example, gxa/json/experiments). Requires HTTP Basic credentials configured for the GXA cache-purge operations endpoint."
+          parameters:
+            - name: cachePath
+              in: path
+              required: true
+              description: Application path prefix to purge, without a leading slash.
+              schema:
+                type: string
+          responses:
+            "200":
+              description: Matching cached URLs purged
+            "401":
+              description: Cache-purge authentication required or rejected
+            "412":
+              description: No matching cached URLs
+      /_ops/cache/purge-all:
+        post:
+          x-http-method: PURGE
+          summary: Purge the full sidecar cache zone
+          operationId: purgeAllCachedUrls
+          tags:
+            - Operations resources
+            - Cache resources
+          description: >
+            Purge all cached responses from the GXA sidecar cache zone.
+            Requires HTTP Basic credentials configured for the GXA cache-purge
+            operations endpoint.
+          responses:
+            "200":
+              description: Sidecar cache zone purged
+            "401":
+              description: Cache-purge authentication required or rejected
+            "412":
+              description: No matching cached URLs
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
