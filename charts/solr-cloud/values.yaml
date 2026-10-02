@@ -18,9 +18,12 @@ podSecurityContext:
 
 solr:
   replicas: 4
+  # Set to a new UTC timestamp to request a Solr Operator managed rolling restart.
+  # Example: --set-string solr.restartAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  restartAt: ""
   image:
     tag: 8.7.0
-  javaMem: "-Xms8000m -Xmx8000m"
+  javaMem: "-Xms4000m -Xmx10000m"
   opts: >-
     -Denable.packages=true
     -Dblob.max.size.mb=100
@@ -31,10 +34,10 @@ solr:
     -XX:MaxTenuringThreshold=8
   resources:
     limits:
-      memory: 9Gi
+      memory: 11Gi
       cpu: 3
     requests:
-      memory: 7Gi
+      memory: 6Gi
       cpu: 2
   storage:
     # Solr data is always the Isilon solr_data folders (inline NFS + init symlinks).
@@ -64,10 +67,10 @@ zookeeper:
       dataDirPrefix: ""
   resources:
     limits:
-      memory: 512Mi
+      memory: 256Mi
       cpu: 500m
     requests:
-      memory: 512Mi
+      memory: 256Mi
       cpu: 500m
 
 service:

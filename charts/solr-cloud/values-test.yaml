@@ -1,14 +1,17 @@
-# values for solr-cloud ci env
+# values for solr-cloud test env (hh-wp-webadmin-35 / fg-public)
 environment: test
 
 solr:
-  # Heap kept well under the 2Gi container limit to leave room for
-  # non-heap memory (metaspace, thread stacks, direct buffers).
-  javaMem: "-Xms1024m -Xmx1536m"
+  storage:
+    nfsData:
+      # Migrated Isilon symlinks are gxa-solrcloud-{n}, not gxa-test-solrcloud-{n}.
+      dataDirPrefix: gxa
+  # Same ~90GB/shard bulk-analytics indexes as ci/staging; inherit javaMem (8Gi heap)
+  # from values.yaml. A 1.5Gi heap OOMed on ci under Jenkins streaming-expression ITs.
   resources:
     limits:
-      memory: 2Gi
-      cpu: 1
+      memory: 9Gi
+      cpu: "2"
     requests:
-      memory: 2Gi
-      cpu: 1
+      memory: 7Gi
+      cpu: "500m"
