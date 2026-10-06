@@ -29,6 +29,17 @@ fi
 if [[ -z "${BASE_URL:-}" && -n "${GXA_TARGET_JSON_URL:-}" ]]; then
   BASE_URL="${GXA_TARGET_JSON_URL%/json/experiments}"
 fi
+# Note: PARALLEL (default 32) controls the number of concurrent curl processes (background jobs).
+# This is not the same as "32 users"—it means up to 32 HTTP requests may be in progress at any time.
+# Actual user concurrency on a web app usually implies 32 distinct users with separate sessions/behavior.
+# Here, it's 32 simultaneous network requests; depending on target endpoints, this may or may not reflect real-world load patterns.
+#
+# To approximate "N users" instead of "N requests in flight", you would:
+#   - Simulate a user as a loop or script that performs a typical sequence of actions (e.g., viewing an experiment, browsing pages).
+#   - Launch N such user scripts/processes in parallel, each carrying out that workflow independently (and possibly with a user session/cookie).
+#   - Each user can then issue requests serially, according to realistic user timings and think times, rather than just maximizing concurrency.
+# This script as-written models raw request concurrency, not user workflows.
+
 
 BASE_URL="${BASE_URL:-http://hh-rke-wp-webadmin-35-master-1.caas.ebi.ac.uk:30932/gxa}"
 BASE_URL="${BASE_URL%/}"
@@ -43,7 +54,8 @@ PROGRESS="${PROGRESS:-1}"  # 1 = accession + request counts on stderr
 PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-0.5}"  # seconds between live progress updates
 CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-10}"
 MAX_TIME="${MAX_TIME:-120}"
-LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/gxa-hit-$(date +%Y%m%d-%H%M%S).tsv}"
+OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/../reports/performance}"
+LOG_FILE="${LOG_FILE:-${OUTPUT_DIR}/gxa-hit-$(date +%Y%m%d-%H%M%S).tsv}"
 
 USE_COLOR=0
 if [[ -t 1 && -z "${NO_COLOR:-}" ]] || [[ "${FORCE_COLOR:-}" == "1" ]]; then
@@ -60,11 +72,12 @@ if [[ "$USE_COLOR" == "1" ]]; then
   C_CYAN=$'\033[36m'
   C_MAGENTA=$'\033[35m'
 else
-  C_RESET= C_BOLD= C_DIM= C_GREEN= C_YELLOW= C_RED= C_CYAN= C_MAGENTA=
+  C_RESET="" C_BOLD="" C_DIM="" C_GREEN="" C_YELLOW="" C_RED="" C_CYAN="" C_MAGENTA=""
 fi
 
 now_s() {
-  python3 -c 'import time; print(time.time())'
+  # python3 -c 'import time; print(time.time())'
+  date +%s.%N
 }
 
 format_bytes_rate() {
@@ -197,14 +210,35 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-accessions=()
-while IFS= read -r accession; do
-  [[ -n "$accession" ]] && accessions+=("$accession")
-done < <(
-  curl -fsSL --connect-timeout "$CONNECT_TIMEOUT" --max-time "$MAX_TIME" \
-    "$EXPERIMENTS_JSON_URL" \
-    | jq -r '.experiments[].experimentAccession'
-)
+HEALTH_URL="${BASE_URL}/json/health"
+echo "${C_DIM}Checking health:${C_RESET} $HEALTH_URL" >&2
+if ! health_response=$(curl -fsSL \
+  --connect-timeout "$CONNECT_TIMEOUT" \
+  --max-time "$MAX_TIME" \
+  "$HEALTH_URL"); then
+  echo "${C_RED}ERROR: health check failed for $HEALTH_URL${C_RESET}" >&2
+  exit 1
+fi
+if ! jq -e '.solr == "UP" and .db == "UP"' >/dev/null <<<"$health_response"; then
+  echo "${C_RED}ERROR: health check is not ready for $HEALTH_URL: $health_response${C_RESET}" >&2
+  exit 1
+fi
+
+# Allow user to set accessions externally by providing ACCESSIONS as a space-separated list.
+if [[ -n "${ACCESSIONS:-}" ]]; then
+  IFS=' ' read -r -a accessions <<< "$ACCESSIONS"
+else
+  accessions=()
+  while IFS= read -r accession; do
+    [[ -n "$accession" ]] && accessions+=("$accession")
+  done < <(
+    curl -fsSL \
+      --connect-timeout "$CONNECT_TIMEOUT" \
+      --max-time "$MAX_TIME" \
+      "$EXPERIMENTS_JSON_URL" \
+      | jq -r '.experiments[].experimentAccession'
+  )
+fi
 
 if ((${#accessions[@]} == 0)); then
   echo "${C_RED}ERROR: no experiment accessions returned from $EXPERIMENTS_JSON_URL${C_RESET}" >&2
@@ -280,6 +314,38 @@ on_interrupt() {
 }
 
 trap on_interrupt INT TERM
+
+# The `wait_for_slot` function currently only limits the number of concurrent background jobs
+# to `PARALLEL`, but does not control the actual rate (requests per second, RPS) at which jobs
+# are launched. To add rate limiting and simulate a specific load rate, you could introduce a
+# variable (e.g., `TARGET_RPS`) and track the time of the last request(s).
+#
+# One simple approach: store the timestamp of the last job launch and, before allowing the
+# next job, sleep just enough so the launches are spaced to match the desired RPS.
+# This does not guarantee exact RPS but can approximate it for light loads.
+#
+# Example concept (not full implementation):
+#
+#   TARGET_RPS=10    # target 10 launches per second
+#   MIN_INTERVAL=$(awk "BEGIN {print 1/$TARGET_RPS}")
+#
+#   last_launch_time=0
+#   wait_for_rate_limit() {
+#     now=$(date +%s.%N)
+#     elapsed=$(awk "BEGIN {print $now-$last_launch_time}")
+#     if (( $(awk "BEGIN {print ($elapsed < $MIN_INTERVAL)}") )); then
+#       sleep_time=$(awk "BEGIN {print $MIN_INTERVAL - $elapsed}")
+#       sleep "$sleep_time"
+#     fi
+#     last_launch_time=$(date +%s.%N)
+#   }
+#
+# You would then call `wait_for_rate_limit` before each background job launch.
+#
+# For more sustained/request-accurate load, you may need a rolling window mechanism or token
+# bucket algorithm to maintain smoother RPS under high concurrency.
+
+
 
 wait_for_slot() {
   while [[ "$INTERRUPTED" != "1" ]]; do
@@ -372,15 +438,17 @@ report_progress() {
     if (t > 0) printf "%.1f", n / t
     else print "0.0"
   }')
+  mean_latency=$(awk '{sum+=$1} END {if(NR>0) print sum/NR}' $log_file)
   if [[ -t 2 && "$USE_COLOR" == "1" ]]; then
-    printf '\r%bexperiments: %d/%d%b  %brequests: %s%b  %b%.1f req/s%b  %s' \
+    printf '\r%bexperiments: %4d/%d%b  %brequests: %7s%b  %b%2.2f req/s%b  latency %b%2.2f s/req%b %10s%b' \
       "$C_CYAN" "$current" "$total" "$C_RESET" \
       "$C_DIM" "$logged" "$C_RESET" \
       "$C_CYAN" "$req_per_sec" "$C_RESET" \
+      "$C_DIM" "$mean_latency" "$C_RESET" \
       "$accession" >&2
   else
-    printf 'experiments: %d/%d  requests: %s  %.1f req/s  %s\n' \
-      "$current" "$total" "$logged" "$req_per_sec" "$accession" >&2
+    printf 'experiments: %4d/%d  requests: %7s  %2.2f req/s  %2.2f s/req %s\n' \
+      "$current" "$total" "$logged" "$req_per_sec" "$mean_latency" "$accession" >&2
   fi
 }
 

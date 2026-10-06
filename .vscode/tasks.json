@@ -2,106 +2,29 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "deploy expression atlas chart",
+			"label": "view gxa deployment logs",
 			"type": "shell",
-			"command": "make workflow",
-			"problemMatcher": [
-				{
-					"owner": "deploy-errors",
-					"fileLocation": "absolute",
-					"pattern": {
-						"regexp": "^(Error|ERROR|FATAL|FAILED):\\s*(.*)$",
-						"message": 2,
-						"severity": 1
-					}
-				},
-				{
-					"owner": "shell",
-					"fileLocation": "relative",
-					"pattern": {
-						"regexp": "^(\\w+:.+)$",
-						"message": 0,
-						"severity": 1
-					}
-				}
-			],
+			"command": "stern",
+			"args": ["-n", "${input:namespace}", "deployment/gxa"],
 			"options": {
-				"env": {
-					"RELEASE": "${input:release}",
-					"ENV": "${input:env}",
-					"DEBUG": "${input:debug}"
-				}
-			}
-		},
-		{
-			"label": "deploy-war",
-			"type": "shell",
-			"command": "make deploy-war",
-			"problemMatcher": [
-				{
-					"owner": "shell",
-					"fileLocation": "relative",
-					"pattern": {
-						"regexp": "^(\\w+):\\s*\\((\\d+)\\)\\s*(.+)$",
-						"file": 1,
-						"message": 3,
-						"severity": 1
-					}
-				}
-			],
-			"options": {
-				"env": {
-					"RELEASE": "${input:release}",
-					"ENV": "${input:env}",
-				}
-			}
-		},
-		{
-			"label": "webapp",
-			"type": "shell",
-			"command": "make webapp",
-			"problemMatcher": [],
-			"options": {
-				"env": {
-					"RELEASE": "${input:release}",
-					"ENV": "${input:env}",
-				}
-			}
-		}
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": [],		
+		}		
 	],
 	"inputs": [
-
-				{
-					"id": "release",
-					"type": "pickString",
-					"description": "app release: gxa or scxa",
-					"options": [
-						"gxa",
-						"scxa"
-					],
-					"default": "gxa"
-				},
-				{
-					"id": "env",
-					"type": "pickString",
-					"description": "environment: test or dev or prod",
-					"options": [
-						"test",
-						"dev",
-						"staging",
-						"prod"
-					],
-					"default": "test"
-				},
-				{
-					"id": "debug",
-					"type": "pickString",
-					"description": "enable debug mode",
-					"options": [
-						"true",
-						"false"
-					],
-					"default": "false"
-				}
-			]
+		{
+			"id": "namespace",
+			"type": "pickString",
+			"description": "Select the namespace to view the logs for the gxa deployment",
+			"default": "gxa-test",
+			"options": 
+				[
+					"gxa-test",
+					"gxa-ci",
+					"gxa-staging",
+					"gxa-public"
+				]
+		}
+	]
 }

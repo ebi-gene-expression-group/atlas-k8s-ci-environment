@@ -8,6 +8,27 @@
             "default": true
         }
     ],
-    "java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home"
+    "java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
+    "python.defaultInterpreterPath": "${workspaceFolder}/tests/browser/.venv/bin/python",
+    "python.testing.pytestPath": "${workspaceFolder}/tests/browser/.venv/bin/pytest",
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.promptToConfigure": false,
+    "python.testing.pytestArgs": [
+        "tests/browser"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python-envs.pythonProjects": [
+        {
+            "path": "tests/browser",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "tests/system",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        }
+    ]
 
 }

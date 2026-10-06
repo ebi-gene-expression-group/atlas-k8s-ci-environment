@@ -45,7 +45,8 @@ Helm will create a `ServiceAccount` that defines an `imagePullSecret`  using whi
 This repo includes a [`Taskfile.yml`](Taskfile.yml) using [Task](https://taskfile.dev/) so common commands are named, documented, and easy to discover. Install the [Task CLI](https://taskfile.dev/installation/), then:
 
 - **`task`** or **`task --list`** — list all tasks with short descriptions (good starting point for new contributors).
-- **`task test-system ENV=staging`** — live Tavern JSON journey (`/json/health`, experiments, search, gene). Or set `GXA_SYSTEM_BASE`. Jenkins job `GXA system tests` uses `Jenkinsfile.system-test`.
+- **`task test:system ENV=staging`** — live Tavern JSON journey (`/json/health`, experiments, search, gene). Or set `GXA_SYSTEM_BASE`. Jenkins job `GXA system tests` uses `Jenkinsfile.system-test`.
+- **`task test:browser ENV=staging`** — Playwright scenarios for the HTML pages (home, experiments, experiment Results/Plots). Add a `tests/browser/scenarios/test_<name>.py` file to cover another page. Same `GXA_SYSTEM_BASE` / `ENV` as the JSON tests.
 - **`task deploy ENV=test`** — deploy the GXA/SCXA webapp chart.
 - **`task deploy-solrcloud ENV=staging`** — deploy SolrCloud (`charts/solr-cloud/README.md`).
 

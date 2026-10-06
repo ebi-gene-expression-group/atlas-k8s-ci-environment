@@ -15,4 +15,5 @@ __pycache__/
 .pytest_cache/
 reports/
 tests/system/.venv/
+tests/browser/.venv/
 .vscode/task-history.ndjson

@@ -8,10 +8,6 @@
 			"path": "../vtm-terraform-config"
 		},
 		{
-			"name": "fg-search",
-			"path": "../fg-search"
-		},
-		{
 			"path": "../atlas-web-bulk"
 		},
 		{
@@ -40,6 +36,8 @@
 			}
 		],
 		"python.terminal.useEnvFile": true,
+		"python.testing.promptToConfigure": false,
+		"python.testing.pytestPath": "tests/browser/.venv/bin/pytest",
 		"java.jdt.ls.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",
 		"openctx.enable": false,
 		"java.import.gradle.java.home": "/usr/local/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home",

@@ -16,21 +16,16 @@ env:
 vars:
   # Dotenv is not in the environment when Task vars are evaluated, and a var named
   # ENV also shadows ${ENV}. Source .env in a subshell, then default.
-  RELEASE:
-    sh: 'set -a && [ -f .env ] && . ./.env; echo "${RELEASE:-gxa}"'
-  ENV:
-    sh: 'set -a && [ -f .env ] && . ./.env; echo "${ENV:-test}"'
-  K8S_CONTEXT:
-    sh: 'set -a && [ -f .env ] && . ./.env; echo "${K8S_CONTEXT:-fg-public}"'
+  RELEASE: '{{.RELEASE | default "gxa"}}'
+  ENV: '{{.ENV | default "test"}}'
+  K8S_CONTEXT: '{{.K8S_CONTEXT | default "fg-public"}}'
   SUPPORTED_ENVS: test staging public fallback
   APP_VERSION: 37.6.79
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
   ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
   CHART_PATH: charts/{{.RELEASE}}
-  WAR_FILE_DIR: charts/{{.RELEASE}}/war
   # Jenkins — set JENKINS_USER and JENKINS_TOKEN in .env
-  JENKINS_URL:
-    sh: 'set -a && [ -f .env ] && . ./.env; echo "${JENKINS_URL%/}"'
+  JENKINS_URL: '{{.JENKINS_URL | default "https://wwwint.ebi.ac.uk/fg/jenkins"}}'
   JENKINS_JOB: Loading_bulk_using_indexing_pipeline_slurm
   JENKINS_BIOENTITIES_JOB: H_bioentities_loading_pipeline_bulk_and_sc
   # WAR_FILE_NAME: override via .env or env var (default: $RELEASE.war)
@@ -53,8 +48,10 @@ tasks:
     cmds:
       - kubectx "${K8S_CONTEXT}"
       - kubectl config set-context --current --namespace={{.NAMESPACE}}
+      - echo "K8S_CONTEXT={{.K8S_CONTEXT}} NAMESPACE={{.NAMESPACE}}"
+      - echo "RELEASE={{.RELEASE}} ENV={{.ENV}}"
 
-  deploy:
+  webapp:deploy:
     desc: Deploy the Atlas web app Helm chart (gxa or scxa) via helm upgrade --install
     deps: [init-k8s]
     cmds:
@@ -103,15 +100,8 @@ tasks:
           -f "$ENV_VALUES" \
           "${HELM_SET_ARGS[@]}" \
           "${HELM_DEBUG_FLAGS[@]}"
-        
-  deploy-test:
-    desc: Deploy to TEST (same as deploy with ENV=test)
-    cmds:
-      - task: deploy
-        vars:
-          ENV: test
 
-  deploy-solrcloud:
+  solr:deploy:
     desc: |
       Deploy solr-cloud chart. Helm release defaults to {RELEASE}-{ENV} (override with SOLR_HELM_RELEASE);
       namespace is {RELEASE}-{ENV}-solrcloud. Set FORCE_CONFLICTS=1 if Helm 4 reports SSA conflicts.
@@ -151,7 +141,7 @@ tasks:
           --create-namespace=false \
           "${HELM_EXTRA[@]}"
 
-  uninstall-solrcloud:
+  solr:uninstall:
     desc: Uninstall solr-cloud Helm release {RELEASE}-{ENV} from namespace {RELEASE}-{ENV}-solrcloud
     cmds:
       - |
@@ -163,7 +153,7 @@ tasks:
         NS="${RELEASE}-${ENV}-solrcloud"
         helm uninstall "$SOLR_HELM_RELEASE" --namespace "$NS"
 
-  fix-solrcloud-zk-pvcs:
+  solr:fix-zk-pvcs:
     desc: |
       Fix ZK PVCs stuck Pending (operator created them without volumeName).
       Deletes broken Pending PVCs and re-applies Helm NFS PV/PVC manifests.
@@ -195,23 +185,37 @@ tasks:
           -s templates/zk-nfs-data-pv.yaml | kubectl apply -f -
         echo "Recreate ZK pods if needed: kubectl delete pod -n $NS -l app=${SOLR_HELM_RELEASE}-solrcloud-zookeeper"
 
-  uninstall:
+  webapp:uninstall:
     desc: Remove the Atlas web app Helm release from the namespace
     cmds:
-      - helm uninstall "{{.RELEASE}}" --namespace "{{.NAMESPACE}}"
+      - |
+        set -euo pipefail
+        RELEASE="{{.RELEASE}}"
+        ENV="{{.ENV}}"
+        SUPPORTED="{{.SUPPORTED_ENVS}}"
+        ENV_VALUES="{{.ENV_VALUES}}"
+        if ! echo " $SUPPORTED " | grep -q " $ENV "; then
+          if [ ! -f "$ENV_VALUES" ]; then
+            echo "Error: unknown ENV '$ENV'. Use one of: $SUPPORTED, or add $ENV_VALUES"
+            exit 1
+          fi
+        fi
+        helm uninstall \
+          "$RELEASE" \
+          --namespace "{{.NAMESPACE}}" 
 
   print-env:
     desc: Print current RELEASE and ENV (and related paths)
     cmds:
       - echo "ENV={{.ENV}} RELEASE={{.RELEASE}} NAMESPACE={{.NAMESPACE}} VALUES={{.ENV_VALUES}}"
 
-  open:monitoring:
+  monitoring:open:
     desc: Open Grafana namespace pods dashboard for this namespace (EBI internal URL)
     cmds:
       - |
         open "https://grafana-hh-webadmin-35.wp-k8s.ebi.ac.uk/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&var-datasource=default&var-cluster=&var-namespace={{.NAMESPACE}}"
 
-  open:webapp:
+  webapp:open:
     desc: Open the app in a browser via the GXA service NodePort
     deps: [init-k8s]
     cmds:
@@ -245,20 +249,25 @@ tasks:
         SERVICE_PORT="$(kubectl get service "{{.RELEASE}}" --namespace "{{.NAMESPACE}}" \
           -o jsonpath='{.spec.ports[0].nodePort}')"
         BASE_URL="http://${NODE_HOSTNAME}:${SERVICE_PORT}${CTX_PATH}"
-        curl --verbose -u "{{.BASIC_AUTH_USER}}:{{.BASIC_AUTH_PASSWORD}}" -X PURGE "${BASE_URL}/_ops/cache/purge-all"
+        curl -s -u "{{.BASIC_AUTH_USER}}:{{.BASIC_AUTH_PASSWORD}}" \
+          -X PURGE "${BASE_URL}/_ops/cache/purge-all" \
+          | yq -p xml .
 
   cache:warmup:
     desc: Warm up the cache
+    deps: [init-k8s]
+    vars:
+      NODE_HOSTNAME:
+        sh: "kubectl get nodes -o jsonpath='{.items[0].metadata.name}'"
+      SERVICE_PORT:
+        sh: "kubectl get service {{.RELEASE}} --namespace {{.NAMESPACE}} \
+          -o jsonpath='{.spec.ports[0].nodePort}'"
+      CTX_PATH: "/gxa"
+    env:
+      BASE_URL: "http://{{.NODE_HOSTNAME}}:{{.SERVICE_PORT}}{{.CTX_PATH}}"
     cmds:
       - |
         set -euo pipefail
-        RELEASE="{{.RELEASE}}"
-        NAMESPACE="{{.NAMESPACE}}"
-        CTX_PATH="/gxa"
-        NODE_HOSTNAME="$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')"
-        SERVICE_PORT="$(kubectl get service "$RELEASE" --namespace "$NAMESPACE" \
-          -o jsonpath='{.spec.ports[0].nodePort}')"
-        BASE_URL="http://${NODE_HOSTNAME}:${SERVICE_PORT}${CTX_PATH}"
         ./scripts/hit-gxa-experiment-pages.sh
 
   test:system:
@@ -279,6 +288,41 @@ tasks:
         mkdir -p reports
         PYTHONPATH=tests/system tests/system/.venv/bin/python -m pytest tests/system -v \
           --junitxml=reports/system-junit.xml -o junit_logging=all
+
+  test:browser:
+    desc: Playwright GXA page scenarios (GXA_SYSTEM_BASE or ENV=ci|staging|public|fallback). Add tests/browser/scenarios/test_*.py
+    cmds:
+      - |
+        set -euo pipefail
+        if [ ! -x tests/browser/.venv/bin/python ]; then
+          python3 -m venv tests/browser/.venv
+        fi
+        tests/browser/.venv/bin/pip install -q -r tests/browser/requirements.txt
+        tests/browser/.venv/bin/playwright install chromium
+        if [ -z "${GXA_SYSTEM_BASE:-}" ]; then
+          TARGET_ENV="${GXA_ENV:-{{.ENV}}}"
+          export GXA_SYSTEM_BASE="$(tests/browser/.venv/bin/python tests/system/resolve_base.py "${TARGET_ENV}")"
+        fi
+        export GXA_SYSTEM_BASE="${GXA_SYSTEM_BASE%/}"
+        echo "GXA_SYSTEM_BASE=${GXA_SYSTEM_BASE}"
+        mkdir -p reports
+        cd tests/browser
+        .venv/bin/python -m pytest -v --junitxml=../../reports/browser-junit.xml
+
+  test:browser:show:
+    desc: Open the Playwright trace viewer (each action, with screenshots) from the last test:browser run
+    cmds:
+      - |
+        set -euo pipefail
+        latest="$(find reports/playwright -name 'trace*.zip' -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)"
+        if [ -z "${latest}" ]; then
+          echo "No traces in reports/playwright. Run task test:browser first." >&2
+          exit 1
+        fi
+        echo "Opening ${latest}"
+        echo "Other traces:"
+        find reports/playwright -name 'trace*.zip' | sort
+        exec tests/browser/.venv/bin/playwright show-trace "${latest}"
 
   jenkins:upsert-secrets:
     desc: |
@@ -301,7 +345,7 @@ tasks:
           "{{.JENKINS_URL}}/job/{{.JENKINS_JOB}}/api/json?tree=property\[parameterDefinitions\[name,type\]\]" \
           | jq
 
-  open:solr:
+  solr:open:
     desc: Open Solr admin UI (NodePort; uses Helm release {RELEASE}-{ENV}, e.g. ENV=staging → gxa-staging-solrcloud-nodeport)
     deps: [init-k8s]
     cmds:
@@ -359,7 +403,7 @@ tasks:
     desc: Build and push nginx-cache-purge (TAG defaults to 1.29.5)
     deps: [nginx-cache-purge:push]
 
-  deploy-openbao:
+  openbao:deploy:
     desc: |
       Deploy OpenBao to namespace openbao on fg-public, then init/unseal if needed.
       Unseal keys are written to charts/openbao/.secrets-init-public.yaml (gitignored).
@@ -397,7 +441,7 @@ tasks:
         kubectl --context "${CONTEXT}" -n "${NS}" delete pod openbao-0 --wait=true --timeout=3m 2>/dev/null || true
         K8S_CONTEXT="${CONTEXT}" OPENBAO_NAMESPACE="${NS}" ./scripts/openbao-init-unseal.sh
 
-  openbao-apply-acl:
+  openbao:apply-acl:
     desc: |
       Apply OpenBao ACL catalog on fg-public (KV v2, Google OIDC allowlist, identity groups/roles).
       Requires charts/openbao/.secrets-init-public.yaml and .secrets-oidc-public.yaml.
