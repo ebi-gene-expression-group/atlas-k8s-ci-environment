@@ -75,6 +75,7 @@ else
 fi
 
 echo "Jenkins: ${JENKINS_URL}"
+echo "Environment: ${ENV}"
 echo "Store:   ${STORE}"
 echo "Id:      ${ID}"
 echo "File:    ${FILE}"
