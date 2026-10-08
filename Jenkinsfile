@@ -31,7 +31,7 @@ pipeline {
   options {
     buildDiscarder(logRotator(numToKeepStr: '40'))
     disableConcurrentBuilds()
-    timeout(time: 15, unit: 'MINUTES')
+    timeout(time: 20, unit: 'MINUTES')
   }
 
   // Choose the Jenkins Kubernetes cloud from ENV (params are not available on a
@@ -95,21 +95,7 @@ pipeline {
       }
     }
 
-    stage('Trigger JSON system tests') {
-      when { expression { !params.DRY_RUN } }
-      agent none
-      steps {
-        script {
-          try {
-            build job: 'GXA system tests', wait: false, propagate: false, parameters: [
-              string(name: 'ENV', value: params.ENV),
-            ]
-          } catch (err) {
-            echo "Skipping GXA system tests trigger (job must allow ENV=${params.ENV}; see Jenkinsfile.system-test): ${err}"
-          }
-        }
-      }
-    }
+
 
     // DevOps Portal persists on the controller. agent none has no node, so
     // reportDeployOperation fails with "requires a node context".
@@ -126,6 +112,22 @@ pipeline {
               echo "Add environment label gxa-${params.ENV} in Jenkins → DevOps Portal → Manage Environments."
               throw err
             }
+          }
+        }
+      }
+    }
+
+    stage('Trigger JSON system tests') {
+      when { expression { !params.DRY_RUN } }
+      agent none
+      steps {
+        script {
+          try {
+            build job: 'GXA system tests', wait: false, propagate: false, parameters: [
+              string(name: 'ENV', value: params.ENV),
+            ]
+          } catch (err) {
+            echo "Skipping GXA system tests trigger (job must allow ENV=${params.ENV}; see Jenkinsfile.system-test): ${err}"
           }
         }
       }
@@ -159,15 +161,9 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       --set 'appVersion=${imageTag}' \\
       --set 'image.tag=${imageTag}' \\
       ${extraSet} \\
-      ${dryRunFlags}
+      ${dryRunFlags} \\
+      --wait --timeout=900s
   """
-
-  if (!dryRun) {
-    sh """
-      set -eu
-      kubectl rollout status deployment/${release} --namespace='${namespace}' --timeout=900s
-    """
-  }
 }
 
 def recordDeployment(String release, String targetEnv, String imageTag) {
