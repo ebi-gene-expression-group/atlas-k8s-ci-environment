@@ -68,7 +68,7 @@ Used with nginx.ingress.kubernetes.io/proxy-cache annotation referencing keys_zo
 {{- define "app.ingress.cacheConfigurationSnippet" -}}
 proxy_cache_methods GET HEAD;
 set $skip_cache 0;
-if ($request_uri = {{ .Values.ingress.pathPrefix }}/json/health) {
+if ($request_uri ~ "^{{ .Values.ingress.pathPrefix }}/json/(health|build)$") {
   set $skip_cache 1;
 }
 proxy_cache_bypass $skip_cache;
