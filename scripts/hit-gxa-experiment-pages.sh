@@ -29,24 +29,16 @@ fi
 if [[ -z "${BASE_URL:-}" && -n "${GXA_TARGET_JSON_URL:-}" ]]; then
   BASE_URL="${GXA_TARGET_JSON_URL%/json/experiments}"
 fi
-# Note: PARALLEL (default 32) controls the number of concurrent curl processes (background jobs).
-# This is not the same as "32 users"—it means up to 32 HTTP requests may be in progress at any time.
-# Actual user concurrency on a web app usually implies 32 distinct users with separate sessions/behavior.
-# Here, it's 32 simultaneous network requests; depending on target endpoints, this may or may not reflect real-world load patterns.
-#
-# To approximate "N users" instead of "N requests in flight", you would:
-#   - Simulate a user as a loop or script that performs a typical sequence of actions (e.g., viewing an experiment, browsing pages).
-#   - Launch N such user scripts/processes in parallel, each carrying out that workflow independently (and possibly with a user session/cookie).
-#   - Each user can then issue requests serially, according to realistic user timings and think times, rather than just maximizing concurrency.
-# This script as-written models raw request concurrency, not user workflows.
 
-
+# start of configuration
 BASE_URL="${BASE_URL:-http://hh-rke-wp-webadmin-35-master-1.caas.ebi.ac.uk:30932/gxa}"
 BASE_URL="${BASE_URL%/}"
 EXPERIMENTS_JSON_URL="${EXPERIMENTS_JSON_URL:-${BASE_URL}/json/experiments}"
-LIMIT="${LIMIT:-}"          # empty or 0 = all experiments
+LIMIT="${LIMIT:50}"          # empty or 0 = all experiments
+BIOENTITY_LIMIT="${BIOENTITY_LIMIT:-5}" # 0 = all bioentities, > 0 = limit to N bioentities per experiment
 SHUFFLE="${SHUFFLE:-1}"     # 1 = random order, 0 = catalogue order
-PARALLEL="${PARALLEL:-32}"  # max concurrent curl requests
+PARALLEL="${PARALLEL:-10}"  # max concurrent curl requests
+REQUEST_INTERVAL_SECONDS="${REQUEST_INTERVAL_SECONDS:-.25}"  # seconds between requests
 WARM_ACCESSIONS="${WARM_ACCESSIONS:-1}"  # 1 = HTML + JSON resource endpoints per accession
 WARM_BIOENTITIES="${WARM_BIOENTITIES:-1}"  # 1 = experiment JSON + /json/bioentity-information/{id}
 SORT_OUTPUT="${SORT_OUTPUT:-1}"
@@ -56,8 +48,9 @@ CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-10}"
 MAX_TIME="${MAX_TIME:-120}"
 OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/../reports/performance}"
 LOG_FILE="${LOG_FILE:-${OUTPUT_DIR}/gxa-hit-$(date +%Y%m%d-%H%M%S).tsv}"
-
 USE_COLOR=0
+# end of configuration
+
 if [[ -t 1 && -z "${NO_COLOR:-}" ]] || [[ "${FORCE_COLOR:-}" == "1" ]]; then
   USE_COLOR=1
 fi
@@ -195,6 +188,7 @@ echo "${C_BOLD}starting $0${C_RESET}" >&2
 echo "${C_DIM}BASE_URL:${C_RESET} $BASE_URL" >&2
 echo "${C_DIM}EXPERIMENTS_JSON_URL:${C_RESET} $EXPERIMENTS_JSON_URL" >&2
 echo "${C_DIM}LIMIT:${C_RESET} ${LIMIT:-all}" >&2
+echo "${C_DIM}BIOENTITY_LIMIT:${C_RESET} ${BIOENTITY_LIMIT:-1}" >&2
 echo "${C_DIM}SHUFFLE:${C_RESET} $SHUFFLE" >&2
 echo "${C_DIM}PARALLEL:${C_RESET} $PARALLEL" >&2
 echo "${C_DIM}WARM_ACCESSIONS:${C_RESET} $WARM_ACCESSIONS" >&2
@@ -345,13 +339,11 @@ trap on_interrupt INT TERM
 # For more sustained/request-accurate load, you may need a rolling window mechanism or token
 # bucket algorithm to maintain smoother RPS under high concurrency.
 
-
-
 wait_for_slot() {
   while [[ "$INTERRUPTED" != "1" ]]; do
     active=$(jobs -rp | wc -l | tr -d ' ')
     (( active < PARALLEL )) && break
-    sleep 0.05
+    sleep $REQUEST_INTERVAL_SECONDS
   done
 }
 
@@ -387,6 +379,7 @@ warm_accessions() {
     ((acc_index++)) || true
     write_progress_state
     warm_accession_pages "$accession"
+    warm_bioentity_accession "$accession"
   done
 }
 
@@ -404,12 +397,20 @@ warm_bioentity_accession() {
     -w "$CURL_WRITE_OUT" \
     "$experiment_json_url" >>"$log_file" 2>/dev/null || true
 
+  
+  # Add loop control using BIOENTITY_LIMIT if set (> 0)
+  bioentity_count=0
+
   while IFS= read -r id; do
     [[ "$INTERRUPTED" == "1" ]] && break
     [[ -n "$id" ]] || continue
+    if [[ "$BIOENTITY_LIMIT" -gt 0 && "$bioentity_count" -ge "$BIOENTITY_LIMIT" ]]; then
+      break
+    fi
     wait_for_slot
     [[ "$INTERRUPTED" == "1" ]] && break
     hit_url "${BASE_URL}/json/bioentity-information/${id}" &
+    ((bioentity_count++))
   done < <(jq -r '.profiles.rows[]?.id // empty' "$tmp" 2>/dev/null || true)
 
   rm -f "$tmp"
