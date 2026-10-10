@@ -25,6 +25,7 @@ pipeline {
 TZ=Europe/London
 H 0,6,12,18 * * * % ENV=ci
 H 0,6,12,18 * * * % ENV=staging
+H 0,6,12,18 * * * % ENV=test
 H 1,7,13,19 * * * % ENV=public
 H 1,7,13,19 * * * % ENV=fallback
     ''')
