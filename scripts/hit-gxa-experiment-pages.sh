@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 
 # Hit GXA experiment pages to warm caches, exercise the application and gather performance metrics.
-# Two phases (env-controlled, each loops all accessions):
+# Phases (env-controlled). Accession phases loop all accessions; searches are once per run:
 #   WARM_ACCESSIONS=1  -> warm_accessions()  — HTML + JSON resource endpoints
 #   WARM_BIOENTITIES=1 -> warm_bioentities() — experiment JSON + bioentity URLs
+#   WARM_SEARCHES=1    -> warm_searches()    — baseline + differential search pages
 #
-# Individual results: tab-separated lines written to LOG_FILE (duration_s, status, bytes, url).
+# Individual results: tab-separated lines written to LOG_FILE (duration_s, status, bytes, method, url).
 # Summary (tps, throughput, avg latency): stdout, stderr, and LOG_FILE.summary. Progress/config: stderr.
 # Config (env or .env): BASE_URL, EXPERIMENTS_JSON_URL, LIMIT, SHUFFLE, PARALLEL,
-#   WARM_ACCESSIONS, WARM_BIOENTITIES, PROGRESS, PROGRESS_INTERVAL, SORT_OUTPUT, LOG_FILE
+#   REQUEST_INTERVAL_SECONDS, USER_START_INTERVAL_SECONDS,
+#   WARM_ACCESSIONS, WARM_BIOENTITIES, WARM_SEARCHES, PROGRESS, PROGRESS_INTERVAL, SORT_OUTPUT, LOG_FILE
+# PARALLEL — concurrent virtual users; each user has one request in flight
+# REQUEST_INTERVAL_SECONDS — think time before a user's next URL (not before their first)
+# USER_START_INTERVAL_SECONDS — delay between launching each additional user (0 = together)
 # WARM_ACCESSIONS=1 — HTML + JSON resource endpoints per accession (default)
 # WARM_BIOENTITIES=1 — /json/experiments/{accession} -> profiles.rows -> bioentity URLs (default)
+# WARM_SEARCHES=1 — POST /json/baseline_experiments and GET /json/search/differential_results (default)
 # Colors: auto when stdout is a TTY; NO_COLOR=1 disables, FORCE_COLOR=1 enables when piped
 # LOG_FILE: defaults to scripts/gxa-hit-YYYYMMDD-HHMMSS.tsv next to this script
 #
@@ -33,14 +39,15 @@ fi
 # start of configuration
 BASE_URL="${BASE_URL:-http://hh-rke-wp-webadmin-35-master-1.caas.ebi.ac.uk:30932/gxa}"
 BASE_URL="${BASE_URL%/}"
-EXPERIMENTS_JSON_URL="${EXPERIMENTS_JSON_URL:-${BASE_URL}/json/experiments}"
-LIMIT="${LIMIT:50}"          # empty or 0 = all experiments
-BIOENTITY_LIMIT="${BIOENTITY_LIMIT:-5}" # 0 = all bioentities, > 0 = limit to N bioentities per experiment
+LIMIT="${LIMIT:0}"          # empty or 0 = all experiments
+BIOENTITY_LIMIT="${BIOENTITY_LIMIT:-1}" # 0 = all bioentities, > 0 = limit to N bioentities per experiment
 SHUFFLE="${SHUFFLE:-1}"     # 1 = random order, 0 = catalogue order
-PARALLEL="${PARALLEL:-10}"  # max concurrent curl requests
-REQUEST_INTERVAL_SECONDS="${REQUEST_INTERVAL_SECONDS:-.25}"  # seconds between requests
+PARALLEL="${PARALLEL:-15}"  # concurrent virtual users (one request in flight each)
+REQUEST_INTERVAL_SECONDS="${REQUEST_INTERVAL_SECONDS:-0.5}"  # think time before a user's next URL
+USER_START_INTERVAL_SECONDS="${USER_START_INTERVAL_SECONDS:-0}"  # delay between starting each user
 WARM_ACCESSIONS="${WARM_ACCESSIONS:-1}"  # 1 = HTML + JSON resource endpoints per accession
-WARM_BIOENTITIES="${WARM_BIOENTITIES:-1}"  # 1 = experiment JSON + /json/bioentity-information/{id}
+WARM_BIOENTITIES="${WARM_BIOENTITIES:-0}"  # 1 = experiment JSON + /json/bioentity-information/{id}
+WARM_SEARCHES="${WARM_SEARCHES:-1}"  # 1 = baseline + differential search pages (not per accession)
 SORT_OUTPUT="${SORT_OUTPUT:-1}"
 PROGRESS="${PROGRESS:-1}"  # 1 = accession + request counts on stderr
 PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-0.5}"  # seconds between live progress updates
@@ -50,6 +57,9 @@ OUTPUT_DIR="${OUTPUT_DIR:-${SCRIPT_DIR}/../reports/performance}"
 LOG_FILE="${LOG_FILE:-${OUTPUT_DIR}/gxa-hit-$(date +%Y%m%d-%H%M%S).tsv}"
 USE_COLOR=0
 # end of configuration
+
+EXPERIMENTS_JSON_URL="${EXPERIMENTS_JSON_URL:-${BASE_URL}/json/experiments}"
+
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]] || [[ "${FORCE_COLOR:-}" == "1" ]]; then
   USE_COLOR=1
@@ -90,8 +100,8 @@ format_bytes_total() {
 }
 
 colorize_result_line() {
-  local duration status bytes url
-  IFS=$'\t' read -r duration status bytes url <<< "$1"
+  local duration status bytes method url
+  IFS=$'\t' read -r duration status bytes method url <<< "$1"
 
   local status_color="$C_GREEN"
   if [[ ! "$status" =~ ^[0-9]+$ ]] || [[ "$status" -eq 0 ]]; then
@@ -111,10 +121,10 @@ colorize_result_line() {
     duration_color="$C_YELLOW"
   fi
 
-  printf '%b%s%b\t%b%s%b\t%s\t%s\n' \
+  printf '%b%s%b\t%b%s%b\t%s\t%s\t%s\n' \
     "$duration_color" "$duration" "$C_RESET" \
     "$status_color" "$status" "$C_RESET" \
-    "$bytes" "$url"
+    "$bytes" "$method" "$url"
 }
 
 print_slowest_line() {
@@ -182,17 +192,21 @@ emit_summary() {
 read -r -a HTML_ENDPOINTS <<< "${HTML_ENDPOINTS:-Results Plots}"
 read -r -a JSON_ENDPOINTS <<< "${JSON_ENDPOINTS:-resources/DATA resources/PLOTS}"
 
-CURL_WRITE_OUT='%{time_total}\t%{http_code}\t%{size_download}\t%{url_effective}\n'
+CURL_WRITE_OUT='%{time_total}\t%{http_code}\t%{size_download}\t%{method}\t%{url_effective}\n'
 
 echo "${C_BOLD}starting $0${C_RESET}" >&2
+echo "${C_DIM}date:${C_RESET} $(date)" >&2
 echo "${C_DIM}BASE_URL:${C_RESET} $BASE_URL" >&2
 echo "${C_DIM}EXPERIMENTS_JSON_URL:${C_RESET} $EXPERIMENTS_JSON_URL" >&2
 echo "${C_DIM}LIMIT:${C_RESET} ${LIMIT:-all}" >&2
 echo "${C_DIM}BIOENTITY_LIMIT:${C_RESET} ${BIOENTITY_LIMIT:-1}" >&2
 echo "${C_DIM}SHUFFLE:${C_RESET} $SHUFFLE" >&2
 echo "${C_DIM}PARALLEL:${C_RESET} $PARALLEL" >&2
+echo "${C_DIM}REQUEST_INTERVAL_SECONDS:${C_RESET} $REQUEST_INTERVAL_SECONDS" >&2
+echo "${C_DIM}USER_START_INTERVAL_SECONDS:${C_RESET} $USER_START_INTERVAL_SECONDS" >&2
 echo "${C_DIM}WARM_ACCESSIONS:${C_RESET} $WARM_ACCESSIONS" >&2
 echo "${C_DIM}WARM_BIOENTITIES:${C_RESET} $WARM_BIOENTITIES" >&2
+echo "${C_DIM}WARM_SEARCHES:${C_RESET} $WARM_SEARCHES" >&2
 echo "${C_DIM}PROGRESS:${C_RESET} $PROGRESS" >&2
 echo "${C_DIM}HTML endpoints:${C_RESET} ${HTML_ENDPOINTS[*]}" >&2
 echo "${C_DIM}JSON endpoints:${C_RESET} ${JSON_ENDPOINTS[*]}" >&2
@@ -218,58 +232,71 @@ if ! jq -e '.solr == "UP" and .db == "UP"' >/dev/null <<<"$health_response"; the
   exit 1
 fi
 
+if [[ "$WARM_ACCESSIONS" != "1" && "$WARM_BIOENTITIES" != "1" && "$WARM_SEARCHES" != "1" ]]; then
+  echo "${C_RED}ERROR: enable WARM_ACCESSIONS, WARM_BIOENTITIES, and/or WARM_SEARCHES${C_RESET}" >&2
+  exit 1
+fi
+
 # Allow user to set accessions externally by providing ACCESSIONS as a space-separated list.
-if [[ -n "${ACCESSIONS:-}" ]]; then
-  IFS=' ' read -r -a accessions <<< "$ACCESSIONS"
-else
-  accessions=()
-  while IFS= read -r accession; do
-    [[ -n "$accession" ]] && accessions+=("$accession")
-  done < <(
-    curl -fsSL \
-      --connect-timeout "$CONNECT_TIMEOUT" \
-      --max-time "$MAX_TIME" \
-      "$EXPERIMENTS_JSON_URL" \
-      | jq -r '.experiments[].experimentAccession'
-  )
-fi
+accessions=()
+if [[ "$WARM_ACCESSIONS" == "1" || "$WARM_BIOENTITIES" == "1" ]]; then
+  if [[ -n "${ACCESSIONS:-}" ]]; then
+    IFS=' ' read -r -a accessions <<< "$ACCESSIONS"
+  else
+    while IFS= read -r accession; do
+      [[ -n "$accession" ]] && accessions+=("$accession")
+    done < <(
+      curl -fsSL \
+        --connect-timeout "$CONNECT_TIMEOUT" \
+        --max-time "$MAX_TIME" \
+        "$EXPERIMENTS_JSON_URL" \
+        | jq -r '.experiments[].experimentAccession'
+    )
+  fi
 
-if ((${#accessions[@]} == 0)); then
-  echo "${C_RED}ERROR: no experiment accessions returned from $EXPERIMENTS_JSON_URL${C_RESET}" >&2
-  exit 1
-fi
+  if ((${#accessions[@]} == 0)); then
+    echo "${C_RED}ERROR: no experiment accessions returned from $EXPERIMENTS_JSON_URL${C_RESET}" >&2
+    exit 1
+  fi
 
-if [[ -n "$LIMIT" && "$LIMIT" =~ ^[0-9]+$ && "$LIMIT" -gt 0 ]]; then
-  accessions=("${accessions[@]:0:LIMIT}")
-fi
+  if [[ -n "$LIMIT" && "$LIMIT" =~ ^[0-9]+$ && "$LIMIT" -gt 0 ]]; then
+    accessions=("${accessions[@]:0:LIMIT}")
+  fi
 
-if [[ "$SHUFFLE" == "1" ]]; then
-  shuffled=()
-  while IFS= read -r accession; do
-    [[ -n "$accession" ]] && shuffled+=("$accession")
-  done < <(printf '%s\n' "${accessions[@]}" | shuf)
-  accessions=("${shuffled[@]}")
-fi
-
-if [[ "$WARM_ACCESSIONS" != "1" && "$WARM_BIOENTITIES" != "1" ]]; then
-  echo "${C_RED}ERROR: enable WARM_ACCESSIONS and/or WARM_BIOENTITIES${C_RESET}" >&2
-  exit 1
+  if [[ "$SHUFFLE" == "1" ]]; then
+    shuffled=()
+    while IFS= read -r accession; do
+      [[ -n "$accession" ]] && shuffled+=("$accession")
+    done < <(printf '%s\n' "${accessions[@]}" | shuf)
+    accessions=("${shuffled[@]}")
+  fi
 fi
 
 warm_plan=""
 [[ "$WARM_ACCESSIONS" == "1" ]] && warm_plan="${#HTML_ENDPOINTS[@]} HTML + ${#JSON_ENDPOINTS[@]} JSON per accession"
-[[ "$WARM_ACCESSIONS" == "1" && "$WARM_BIOENTITIES" == "1" ]] && warm_plan+=", "
+[[ -n "$warm_plan" && "$WARM_BIOENTITIES" == "1" ]] && warm_plan+=", "
 [[ "$WARM_BIOENTITIES" == "1" ]] && warm_plan+="bioentity URLs from profiles.rows"
-echo "${C_BOLD}Hitting ${#accessions[@]} experiment(s) (${warm_plan})${C_RESET}" >&2
+[[ -n "$warm_plan" && "$WARM_SEARCHES" == "1" ]] && warm_plan+=", "
+[[ "$WARM_SEARCHES" == "1" ]] && warm_plan+="baseline + differential search pages"
+if [[ "$WARM_ACCESSIONS" == "1" || "$WARM_BIOENTITIES" == "1" ]]; then
+  echo "${C_BOLD}Hitting ${#accessions[@]} experiment(s) (${warm_plan})${C_RESET}" >&2
+else
+  echo "${C_BOLD}Hitting ${warm_plan}${C_RESET}" >&2
+fi
 
 log_file="$LOG_FILE"
 mkdir -p "$(dirname "$log_file")"
 : >"$log_file"
 progress_state_file="${log_file}.progress"
 progress_watch_flag="${log_file}.watch"
+accession_queue="${log_file}.queue"
+work_lock="${log_file}.work.lock"
 
 write_progress_state() {
-  printf '%s\t%s\n' "$acc_index" "$current_accession" >"$progress_state_file"
+  local tmp
+  tmp="$(mktemp "${progress_state_file}.tmp.XXXXXX")"
+  printf '%s\t%s\n' "$acc_index" "$current_accession" >"$tmp"
+  mv "$tmp" "$progress_state_file"
 }
 
 read_progress_state() {
@@ -304,47 +331,57 @@ on_interrupt() {
   if [[ -s "$log_file" ]]; then
     emit_summary
   fi
+  cleanup_work_files
   exit 130
 }
 
 trap on_interrupt INT TERM
 
-# The `wait_for_slot` function currently only limits the number of concurrent background jobs
-# to `PARALLEL`, but does not control the actual rate (requests per second, RPS) at which jobs
-# are launched. To add rate limiting and simulate a specific load rate, you could introduce a
-# variable (e.g., `TARGET_RPS`) and track the time of the last request(s).
-#
-# One simple approach: store the timestamp of the last job launch and, before allowing the
-# next job, sleep just enough so the launches are spaced to match the desired RPS.
-# This does not guarantee exact RPS but can approximate it for light loads.
-#
-# Example concept (not full implementation):
-#
-#   TARGET_RPS=10    # target 10 launches per second
-#   MIN_INTERVAL=$(awk "BEGIN {print 1/$TARGET_RPS}")
-#
-#   last_launch_time=0
-#   wait_for_rate_limit() {
-#     now=$(date +%s.%N)
-#     elapsed=$(awk "BEGIN {print $now-$last_launch_time}")
-#     if (( $(awk "BEGIN {print ($elapsed < $MIN_INTERVAL)}") )); then
-#       sleep_time=$(awk "BEGIN {print $MIN_INTERVAL - $elapsed}")
-#       sleep "$sleep_time"
-#     fi
-#     last_launch_time=$(date +%s.%N)
-#   }
-#
-# You would then call `wait_for_rate_limit` before each background job launch.
-#
-# For more sustained/request-accurate load, you may need a rolling window mechanism or token
-# bucket algorithm to maintain smoother RPS under high concurrency.
+interval_positive() {
+  awk -v s="$1" 'BEGIN { exit !(s > 0) }'
+}
 
-wait_for_slot() {
-  while [[ "$INTERRUPTED" != "1" ]]; do
-    active=$(jobs -rp | wc -l | tr -d ' ')
-    (( active < PARALLEL )) && break
-    sleep $REQUEST_INTERVAL_SECONDS
+interruptible_sleep() {
+  local seconds="$1"
+  interval_positive "$seconds" || return 0
+  sleep "$seconds" &
+  wait "$!" || true
+}
+
+acquire_lock() {
+  local lock_dir="$1"
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    [[ "$INTERRUPTED" == "1" ]] && return 1
+    sleep 0.05
   done
+}
+
+release_lock() {
+  rmdir "$1" 2>/dev/null || true
+}
+
+# Claim the next accession and record it in the progress file. Empty queue -> failure.
+claim_accession() {
+  local line=""
+  acquire_lock "$work_lock" || return 1
+  line="$(claim_accession_locked)" || true
+  release_lock "$work_lock"
+  [[ -n "$line" ]] || return 1
+  printf '%s\n' "$line"
+}
+
+claim_accession_locked() {
+  local line=""
+  [[ -s "$accession_queue" ]] || return 0
+  IFS= read -r line <"$accession_queue" || return 0
+  [[ -n "$line" ]] || return 0
+  tail -n +2 "$accession_queue" >"${accession_queue}.next"
+  mv "${accession_queue}.next" "$accession_queue"
+  read_progress_state
+  acc_index=$((acc_index + 1))
+  current_accession="$line"
+  write_progress_state
+  printf '%s\n' "$line"
 }
 
 hit_url() {
@@ -355,51 +392,50 @@ hit_url() {
     "$1" >>"$log_file" 2>/dev/null || true
 }
 
+# Think time before every request except this user's first.
+user_think() {
+  if [[ "$user_has_requested" == "1" ]]; then
+    interruptible_sleep "$REQUEST_INTERVAL_SECONDS"
+  fi
+  user_has_requested=1
+}
+
+user_hit_url() {
+  [[ "$INTERRUPTED" == "1" ]] && return 0
+  user_think
+  [[ "$INTERRUPTED" == "1" ]] && return 0
+  hit_url "$1"
+}
+
 warm_accession_pages() {
   local accession="$1"
-  [[ "$INTERRUPTED" == "1" ]] && return 0
   local endpoint
+  [[ "$INTERRUPTED" == "1" ]] && return 0
   for endpoint in "${HTML_ENDPOINTS[@]}"; do
-    wait_for_slot
     [[ "$INTERRUPTED" == "1" ]] && return 0
-    hit_url "${BASE_URL}/experiments/${accession}/${endpoint}" &
+    user_hit_url "${BASE_URL}/experiments/${accession}/${endpoint}"
   done
   for endpoint in "${JSON_ENDPOINTS[@]}"; do
-    wait_for_slot
     [[ "$INTERRUPTED" == "1" ]] && return 0
-    hit_url "${BASE_URL}/json/experiments/${accession}/${endpoint}" &
+    user_hit_url "${BASE_URL}/json/experiments/${accession}/${endpoint}"
   done
+  return 0
 }
 
-warm_accessions() {
-  acc_index=0
-  for accession in "${accessions[@]}"; do
-    [[ "$INTERRUPTED" == "1" ]] && break
-    current_accession="$accession"
-    ((acc_index++)) || true
-    write_progress_state
-    warm_accession_pages "$accession"
-    warm_bioentity_accession "$accession"
-  done
-}
-
-# Fetch experiment JSON (logged), then queue /json/bioentity-information/{id} for each profiles.rows id.
+# Fetch experiment JSON (logged), then each /json/bioentity-information/{id} in order.
 warm_bioentity_accession() {
   local accession="$1"
-  [[ "$INTERRUPTED" == "1" ]] && return 0
   local experiment_json_url="${BASE_URL}/json/experiments/${accession}"
-  local tmp
+  local tmp id bioentity_count=0
+  [[ "$INTERRUPTED" == "1" ]] && return 0
   tmp="$(mktemp)"
 
+  user_think
   curl -sS -L -o "$tmp" \
     --connect-timeout "$CONNECT_TIMEOUT" \
     --max-time "$MAX_TIME" \
     -w "$CURL_WRITE_OUT" \
     "$experiment_json_url" >>"$log_file" 2>/dev/null || true
-
-  
-  # Add loop control using BIOENTITY_LIMIT if set (> 0)
-  bioentity_count=0
 
   while IFS= read -r id; do
     [[ "$INTERRUPTED" == "1" ]] && break
@@ -407,24 +443,86 @@ warm_bioentity_accession() {
     if [[ "$BIOENTITY_LIMIT" -gt 0 && "$bioentity_count" -ge "$BIOENTITY_LIMIT" ]]; then
       break
     fi
-    wait_for_slot
-    [[ "$INTERRUPTED" == "1" ]] && break
-    hit_url "${BASE_URL}/json/bioentity-information/${id}" &
-    ((bioentity_count++))
+    user_hit_url "${BASE_URL}/json/bioentity-information/${id}"
+    bioentity_count=$((bioentity_count + 1))
   done < <(jq -r '.profiles.rows[]?.id // empty' "$tmp" 2>/dev/null || true)
 
   rm -f "$tmp"
+  return 0
+}
+
+user_worker() {
+  local accession
+  user_has_requested=0
+  while accession="$(claim_accession)"; do
+    [[ "$INTERRUPTED" == "1" ]] && break
+    if [[ "$USER_PHASE" == "both" ]]; then
+      warm_accession_pages "$accession"
+      warm_bioentity_accession "$accession"
+    else
+      warm_bioentity_accession "$accession"
+    fi
+  done
+  return 0
+}
+
+run_user_workers() {
+  local i pid started=0
+  local -a pids=()
+  USER_PHASE="$1"
+  acc_index=0
+  current_accession=""
+  write_progress_state
+  printf '%s\n' "${accessions[@]}" >"$accession_queue"
+  for ((i = 0; i < PARALLEL; i++)); do
+    if (( started > 0 )); then
+      interruptible_sleep "$USER_START_INTERVAL_SECONDS"
+    fi
+    [[ "$INTERRUPTED" == "1" ]] && break
+    user_worker &
+    pids+=("$!")
+    started=$((started + 1))
+  done
+  for pid in "${pids[@]}"; do
+    wait "$pid" 2>/dev/null || true
+  done
+}
+
+warm_accessions() {
+  run_user_workers both
 }
 
 warm_bioentities() {
-  acc_index=0
-  for accession in "${accessions[@]}"; do
-    [[ "$INTERRUPTED" == "1" ]] && break
-    current_accession="$accession"
-    ((acc_index++)) || true
-    write_progress_state
-    warm_bioentity_accession "$accession"
-  done
+  run_user_workers bioentities
+}
+
+# Search pages are global (one pass per run), not tied to an accession or bioentity.
+warm_searches() {
+  local gene_query="${1:-REG1B}"
+  local species_query="${2:-homo sapiens}"
+
+  local differential_url
+  differential_url="${BASE_URL}/json/search/differential_results?geneQuery=%255B%257B%2522value%2522%253A%2522${gene_query}%2522%257D%255D&conditionQuery=%255B%255D"
+
+  curl -sS -L -o /dev/null \
+    --connect-timeout "$CONNECT_TIMEOUT" \
+    --max-time "$MAX_TIME" \
+    -w "$CURL_WRITE_OUT" \
+    --data-urlencode "geneQuery=[{\"value\":\"${gene_query}\"}]" \
+    --data-urlencode 'conditionQuery=[]' \
+    --data-urlencode "species=${species_query}" \
+    --data-urlencode 'source=ORGANISM_PART' \
+    "${BASE_URL}/json/baseline_experiments" >>"$log_file" 2>/dev/null || true
+
+  interruptible_sleep "$REQUEST_INTERVAL_SECONDS"
+
+  hit_url "$differential_url"
+
+}
+
+cleanup_work_files() {
+  rm -f "$accession_queue" "${accession_queue}.next" "${progress_state_file}.tmp."*
+  release_lock "$work_lock"
 }
 
 report_progress() {
@@ -493,7 +591,18 @@ fi
 if [[ "$WARM_BIOENTITIES" == "1" ]]; then
   warm_bioentities
 fi
+if [[ "$WARM_SEARCHES" == "1" ]]; then
+  # Iterate on 2 search queries: REG1B and zinc finger
+  for query in "REG1B" "zinc finger" "O14777"; do
+    for species in "homo sapiens" "mus musculus"; do
+      echo "Warming up search for query: $query and species: $species" >&2
+      warm_searches "$query" "$species"
+    done
+  done
+fi
 
+read_progress_state
+cleanup_work_files
 stop_progress_watcher
 report_progress "$acc_index" "$total_accessions" "$current_accession"
 
