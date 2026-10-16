@@ -1,7 +1,5 @@
 classes: [app, ops]
 
-services:
-  svc1: {}
 
 groups:
   its:  

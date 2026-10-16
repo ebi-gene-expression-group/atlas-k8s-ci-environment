@@ -70,7 +70,7 @@ users:
   haber:
     email: haber@ebi.ac.uk
     memberships:
-      - { group: fg, role: developer, services: [gxa] }
+      - { group: fg, role: developer, services: [gxa, fenix] }
   irisyu:
     email: irisyu@ebi.ac.uk
     memberships:
@@ -86,7 +86,7 @@ users:
   sandeepkurri:
     email: sandeepkurri@ebi.ac.uk
     memberships:
-      - { group: fg, role: developer, services: [gxa] }
+      - { group: fg, role: developer, services: [gxa, fenix] }
       - { group: fg, role: operator, services: [annotare] }
   sands:
     email: sands@ebi.ac.uk

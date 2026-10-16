@@ -22,14 +22,5 @@ users:
     memberships:
       - { group: bia, role: admin }
 
-# kubeconfig clusters[].cluster.server host, no scheme/port (more than one "public" cluster).
-clusters: {}
-  # - hh-wp-webadmin-nn.wp-k8s.ebi.ac.uk
 
-services:
-  svc1: {}
-  svc2: {}
 
-secret_sets:
-  svc1: {}
-  svc2:

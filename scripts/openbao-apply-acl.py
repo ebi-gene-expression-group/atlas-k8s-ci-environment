@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Apply charts/openbao/acl/catalog.yaml to the running OpenBao (KV, Google OIDC, identity)."""
+"""Apply the OpenBao ACL catalog (KV, Google OIDC, identity).
+
+Catalog path: OPENBAO_CATALOG, or charts/openbao/acl/catalog.yaml.
+"""
 from __future__ import annotations
 
 import json
@@ -13,7 +16,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG_PATH = ROOT / "charts/openbao/acl/catalog.yaml"
+CATALOG_PATH = Path(os.environ.get("OPENBAO_CATALOG", ROOT / "charts/openbao/acl/catalog.yaml"))
 INIT_PATH = ROOT / "charts/openbao/.secrets-init-public.yaml"
 OIDC_PATH = ROOT / "charts/openbao/.secrets-oidc-public.yaml"
 KV_VALUES_PATH = ROOT / "charts/openbao/.secrets-kv-public.yaml"
