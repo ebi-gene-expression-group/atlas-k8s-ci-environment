@@ -155,6 +155,7 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
 
     echo "---- cluster ----"
     echo "hostname=\$(hostname)"
+    echo "node=\${NODE_NAME:-<unset>}"
     echo "KUBECONFIG=\${KUBECONFIG:-<unset>}"
     echo "KUBERNETES_SERVICE_HOST=\${KUBERNETES_SERVICE_HOST:-<unset>}"
     if [ -r /var/run/secrets/kubernetes.io/serviceaccount/namespace ]; then
@@ -174,7 +175,7 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       --set 'appVersion=${imageTag}' \\
       --set 'image.tag=${imageTag}' \\
       ${extraSet} \\
-      ${dryRunFlags} \\
+      ${dryRunFlags} \Thanks \think 
       --wait --timeout=900s
   """
 }
