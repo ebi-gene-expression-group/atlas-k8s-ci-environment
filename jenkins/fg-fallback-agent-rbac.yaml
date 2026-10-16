@@ -1,0 +1,235 @@
+# RBAC on fg-fallback (hx-wp-webadmin-121) for the Jenkins Kubernetes cloud hx-webadmin-121.
+#
+# Apply:
+#   kubectl --context=fg-fallback apply -f jenkins/fg-fallback-agent-rbac.yaml
+#
+# List everything created by this file:
+#   kubectl --context=fg-fallback get sa,role,rolebinding,ns -A \
+#     -l atlas.ebi.ac.uk/jenkins-integration=fg-fallback
+#
+# The deploy agent pod (jenkins-k8s-pod-deploy.yaml) runs as
+# system:serviceaccount:gxa-jenkins:jenkins-cloud. Helm lists Secrets in the
+# target namespace; without jenkins-gxa-deploy there, upgrade fails with
+# "secrets is forbidden".
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+  annotations:
+    atlas.ebi.ac.uk/description: "Namespace for FG Atlas Jenkins CI agent pods"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+---
+# SA the Jenkins cloud kubeconfig and the in-pod helm agent both use.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-cloud
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: cloud
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: cloud
+  annotations:
+    atlas.ebi.ac.uk/description: "SA for hx-webadmin-121 Jenkins cloud and helm deploy"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+---
+# In-pod SA kept in parity with fg-public. The current pod template uses jenkins-cloud.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-jenkins-fg
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: agent
+  annotations:
+    atlas.ebi.ac.uk/description: "In-pod SA for Jenkins agent pods"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+---
+# Lets the Jenkins Kubernetes plugin spawn and manage CI agent pods.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-agent-pods
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: cloud
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: cloud
+  annotations:
+    atlas.ebi.ac.uk/description: "Manage Jenkins CI agent pods in gxa-jenkins"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-cloud-agent-pods
+  namespace: gxa-jenkins
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: cloud
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: cloud
+  annotations:
+    atlas.ebi.ac.uk/description: "Binds jenkins-cloud SA to jenkins-agent-pods Role"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-cloud
+    namespace: gxa-jenkins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-agent-pods
+---
+# Helm/kubectl deploy permissions in the webapp namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-gxa-deploy
+  namespace: gxa-fallback
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: deploy
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: deploy
+    atlas.ebi.ac.uk/target-namespace: gxa-fallback
+  annotations:
+    atlas.ebi.ac.uk/description: "Helm/kubectl deploy permissions for GXA fallback"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-gxa-deploy
+  namespace: gxa-fallback
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: deploy
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: deploy
+    atlas.ebi.ac.uk/target-namespace: gxa-fallback
+  annotations:
+    atlas.ebi.ac.uk/description: "Binds jenkins-cloud SA to jenkins-gxa-deploy Role"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-cloud
+    namespace: gxa-jenkins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-gxa-deploy
+---
+# Same deploy permissions in the SolrCloud namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-gxa-deploy
+  namespace: gxa-fallback-solrcloud
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: deploy
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: deploy
+    atlas.ebi.ac.uk/target-namespace: gxa-fallback-solrcloud
+  annotations:
+    atlas.ebi.ac.uk/description: "Helm/kubectl deploy permissions for GXA fallback SolrCloud"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-gxa-deploy
+  namespace: gxa-fallback-solrcloud
+  labels:
+    app.kubernetes.io/name: gxa-jenkins
+    app.kubernetes.io/component: deploy
+    app.kubernetes.io/managed-by: atlas-k8s-ci-environment
+    atlas.ebi.ac.uk/jenkins-integration: fg-fallback
+    atlas.ebi.ac.uk/jenkins-role: deploy
+    atlas.ebi.ac.uk/target-namespace: gxa-fallback-solrcloud
+  annotations:
+    atlas.ebi.ac.uk/description: "Binds jenkins-cloud SA to jenkins-gxa-deploy Role"
+    atlas.ebi.ac.uk/source-file: jenkins/fg-fallback-agent-rbac.yaml
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-cloud
+    namespace: gxa-jenkins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-gxa-deploy

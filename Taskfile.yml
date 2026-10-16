@@ -20,14 +20,12 @@ vars:
   ENV: '{{.ENV | default "test"}}'
   K8S_CONTEXT: '{{.K8S_CONTEXT | default "fg-public"}}'
   SUPPORTED_ENVS: test staging public fallback
-  APP_VERSION: 37.6.79
+  APP_VERSION: 37.6.187
   NAMESPACE: "{{.RELEASE}}-{{.ENV}}"
   ENV_VALUES: charts/{{.RELEASE}}/values-{{.ENV}}.yaml
   CHART_PATH: charts/{{.RELEASE}}
   # Jenkins — set JENKINS_USER and JENKINS_TOKEN in .env
   JENKINS_URL: '{{.JENKINS_URL | default "https://wwwint.ebi.ac.uk/fg/jenkins"}}'
-  JENKINS_JOB: Loading_bulk_using_indexing_pipeline_slurm
-  JENKINS_BIOENTITIES_JOB: H_bioentities_loading_pipeline_bulk_and_sc
   # WAR_FILE_NAME: override via .env or env var (default: $RELEASE.war)
   CURL_DEBUG_OPTS: "--progress-bar"
   NGINX_CACHE_PURGE_DIR: nginx-cache-purge
@@ -82,7 +80,7 @@ tasks:
           HELM_SET_ARGS+=(-f "$SECRETS_FILE")
         fi
         if [ "$ENV" != "fallback" ]; then
-          # platform-secrets-propagate owns gxa-registry on fg-public
+          # loggingLevel owns gxa-registry on fg-public
           HELM_SET_ARGS+=(--set "imagePullSecret.create=false")
         fi
         HELM_DEBUG_FLAGS=()
@@ -209,11 +207,16 @@ tasks:
     cmds:
       - echo "ENV={{.ENV}} RELEASE={{.RELEASE}} NAMESPACE={{.NAMESPACE}} VALUES={{.ENV_VALUES}}"
 
-  monitoring:open:
+  monitoring:grafana:open:
     desc: Open Grafana namespace pods dashboard for this namespace (EBI internal URL)
     cmds:
       - |
         open "https://grafana-hh-webadmin-35.wp-k8s.ebi.ac.uk/d/85a562078cdf77779eaa1add43ccec1e/kubernetes-compute-resources-namespace-pods?orgId=1&refresh=10s&var-datasource=default&var-cluster=&var-namespace={{.NAMESPACE}}"
+
+  monitoring:kibana:open:
+    desc: Open the Kibana monitoring dashboard (EBI internal URL)
+    cmds:
+      - open "https://hh-logs.wp-k8s.ebi.ac.uk/s/hh-wp-webadmin-35/app/dashboards#/view/f6ae2000-c725-11f1-ad14-95860a70187e"
 
   webapp:open:
     desc: Open the app in a browser via the GXA service NodePort
@@ -336,14 +339,7 @@ tasks:
         export JENKINS_URL="{{.JENKINS_URL}}"
         exec "{{.ROOT_DIR}}/scripts/jenkins-upsert-gxa-secrets.sh"
 
-  jenkins:params:
-    desc: List parameters accepted by the indexing pipeline job
-    cmds:
-      - |
-        curl -fsSL \
-          --user "${JENKINS_USER}:${JENKINS_TOKEN}" \
-          "{{.JENKINS_URL}}/job/{{.JENKINS_JOB}}/api/json?tree=property\[parameterDefinitions\[name,type\]\]" \
-          | jq
+
 
   solr:open:
     desc: Open Solr admin UI (NodePort; uses Helm release {RELEASE}-{ENV}, e.g. ENV=staging → gxa-staging-solrcloud-nodeport)
@@ -403,6 +399,15 @@ tasks:
     desc: Build and push nginx-cache-purge (TAG defaults to 1.29.5)
     deps: [nginx-cache-purge:push]
 
+  openbao:login:oidc:
+    desc: Log in to dockerhub.ebi.ac.uk (REGISTRY_USER, REGISTRY_PASSWORD)
+    internal: false
+    cmds:
+      - |
+        echo BAO_ADDR="{{.BAO_ADDR}}"
+        echo BAO_ADDR env var : ${BAO_ADDR}
+        bao login -method=oidc -path=embl-ebi
+
   openbao:deploy:
     desc: |
       Deploy OpenBao to namespace openbao on fg-public, then init/unseal if needed.
@@ -448,3 +453,16 @@ tasks:
     cmds:
       - ./scripts/openbao-apply-acl.sh
 
+  secrets:propagate:
+    desc: Propagate secrets from platform-secrets to fg-public
+    deps: [init-k8s]
+    cmds:
+      - |
+        set -euo pipefail
+        kubectx "${K8S_CONTEXT}"
+        # Use a readably formatted timestamp (e.g. YYYYMMDD-HHMMSS) instead of epoch seconds for the job name
+        JOB_TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+        JOB_NAME="propagate-secrets-{{.ENV}}-ondemand-${JOB_TIMESTAMP}"
+        echo "Creating job ${JOB_NAME}"
+        kubectl create job --from=cronjob/platform-secrets-propagate -n platform-secrets ${JOB_NAME}
+        kubectl wait --for=condition=complete job/${JOB_NAME} -n platform-secrets --timeout=10m

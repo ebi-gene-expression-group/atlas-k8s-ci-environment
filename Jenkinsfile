@@ -153,6 +153,19 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       exit 1
     fi
 
+    echo "---- cluster ----"
+    echo "hostname=\$(hostname)"
+    echo "KUBECONFIG=\${KUBECONFIG:-<unset>}"
+    echo "KUBERNETES_SERVICE_HOST=\${KUBERNETES_SERVICE_HOST:-<unset>}"
+    if [ -r /var/run/secrets/kubernetes.io/serviceaccount/namespace ]; then
+      echo "pod serviceaccount namespace=\$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)"
+    else
+      echo "pod serviceaccount token: not mounted"
+    fi
+    kubectl cluster-info
+    kubectl config view --minify -o 'jsonpath=context={.current-context}{"\\n"}server={.clusters[0].cluster.server}{"\\n"}' || true
+    echo "---- helm ----"
+
     helm upgrade --install '${release}' 'charts/${release}' \\
       --namespace '${namespace}' \\
       --create-namespace \\

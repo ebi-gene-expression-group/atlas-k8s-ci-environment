@@ -45,8 +45,6 @@ Confirm:
 kubectl --context "$K8S_CONTEXT" get ns gxa-jenkins gxa-${ENV} gxa-${ENV}-solrcloud
 ```
 
-
-
 ### Jenkins Kubernetes cloud
 
 The deploy pipeline (`Jenkinsfile`) picks the **Jenkins Kubernetes plugin cloud name** from `ENV`:
@@ -93,8 +91,6 @@ Verify:
 kubectl --context "$K8S_CONTEXT" api-resources | grep -E 'solr|zookeeper'
 kubectl --context "$K8S_CONTEXT" -n solr-operator get deploy,pods
 ```
-
-
 
 ### Team RBAC for SolrCloud CRs
 
