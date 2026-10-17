@@ -162,7 +162,6 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
     else
       echo "pod serviceaccount token: not mounted"
     fi
-    kubectl cluster-info
     echo "---- helm ----"
 
     helm upgrade --install '${release}' 'charts/${release}' \\
