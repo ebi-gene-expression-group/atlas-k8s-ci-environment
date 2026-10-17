@@ -6,7 +6,7 @@ tomcat:
   debug:
     enabled: false
 
-loggingLevel: INFO
+loggingLevel: DEBUG
 
 jdbc:
   # Shared with ci (populate source): pgsql-hlvm-147

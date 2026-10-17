@@ -181,7 +181,7 @@ tomcat:
     port: 8000
     address: "*:8000"  # Use "*:8000" to listen on all interfaces, or "localhost:8000" for localhost only
 
-loggingLevel: DEBUG
+loggingLevel: INFO
 
 # Optional in-cluster PostgreSQL 16.
 # Default is disabled: most environments connect to an external PG via jdbc.url.

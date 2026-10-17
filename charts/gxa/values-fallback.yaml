@@ -6,7 +6,6 @@ tomcat:
   debug:
     enabled: false
 
-loggingLevel: INFO
 
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvmpubfall2-019.ebi.ac.uk:5432/gxpatlaspub"

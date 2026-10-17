@@ -33,3 +33,8 @@ solr:
   namespace: gxa-ci-solrcloud
   user: admin
   createSecret: true
+
+# Pull secret is mirrored from platform-secrets (do not let Helm recreate it).
+imagePullSecret:
+  create: false
+  name: gxa-registry
