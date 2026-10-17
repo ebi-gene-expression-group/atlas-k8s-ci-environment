@@ -175,7 +175,7 @@ def runHelmDeploy(String release, String env, String imageTag, boolean dryRun) {
       --set 'appVersion=${imageTag}' \\
       --set 'image.tag=${imageTag}' \\
       ${extraSet} \\
-      ${dryRunFlags} \Thanks \think 
+      ${dryRunFlags} \\
       --wait --timeout=900s
   """
 }
