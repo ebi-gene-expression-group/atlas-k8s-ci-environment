@@ -49,6 +49,62 @@ class Gxa:
         page.locator("#experiment-page").wait_for(state="attached")
         assert accession in page.content(), f"{accession} missing from experiment page HTML"
 
+    def expect_search_results(self, page: Page, example: str) -> None:
+        """An example search showed results for that query."""
+        assert "Search results" in page.title(), f"{example} title was {page.title()!r} at {page.url}"
+        assert page.locator("h4", has_text="Error:").count() == 0, f"{example} rendered the GXA error page"
+        empty = page.get_by_text("Sorry, we could not find results matching your search criteria")
+        assert empty.count() == 0, f"{example} returned no results ({page.url})"
+
+        # A single gene or gene-set query redirects to /genes/ or /genesets/.
+        core = example.split(" (", 1)[0]
+        if "/genes/" in page.url or "/genesets/" in page.url:
+            name = page.locator(".gxaBioentityName")
+            name.wait_for(state="visible")
+            assert name.inner_text().strip(), f"{example} gene page had an empty name"
+            if "/genesets/" in page.url:
+                assert core in page.url or core in name.inner_text(), (
+                    f"{example} geneset page did not mention {core}"
+                )
+                if " (" in example:
+                    label = example.split(" (", 1)[1].rstrip(")")
+                    description = page.locator(".gxaBioentityDescription")
+                    description.wait_for(state="visible")
+                    assert label in description.inner_text(), (
+                        f"{example} geneset description was {description.inner_text()!r}"
+                    )
+        else:
+            term = page.locator(".searchterm")
+            term.wait_for(state="visible")
+            assert core in term.inner_text(), f"{example} search term was {term.inner_text()!r}"
+
+        self._expect_expression_results(page, example)
+        self.dismiss_banner(page)
+
+    def _expect_expression_results(self, page: Page, example: str) -> None:
+        """Baseline draws a heatmap; differential-only queries render a results table.
+
+        A gene-set page can resolve with an empty facet tree, so the card is the result.
+        """
+        if page.locator("#differential.is-active").count() and not page.locator("#baseline.is-active").count():
+            page.locator("#gxaDifferentialTab .gxaDifferentialResultsTable tbody tr").first.wait_for(
+                state="visible", timeout=120_000
+            )
+            return
+
+        # The facet tree is in the first React paint. An empty tree has the heading and no species.
+        page.locator("#gxaBaselineTab h4", has_text="Filter your results").wait_for(
+            state="visible", timeout=60_000
+        )
+        if page.locator("#gxaBaselineTab h5").count() == 0:
+            assert "/genes/" in page.url or "/genesets/" in page.url, (
+                f"{example} baseline tab had no facets at {page.url}"
+            )
+            return
+        page.locator("#baseline.is-active .highcharts-point").first.wait_for(
+            state="visible", timeout=120_000
+        )
+
     def expect_heatmap(self, page: Page) -> None:
         """Results tab heatmap has drawn (Highcharts), not only the empty mount point."""
         chart = page.locator("#experiment-page .gxaHeatmapContainer .highcharts-container")
