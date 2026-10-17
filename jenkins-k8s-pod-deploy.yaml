@@ -18,11 +18,6 @@ spec:
     - name: helm
       image: dtzar/helm-kubectl:3.14
       command: ["/bin/sh", "-c", "sleep 2h"]
-      env:
-        - name: NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
       resources:
         requests:
           memory: "256Mi"
