@@ -312,20 +312,43 @@ tasks:
         cd tests/browser
         .venv/bin/python -m pytest -v --junitxml=../../reports/browser-junit.xml
 
+  
   test:browser:show:
-    desc: Open the Playwright trace viewer (each action, with screenshots) from the last test:browser run
+    desc: Pick a Playwright trace (newest first) and open it in the trace viewer
     cmds:
       - |
-        set -euo pipefail
-        latest="$(find reports/playwright -name 'trace*.zip' -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)"
-        if [ -z "${latest}" ]; then
-          echo "No traces in reports/playwright. Run task test:browser first." >&2
-          exit 1
-        fi
-        echo "Opening ${latest}"
-        echo "Other traces:"
-        find reports/playwright -name 'trace*.zip' | sort
-        exec tests/browser/.venv/bin/playwright show-trace "${latest}"
+        bash -euo pipefail -c '
+          traces=()
+          if [ -d reports/playwright ]; then
+            while IFS= read -r trace; do
+              case "$trace" in
+                *.zip) traces+=("$trace") ;;
+              esac
+            done < <(find reports/playwright -name "trace.zip" -print0 | xargs -0 ls -t 2>/dev/null || true)
+          fi
+          if [ ${#traces[@]} -eq 0 ]; then
+            echo "No traces in reports/playwright. Run task test:browser first." >&2
+            exit 1
+          fi
+          labels=()
+          for trace in "${traces[@]}"; do
+            when=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$trace")
+            name=${trace#reports/playwright/}
+            name=${name%/trace.zip}
+            labels+=("$when  $name")
+          done
+          echo "Select a trace (newest first):"
+          PS3="#? "
+          select label in "${labels[@]}"; do
+            if [[ "$REPLY" =~ ^[0-9]+$ ]] && [ "$REPLY" -ge 1 ] && [ "$REPLY" -le ${#traces[@]} ]; then
+              trace="${traces[$((REPLY-1))]}"
+              echo "Opening ${trace}"
+              exec tests/browser/.venv/bin/playwright show-trace "$trace"
+            fi
+            echo "Pick a number from the list." >&2
+          done
+        '
+
 
   jenkins:upsert-secrets:
     desc: |
