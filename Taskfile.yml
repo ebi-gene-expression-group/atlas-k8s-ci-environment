@@ -293,61 +293,43 @@ tasks:
           --junitxml=reports/system-junit.xml -o junit_logging=all
 
   test:browser:
-    desc: Playwright GXA page scenarios (GXA_SYSTEM_BASE or ENV=ci|staging|public|fallback). Add tests/browser/scenarios/test_*.py
+    desc: Playwright GXA page scenarios (GXA_SYSTEM_BASE or ENV=ci|staging|public|fallback). Add tests/browser/scenarios/*.spec.ts
     cmds:
       - |
         set -euo pipefail
-        if [ ! -x tests/browser/.venv/bin/python ]; then
-          python3 -m venv tests/browser/.venv
+        if [ ! -x tests/system/.venv/bin/python ]; then
+          python3 -m venv tests/system/.venv
+          tests/system/.venv/bin/pip install -q -r tests/system/requirements.txt
         fi
-        tests/browser/.venv/bin/pip install -q -r tests/browser/requirements.txt
-        tests/browser/.venv/bin/playwright install chromium
         if [ -z "${GXA_SYSTEM_BASE:-}" ]; then
           TARGET_ENV="${GXA_ENV:-{{.ENV}}}"
-          export GXA_SYSTEM_BASE="$(tests/browser/.venv/bin/python tests/system/resolve_base.py "${TARGET_ENV}")"
+          export GXA_SYSTEM_BASE="$(tests/system/.venv/bin/python tests/system/resolve_base.py "${TARGET_ENV}")"
         fi
         export GXA_SYSTEM_BASE="${GXA_SYSTEM_BASE%/}"
         echo "GXA_SYSTEM_BASE=${GXA_SYSTEM_BASE}"
         mkdir -p reports
         cd tests/browser
-        .venv/bin/python -m pytest -v --junitxml=../../reports/browser-junit.xml
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
+        npx playwright install chromium
+        status=0
+        npx playwright test || status=$?
+        exit "$status"
 
-  
   test:browser:show:
-    desc: Pick a Playwright trace (newest first) and open it in the trace viewer
+    desc: Open the Playwright HTML report
     cmds:
       - |
-        bash -euo pipefail -c '
-          traces=()
-          if [ -d reports/playwright ]; then
-            while IFS= read -r trace; do
-              case "$trace" in
-                *.zip) traces+=("$trace") ;;
-              esac
-            done < <(find reports/playwright -name "trace.zip" -print0 | xargs -0 ls -t 2>/dev/null || true)
-          fi
-          if [ ${#traces[@]} -eq 0 ]; then
-            echo "No traces in reports/playwright. Run task test:browser first." >&2
-            exit 1
-          fi
-          labels=()
-          for trace in "${traces[@]}"; do
-            when=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$trace")
-            name=${trace#reports/playwright/}
-            name=${name%/trace.zip}
-            labels+=("$when  $name")
-          done
-          echo "Select a trace (newest first):"
-          PS3="#? "
-          select label in "${labels[@]}"; do
-            if [[ "$REPLY" =~ ^[0-9]+$ ]] && [ "$REPLY" -ge 1 ] && [ "$REPLY" -le ${#traces[@]} ]; then
-              trace="${traces[$((REPLY-1))]}"
-              echo "Opening ${trace}"
-              exec tests/browser/.venv/bin/playwright show-trace "$trace"
-            fi
-            echo "Pick a number from the list." >&2
-          done
-        '
+        set -euo pipefail
+        if [ ! -d reports/playwright-report ]; then
+          echo "No report in reports/playwright-report. Run task test:browser first." >&2
+          exit 1
+        fi
+        cd tests/browser
+        exec npx playwright show-report ../../reports/playwright-report
 
 
   jenkins:upsert-secrets:

@@ -14,6 +14,6 @@ k8s_staging.sh
 __pycache__/
 .pytest_cache/
 reports/
-tests/system/.venv/
-tests/browser/.venv/
+.venv/
+node_modules/
 .vscode/task-history.ndjson
