@@ -11,6 +11,7 @@
 # Config (env or .env): BASE_URL, EXPERIMENTS_JSON_URL, LIMIT, SHUFFLE, PARALLEL,
 #   REQUEST_INTERVAL_SECONDS, USER_START_INTERVAL_SECONDS,
 #   WARM_ACCESSIONS, WARM_BIOENTITIES, WARM_SEARCHES, PROGRESS, PROGRESS_INTERVAL, SORT_OUTPUT, LOG_FILE
+# Catalogue order is descending numberOfAssays (largest experiments first); SHUFFLE=1 randomizes after LIMIT
 # PARALLEL — concurrent virtual users; each user has one request in flight
 # REQUEST_INTERVAL_SECONDS — think time before a user's next URL (not before their first)
 # USER_START_INTERVAL_SECONDS — delay between launching each additional user (0 = together)
@@ -41,10 +42,10 @@ BASE_URL="${BASE_URL:-http://hh-rke-wp-webadmin-35-master-1.caas.ebi.ac.uk:30932
 BASE_URL="${BASE_URL%/}"
 LIMIT="${LIMIT:0}"          # empty or 0 = all experiments
 BIOENTITY_LIMIT="${BIOENTITY_LIMIT:-1}" # 0 = all bioentities, > 0 = limit to N bioentities per experiment
-SHUFFLE="${SHUFFLE:-1}"     # 1 = random order, 0 = catalogue order
+SHUFFLE="${SHUFFLE:-0}"     # 1 = random order, 0 = largest numberOfAssays first
 PARALLEL="${PARALLEL:-15}"  # concurrent virtual users (one request in flight each)
-REQUEST_INTERVAL_SECONDS="${REQUEST_INTERVAL_SECONDS:-0.5}"  # think time before a user's next URL
-USER_START_INTERVAL_SECONDS="${USER_START_INTERVAL_SECONDS:-0}"  # delay between starting each user
+REQUEST_INTERVAL_SECONDS="${REQUEST_INTERVAL_SECONDS:-0.25}"  # think time before a user's next URL
+USER_START_INTERVAL_SECONDS="${USER_START_INTERVAL_SECONDS:-0.5}"  # delay between starting each user
 WARM_ACCESSIONS="${WARM_ACCESSIONS:-1}"  # 1 = HTML + JSON resource endpoints per accession
 WARM_BIOENTITIES="${WARM_BIOENTITIES:-0}"  # 1 = experiment JSON + /json/bioentity-information/{id}
 WARM_SEARCHES="${WARM_SEARCHES:-1}"  # 1 = baseline + differential search pages (not per accession)
@@ -250,7 +251,7 @@ if [[ "$WARM_ACCESSIONS" == "1" || "$WARM_BIOENTITIES" == "1" ]]; then
         --connect-timeout "$CONNECT_TIMEOUT" \
         --max-time "$MAX_TIME" \
         "$EXPERIMENTS_JSON_URL" \
-        | jq -r '.experiments[].experimentAccession'
+        | jq -r '.experiments | sort_by(.numberOfAssays) | reverse[] | .experimentAccession'
     )
   fi
 
@@ -539,7 +540,7 @@ report_progress() {
   }')
   mean_latency=$(awk '{sum+=$1} END {if(NR>0) print sum/NR}' $log_file)
   if [[ -t 2 && "$USE_COLOR" == "1" ]]; then
-    printf '\r%bexperiments: %4d/%d%b  %brequests: %7s%b  %b%2.2f req/s%b  latency %b%2.2f s/req%b %10s%b' \
+    printf '\r%bexperiments: %4d/%d%b  %brequests: %7s%b  %b%2.2f req/s%b  latency %b%2.2f s/req%b %s%b\033[K' \
       "$C_CYAN" "$current" "$total" "$C_RESET" \
       "$C_DIM" "$logged" "$C_RESET" \
       "$C_CYAN" "$req_per_sec" "$C_RESET" \
