@@ -36,13 +36,16 @@ services:
   annotare: {}
   fg-search: {}
   boarding-pass: {}
+  another-s3-manager:
+    namespaces:
+      test: fenix-test
   k8s:
     scope: cluster
 
 groups:
   fg:
     display_name: Functional Genomics
-    services: [gxa, fenix, annotare, fg-search, boarding-pass, k8s]
+    services: [gxa, fenix, annotare, fg-search, boarding-pass, k8s, another-s3-manager]
     roles:
       viewer:
         grants:
@@ -67,10 +70,12 @@ users:
     email: cernst@ebi.ac.uk
     memberships:
       - { group: fg, role: viewer }
+      - { group: fg, role: developer, services: [another-s3-manager] }
   haber:
     email: haber@ebi.ac.uk
     memberships:
       - { group: fg, role: developer, services: [gxa, fenix] }
+      - { group: fg, role: developer, services: [another-s3-manager] }
   irisyu:
     email: irisyu@ebi.ac.uk
     memberships:
@@ -83,19 +88,23 @@ users:
     email: jmiguel@ebi.ac.uk
     memberships:
       - { group: fg, role: operator, services: [gxa, fenix, annotare] }
+      - { group: fg, role: developer, services: [another-s3-manager] }
   sandeepkurri:
     email: sandeepkurri@ebi.ac.uk
     memberships:
       - { group: fg, role: developer, services: [gxa, fenix] }
       - { group: fg, role: operator, services: [annotare] }
+      - { group: fg, role: developer, services: [another-s3-manager] }
   sands:
     email: sands@ebi.ac.uk
     memberships:
       - { group: fg, role: developer, services: [gxa, fenix] }
+      - { group: fg, role: developer, services: [another-s3-manager] }
   schellhaass:
     email: schellhaass@ebi.ac.uk
     memberships:
       - { group: fg, role: developer, services: [gxa, fenix] }
+      - { group: fg, role: developer, services: [another-s3-manager] }
   sfexova:
     email: sfexova@ebi.ac.uk
     memberships:
@@ -147,3 +156,56 @@ secret_sets:
         buckets:
           - name: fenix-data-dev
             roles: [ReadWrite, ReadOnly]
+  - service: fenix
+    environments: [staging]
+    secrets:
+      - name: ebi-storage
+        description: "EBI Storage (LivingObjects S3)"
+        fields: [access_key, secret_key, endpoint]
+        defaults:
+          endpoint: https://livingobjects-int.ebi.ac.uk
+        buckets:
+          - name: fenix-data-staging
+            roles: [ReadWrite, ReadOnly]
+  # another-s3-manager logins on fenix-test. Passwords are set in the OpenBao UI.
+  # Paths: kv/data/another-s3-manager/test/users/<email>
+  #        kv/data/another-s3-manager/test/admin  (FG operator only)
+  - service: another-s3-manager
+    environments: [test]
+    secrets:
+      - name: admin
+        description: "another-s3-manager admin"
+        fields: [username, password]
+        defaults:
+          username: admin
+        visible_to_roles: [operator]
+      - name: users/cernst@ebi.ac.uk
+        description: "Christina Ernst"
+        fields: [username, password]
+        defaults:
+          username: cernst@ebi.ac.uk
+      - name: users/haber@ebi.ac.uk
+        description: "Dean Haber"
+        fields: [username, password]
+        defaults:
+          username: haber@ebi.ac.uk
+      - name: users/schellhaass@ebi.ac.uk
+        description: "Brandon Schellhaass"
+        fields: [username, password]
+        defaults:
+          username: schellhaass@ebi.ac.uk
+      - name: users/sands@ebi.ac.uk
+        description: "Sandeep Selvakumar"
+        fields: [username, password]
+        defaults:
+          username: sands@ebi.ac.uk
+      - name: users/sandeepkurri@ebi.ac.uk
+        description: "Sandeep Kurri"
+        fields: [username, password]
+        defaults:
+          username: sandeepkurri@ebi.ac.uk
+      - name: users/jmiguel@ebi.ac.uk
+        description: "Jon Ander Novella de Miguel"
+        fields: [username, password]
+        defaults:
+          username: jmiguel@ebi.ac.uk

@@ -101,17 +101,19 @@ class Bao:
 
 
 def _secret_item(service: str, secret: dict, environment: str = "", cls: str = "", **extra) -> dict:
+    name = extra.get("name") or secret["name"]
     item = {
         "service": service,
         "environment": environment,
         "class": cls or secret.get("class") or "",
-        "name": extra.get("name") or secret["name"],
-        "root_name": extra.get("root_name") or secret["name"],
+        "name": name,
+        "root_name": extra.get("root_name") or name.split("/", 1)[0],
         "description": extra.get("description") or secret.get("description", ""),
         "fields": list(secret.get("fields") or []),
         "defaults": dict(secret.get("defaults") or {}),
         "bucket": extra.get("bucket") or "",
         "role": extra.get("role") or "",
+        "visible_to_roles": [str(r) for r in (secret.get("visible_to_roles") or [])],
     }
     return item
 
@@ -360,7 +362,10 @@ def policy_hcl(group_id: str, group: dict, catalog: dict | None = None) -> str:
         grant_env = "test" if secret_env == "dev" else secret_env
         if item.get("environment"):
             add(f"kv/metadata/{item['service']}/{item['environment']}", ["list"])
-        for role in (group.get("roles") or {}).values():
+        for role_name, role in (group.get("roles") or {}).items():
+            visible = item.get("visible_to_roles") or []
+            if visible and role_name not in visible:
+                continue
             for grant in role.get("grants") or []:
                 if grant.get("all_kv") or grant_env not in (grant.get("environments") or []):
                     continue
@@ -370,10 +375,13 @@ def policy_hcl(group_id: str, group: dict, catalog: dict | None = None) -> str:
                 )
                 prefix = service_secret_prefix(item)
                 add(f"kv/metadata/{prefix}", ["list"])
-                if item.get("bucket"):
+                # Nested names (users/admin) share the folder wildcard with bucket children.
+                nested = "/" in item["name"] and not item.get("bucket")
+                if item.get("bucket") or nested:
                     add(f"kv/data/{prefix}/*", caps)
                     add(f"kv/metadata/{prefix}/*", meta_caps)
-                    add(f"kv/metadata/{prefix}/{item['bucket']}", ["list"])
+                    if item.get("bucket"):
+                        add(f"kv/metadata/{prefix}/{item['bucket']}", ["list"])
                 else:
                     add(f"kv/data/{prefix}", caps)
                     add(f"kv/metadata/{prefix}", meta_caps)

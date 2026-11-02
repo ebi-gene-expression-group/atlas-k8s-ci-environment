@@ -179,3 +179,14 @@ secret_sets:
         buckets:
           - name: fenix-data-dev
             roles: [ReadWrite, ReadOnly]
+  - service: fenix
+    environments: [staging]
+    secrets:
+      - name: ebi-storage
+        description: "EBI Storage (LivingObjects S3)"
+        fields: [access_key, secret_key, endpoint]
+        defaults:
+          endpoint: https://livingobjects-int.ebi.ac.uk
+        buckets:
+          - name: fenix-data-staging
+            roles: [ReadWrite, ReadOnly]
