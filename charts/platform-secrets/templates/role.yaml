@@ -1,0 +1,33 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    atlas.ebi.ac.uk/app: platform-secrets
+    atlas.ebi.ac.uk/description: Shared GitLab read_registry pull secret and propagate
+      Job for FG apps
+    atlas.ebi.ac.uk/source-file: charts/platform-secrets
+    atlas.ebi.ac.uk/team: fg
+    meta.helm.sh/release-name: platform-secrets
+    meta.helm.sh/release-namespace: platform-secrets
+  creationTimestamp: "2026-08-07T13:08:27Z"
+  labels:
+    app: platform-secrets
+    app.kubernetes.io/instance: platform-secrets
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: platform-secrets
+    app.kubernetes.io/part-of: platform-secrets
+    app.kubernetes.io/version: 1.0.0
+    helm.sh/chart: platform-secrets-0.1.0
+    team: fg
+  name: platform-secrets-source-read
+  namespace: platform-secrets
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - gitlab-read-registry
+  resources:
+  - secrets
+  verbs:
+  - get
+

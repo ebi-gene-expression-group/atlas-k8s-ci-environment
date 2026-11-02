@@ -1,0 +1,119 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations:
+    atlas.ebi.ac.uk/app: platform-secrets
+    atlas.ebi.ac.uk/description: Shared GitLab read_registry pull secret and propagate
+      Job for FG apps
+    atlas.ebi.ac.uk/source-file: charts/platform-secrets
+    atlas.ebi.ac.uk/team: fg
+    meta.helm.sh/release-name: platform-secrets
+    meta.helm.sh/release-namespace: platform-secrets
+  labels:
+    app: platform-secrets
+    app.kubernetes.io/component: propagate
+    app.kubernetes.io/instance: platform-secrets
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: platform-secrets
+    app.kubernetes.io/part-of: platform-secrets
+    app.kubernetes.io/version: 1.0.0
+    helm.sh/chart: platform-secrets-0.1.0
+    team: fg
+  name: platform-secrets-propagate
+  namespace: platform-secrets
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          annotations:
+            atlas.ebi.ac.uk/app: platform-secrets
+            atlas.ebi.ac.uk/description: Shared GitLab read_registry pull secret
+              and propagate Job for FG apps
+            atlas.ebi.ac.uk/source-file: charts/platform-secrets
+            atlas.ebi.ac.uk/team: fg
+          labels:
+            app: platform-secrets
+            app.kubernetes.io/component: propagate
+            app.kubernetes.io/instance: platform-secrets
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: platform-secrets
+            app.kubernetes.io/part-of: platform-secrets
+            app.kubernetes.io/version: 1.0.0
+            helm.sh/chart: platform-secrets-0.1.0
+            team: fg
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              SOURCE_NS="platform-secrets"
+              SOURCE_SECRET="gitlab-read-registry"
+              TARGET_SECRET="gxa-registry"
+              # TODO: move to configmap or parametrised job
+              TARGETS="gxa-ci gxa-test gxa-staging gxa-public"
+
+              echo "Propagating ${SOURCE_NS}/${SOURCE_SECRET} -> */${TARGET_SECRET}"
+              if ! kubectl -n "${SOURCE_NS}" get secret "${SOURCE_SECRET}" >/dev/null 2>&1; then
+                echo "ERROR: source secret ${SOURCE_NS}/${SOURCE_SECRET} not found." >&2
+                echo "Create it first, e.g.:" >&2
+                echo "  kubectl -n ${SOURCE_NS} create secret docker-registry ${SOURCE_SECRET} \\" >&2
+                echo "    --docker-server=dockerhub.ebi.ac.uk --docker-username=USER --docker-password=TOKEN" >&2
+                exit 1
+              fi
+
+              TMP="$(mktemp)"
+              kubectl -n "${SOURCE_NS}" get secret "${SOURCE_SECRET}" -o json >"${TMP}"
+
+              for ns in ${TARGETS}; do
+                echo "Applying ${ns}/${TARGET_SECRET}"
+                if ! jq --arg ns "${ns}" --arg name "${TARGET_SECRET}" \
+                    --arg team "fg" --arg app "platform-secrets" '
+                  .metadata = {
+                    name: $name,
+                    namespace: $ns,
+                    labels: ((.metadata.labels // {}) + {
+                      "app.kubernetes.io/managed-by": "platform-secrets-propagate",
+                      "app.kubernetes.io/part-of": $app,
+                      "app": $app,
+                      "team": $team
+                    }),
+                    annotations: ((.metadata.annotations // {}) + {
+                      "atlas.ebi.ac.uk/source-namespace": .metadata.namespace,
+                      "atlas.ebi.ac.uk/source-name": .metadata.name,
+                      "atlas.ebi.ac.uk/team": $team,
+                      "atlas.ebi.ac.uk/app": $app
+                    })
+                  }
+                  | del(.metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid,
+                        .metadata.managedFields, .metadata.ownerReferences, .metadata.selfLink,
+                        .metadata.generation)
+                ' "${TMP}" | kubectl apply -f -; then
+                  echo "SKIP ${ns}: apply failed (namespace missing or RBAC not granted?)"
+                fi
+              done
+              echo "Done."
+            command:
+            - /bin/bash
+            - -c
+            image: alpine/k8s:1.31.0
+            imagePullPolicy: IfNotPresent
+            name: propagate
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          restartPolicy: OnFailure
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: platform-secrets-propagate
+          serviceAccountName: platform-secrets-propagate
+          terminationGracePeriodSeconds: 30
+  schedule: 0 6 * * 1
+  successfulJobsHistoryLimit: 3
+  suspend: false
+

@@ -10,7 +10,8 @@
 # Summary (tps, throughput, avg latency): stdout, stderr, and LOG_FILE.summary. Progress/config: stderr.
 # Config (env or .env): BASE_URL, EXPERIMENTS_JSON_URL, LIMIT, SHUFFLE, PARALLEL,
 #   REQUEST_INTERVAL_SECONDS, USER_START_INTERVAL_SECONDS,
-#   WARM_ACCESSIONS, WARM_BIOENTITIES, WARM_SEARCHES, PROGRESS, PROGRESS_INTERVAL, SORT_OUTPUT, LOG_FILE
+#   WARM_ACCESSIONS, WARM_BIOENTITIES, WARM_SEARCHES, SEARCH_QUERIES_FILE, SEARCH_QUERIES,
+#   SEARCH_SPECIES, PROGRESS, PROGRESS_INTERVAL, SORT_OUTPUT, LOG_FILE
 # Catalogue order is descending numberOfAssays (largest experiments first); SHUFFLE=1 randomizes after LIMIT
 # PARALLEL — concurrent virtual users; each user has one request in flight
 # REQUEST_INTERVAL_SECONDS — think time before a user's next URL (not before their first)
@@ -18,6 +19,8 @@
 # WARM_ACCESSIONS=1 — HTML + JSON resource endpoints per accession (default)
 # WARM_BIOENTITIES=1 — /json/experiments/{accession} -> profiles.rows -> bioentity URLs (default)
 # WARM_SEARCHES=1 — POST /json/baseline_experiments and GET /json/search/differential_results (default)
+# SEARCH_QUERIES_FILE — one query per line (default: scripts/search_terms.csv); # comments and a search_term header are skipped
+# SEARCH_QUERIES — optional comma-separated override; when set, the file is not used
 # Colors: auto when stdout is a TTY; NO_COLOR=1 disables, FORCE_COLOR=1 enables when piped
 # LOG_FILE: defaults to scripts/gxa-hit-YYYYMMDD-HHMMSS.tsv next to this script
 #
@@ -49,6 +52,9 @@ USER_START_INTERVAL_SECONDS="${USER_START_INTERVAL_SECONDS:-0.5}"  # delay betwe
 WARM_ACCESSIONS="${WARM_ACCESSIONS:-1}"  # 1 = HTML + JSON resource endpoints per accession
 WARM_BIOENTITIES="${WARM_BIOENTITIES:-0}"  # 1 = experiment JSON + /json/bioentity-information/{id}
 WARM_SEARCHES="${WARM_SEARCHES:-1}"  # 1 = baseline + differential search pages (not per accession)
+SEARCH_QUERIES="${SEARCH_QUERIES:-}"  # comma-separated override; empty = load SEARCH_QUERIES_FILE
+SEARCH_QUERIES_FILE="${SEARCH_QUERIES_FILE:-${SCRIPT_DIR}/search_terms.csv}"
+SEARCH_SPECIES="${SEARCH_SPECIES:-homo sapiens,mus musculus}"
 SORT_OUTPUT="${SORT_OUTPUT:-1}"
 PROGRESS="${PROGRESS:-1}"  # 1 = accession + request counts on stderr
 PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-0.5}"  # seconds between live progress updates
@@ -190,8 +196,19 @@ emit_summary() {
 }
 
 # Four endpoints per experiment (override with space-separated lists if needed).
-read -r -a HTML_ENDPOINTS <<< "${HTML_ENDPOINTS:-Results Plots}"
+read -r -a HTML_ENDPOINTS <<< "${HTML_ENDPOINTS:-Results Plots Downloads}"
 read -r -a JSON_ENDPOINTS <<< "${JSON_ENDPOINTS:-resources/DATA resources/PLOTS}"
+search_queries=()
+if [[ -n "$SEARCH_QUERIES" ]]; then
+  IFS=',' read -r -a search_queries <<< "$SEARCH_QUERIES"
+elif [[ -f "$SEARCH_QUERIES_FILE" ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" || "$line" == \#* || "$line" == "search_term" ]] && continue
+    search_queries+=("$line")
+  done < "$SEARCH_QUERIES_FILE"
+fi
+IFS=',' read -r -a search_species <<< "$SEARCH_SPECIES"
 
 CURL_WRITE_OUT='%{time_total}\t%{http_code}\t%{size_download}\t%{method}\t%{url_effective}\n'
 
@@ -208,6 +225,9 @@ echo "${C_DIM}USER_START_INTERVAL_SECONDS:${C_RESET} $USER_START_INTERVAL_SECOND
 echo "${C_DIM}WARM_ACCESSIONS:${C_RESET} $WARM_ACCESSIONS" >&2
 echo "${C_DIM}WARM_BIOENTITIES:${C_RESET} $WARM_BIOENTITIES" >&2
 echo "${C_DIM}WARM_SEARCHES:${C_RESET} $WARM_SEARCHES" >&2
+echo "${C_DIM}SEARCH_QUERIES_FILE:${C_RESET} $SEARCH_QUERIES_FILE" >&2
+echo "${C_DIM}SEARCH_QUERIES:${C_RESET} ${search_queries[*]}" >&2
+echo "${C_DIM}SEARCH_SPECIES:${C_RESET} ${search_species[*]}" >&2
 echo "${C_DIM}PROGRESS:${C_RESET} $PROGRESS" >&2
 echo "${C_DIM}HTML endpoints:${C_RESET} ${HTML_ENDPOINTS[*]}" >&2
 echo "${C_DIM}JSON endpoints:${C_RESET} ${JSON_ENDPOINTS[*]}" >&2
@@ -235,6 +255,11 @@ fi
 
 if [[ "$WARM_ACCESSIONS" != "1" && "$WARM_BIOENTITIES" != "1" && "$WARM_SEARCHES" != "1" ]]; then
   echo "${C_RED}ERROR: enable WARM_ACCESSIONS, WARM_BIOENTITIES, and/or WARM_SEARCHES${C_RESET}" >&2
+  exit 1
+fi
+
+if [[ "$WARM_SEARCHES" == "1" && ${#search_queries[@]} -eq 0 ]]; then
+  echo "${C_RED}ERROR: no search queries (set SEARCH_QUERIES or SEARCH_QUERIES_FILE)${C_RESET}" >&2
   exit 1
 fi
 
@@ -593,9 +618,8 @@ if [[ "$WARM_BIOENTITIES" == "1" ]]; then
   warm_bioentities
 fi
 if [[ "$WARM_SEARCHES" == "1" ]]; then
-  # Iterate on 2 search queries: REG1B and zinc finger
-  for query in "REG1B" "zinc finger" "O14777"; do
-    for species in "homo sapiens" "mus musculus"; do
+  for query in "${search_queries[@]}"; do
+    for species in "${search_species[@]}"; do
       echo "Warming up search for query: $query and species: $species" >&2
       warm_searches "$query" "$species"
     done

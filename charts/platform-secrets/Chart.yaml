@@ -1,0 +1,12 @@
+apiVersion: v2
+icon: https://www.ebi.ac.uk/about/images/logos/ebi/ebi_logo_bw.png
+name: platform-secrets
+version: 0.1.0
+appVersion: 0.1.0 
+description: Platform secrets for the gxa
+keywords:
+  - secrets
+  - platform
+  - ebi
+  - fg
+  - gxa

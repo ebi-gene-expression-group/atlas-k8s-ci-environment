@@ -196,25 +196,16 @@ kubectl --context "$K8S_CONTEXT" -n gxa-${ENV} run pg-tcp --rm -it --restart=Nev
 
 ## 6. Webapp Helm chart
 
-On **fg-public**, do not set `imagePullSecret.create: true` (in values or in the Jenkins `gxa-secrets-<env>` file). Copy the existing `gxa-registry` Secret from another GXA namespace (it is mirrored by platform-secrets). If Helm tries to create that Secret, upgrade fails with `exists and cannot be imported` (`managed-by: platform-secrets-propagate`). A GitLab token in `.secrets-<env>.yaml` also overwrites the working pull secret and causes `unauthorized: HTTP Basic: Access denied` on `dockerhub.ebi.ac.uk`. After editing the local secrets file, run `task jenkins-upsert-secrets ENV=<env>` so Jenkins does not keep `create: true`. `gxa-deploy` and `task deploy` force `imagePullSecret.create=false` on every env except `fallback`.
+Two releases, two charts:
 
-```bash
-SRC_NS=gxa-ci
-DST_NS=gxa-${ENV}
-export DST_NS
-kubectl --context fg-public get secret gxa-registry -n "$SRC_NS" -o json \
-  | python3 -c '
-import json, os, sys
-s = json.load(sys.stdin)
-labels = {k: v for k, v in s["metadata"].get("labels", {}).items()
-          if k.startswith("app") or k.startswith("atlas")}
-s["metadata"] = {"name": "gxa-registry", "namespace": os.environ["DST_NS"], "labels": labels}
-s.pop("status", None)
-json.dump(s, sys.stdout)
-' | kubectl --context fg-public apply -f -
-```
+| Release | Chart | What it owns in `gxa-<env>` |
+| --- | --- | --- |
+| `platform-secrets` | `charts/platform-secrets` | Secret `gxa-registry`, and Role/RoleBinding `platform-secrets-target-write` so its propagate job can write that secret |
+| `gxa` | `charts/gxa` | The webapp. It mounts `gxa-registry` and does not create it |
 
-In `values-<env>.yaml`:
+`platform-secrets` is installed once per cluster, in namespace `platform-secrets`. Its CronJob copies `gitlab-read-registry` to `gxa-registry` in each target namespace. Add a new `gxa-<env>` to that target list and upgrade the `platform-secrets` release before the first `gxa` upgrade. The GXA chart does not contain that Role or that Secret.
+
+On **fg-public**, keep `imagePullSecret.create: false` in `values-<env>.yaml` and in the Jenkins `gxa-secrets-<env>` file. A GitLab token in `.secrets-<env>.yaml` makes the `gxa` release try to adopt `gxa-registry` and fails with `exists and cannot be imported` (`managed-by: platform-secrets-propagate`). After editing the local secrets file, run `task jenkins-upsert-secrets ENV=<env>` so Jenkins does not keep `create: true`. `gxa-deploy` and `task deploy` force `imagePullSecret.create=false` on every env except `fallback`.
 
 ```yaml
 imagePullSecret:
@@ -318,7 +309,7 @@ nginx:
         password: "..."
 ```
 
-On fg-public leave `imagePullSecret.create: false` and copy `gxa-registry` (step 6). Do not put a GitLab token in this file or Helm will replace the working pull secret.
+On fg-public leave `imagePullSecret.create: false`. The `platform-secrets` release creates `gxa-registry` (step 6). Do not put a GitLab token in this file or the `gxa` release will try to replace that secret.
 
 Do not commit `.secrets-*.yaml`. Copy from an existing env’s local file as a template.
 

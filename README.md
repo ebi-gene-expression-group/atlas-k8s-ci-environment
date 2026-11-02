@@ -113,10 +113,11 @@ tomcat:
   deployerPassword: "..."
   curatorPassword: "..."
 imagePullSecret:
-  create: yes
-  username: "..."
-  password: "..."
+  create: false
+  name: gxa-registry
 ```
+
+On fg-public the `platform-secrets` release creates `gxa-registry` and the Role that lets it write into `gxa-<env>`. Do not put a registry username or token in this file. Add the new namespace to the `platform-secrets` target list and upgrade that release before the first `gxa` deploy. See [New cluster setup — Webapp Helm chart](docs/new-cluster-setup.md#6-webapp-helm-chart).
 
 Copy from an existing environment’s local `.secrets-*.yaml` as a template. Do not commit secrets to git.
 
