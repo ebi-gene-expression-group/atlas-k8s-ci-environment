@@ -47,7 +47,7 @@ H 1,7,13,19 * * * % ENV=fallback
         kubernetes {
           cloud "${params.ENV == 'fallback' ? 'hx-webadmin-121' : 'hh-webadmin-35'}"
           defaultContainer 'python'
-          yamlFile 'jenkins-k8s-pod-system-test.yaml'
+          yamlFile "${params.ENV == 'fallback' ? 'jenkins-k8s-pod-system-test-fallback.yaml' : 'jenkins-k8s-pod-system-test.yaml'}"
         }
       }
       steps {
