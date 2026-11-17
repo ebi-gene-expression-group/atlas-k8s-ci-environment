@@ -1,6 +1,8 @@
 # OpenBao on fg-public (hh-wp-webadmin-35).
-# Standalone (file storage, 1 replica) — not HA. Unseal keys live in
-# .secrets-init-public.yaml (gitignored); store a copy off-cluster.
+# Standalone (file storage, 1 replica) — not HA. Unseal keys and the root
+# token: gitignored .secrets-init-public.yaml, durable copy in GCP Secret
+# Manager project prj-int-dev-func-gen-webst (openbao-fg-public-unseal-1..5,
+# openbao-fg-public-root-token). See charts/openbao/README.md.
 #
 # Agent Injector / CSI / auth-delegator stay off: team-admin cannot create
 # ClusterRoleBindings or MutatingWebhookConfigurations.

@@ -226,9 +226,9 @@ task deploy-openbao
 
 The task installs/upgrades the release, then **initializes and unseals** if
 needed. Unseal keys and the root token are written to
-`charts/openbao/.secrets-init-public.yaml` (gitignored). Copy that file off the
-laptop — without the keys you cannot unseal after a pod restart, even with the
-PVC intact.
+`charts/openbao/.secrets-init-public.yaml` (gitignored). The durable copy is
+in Secret Manager; see [Unseal keys and root token](#unseal-keys-and-root-token).
+Without the keys you cannot unseal after a pod restart, even with the PVC intact.
 
 Pods stay unready until unsealed; do not pass Helm `--wait` unless the probe is
 changed to treat sealed/uninitialized as success.
@@ -243,6 +243,42 @@ curl -fsS https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health
 
 
 
+## Unseal keys and root token
+
+Shamir threshold is 3 of 5. `task deploy-openbao` and `task openbao-apply-acl`
+read the gitignored working copy `charts/openbao/.secrets-init-public.yaml`.
+The durable copy is GCP Secret Manager in project
+[prj-int-dev-func-gen-webst](https://console.cloud.google.com/security/secret-manager?project=prj-int-dev-func-gen-webst):
+
+| Secret | Contents |
+| --- | --- |
+| `openbao-fg-public-unseal-1` … `openbao-fg-public-unseal-5` | one Shamir share each |
+| `openbao-fg-public-root-token` | root token |
+
+Each share is its own secret so access can be split across people. Anyone with
+Owner or Secret Manager Admin on that project can still read all six. A new
+`bao operator init` replaces every value: add a new secret version and destroy
+the previous one.
+
+Rebuild the local file from Secret Manager:
+
+```bash
+PROJECT=prj-int-dev-func-gen-webst
+OUT=charts/openbao/.secrets-init-public.yaml
+{
+  echo "# Never commit. Durable copy is in Secret Manager ($PROJECT)."
+  echo "unseal_threshold: 3"
+  printf 'root_token: "%s"\n' \
+    "$(gcloud secrets versions access latest --secret=openbao-fg-public-root-token --project="$PROJECT")"
+  echo "unseal_keys_b64:"
+  for i in 1 2 3 4 5; do
+    printf '  - "%s"\n' \
+      "$(gcloud secrets versions access latest --secret=openbao-fg-public-unseal-$i --project="$PROJECT")"
+  done
+} > "$OUT"
+chmod 600 "$OUT"
+```
+
 ## After a pod restart (sealed)
 
 If `.secrets-init-public.yaml` exists locally:
@@ -252,8 +288,8 @@ task deploy-openbao
 ```
 
 That waits for the replacement pod, then unseals from `.secrets-init-public.yaml`
-(no interactive key prompt). Do not type Shamir shares into the UI unless that
-file is missing.
+(no interactive key prompt). If the file is missing, rebuild it from Secret
+Manager above, then run the task again.
 
 Manual unseal:
 
