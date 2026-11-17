@@ -20,6 +20,9 @@ CATALOG_PATH = Path(os.environ.get("OPENBAO_CATALOG", ROOT / "charts/openbao/acl
 INIT_PATH = ROOT / "charts/openbao/.secrets-init-public.yaml"
 OIDC_PATH = ROOT / "charts/openbao/.secrets-oidc-public.yaml"
 KV_VALUES_PATH = ROOT / "charts/openbao/.secrets-kv-public.yaml"
+ADMIN_POLICY_PATH = ROOT / "charts/openbao/acl/openbao-admin.hcl"
+ADMIN_POLICY_NAME = "openbao-admin"
+ADMIN_OIDC_ROLE = "admin"
 GXA_CHART = ROOT / "charts/gxa"
 BAO_ADDR = os.environ.get("BAO_ADDR", "https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk")
 ACTOR = os.environ.get("OPENBAO_ACTOR", "root")
@@ -209,6 +212,40 @@ def oidc_display_name(catalog: dict) -> str:
     return str((catalog.get("auth") or {}).get("oidc", {}).get("display_name") or "EMBL-EBI Login")
 
 
+def catalog_emails(catalog: dict) -> list[str]:
+    return sorted({u["email"] for u in (catalog.get("users") or {}).values() if u.get("email")})
+
+
+def openbao_admin_emails(catalog: dict) -> list[str]:
+    return sorted(
+        {
+            spec["email"]
+            for spec in (catalog.get("users") or {}).values()
+            if spec.get("openbao_admin") and spec.get("email")
+        }
+    )
+
+
+def oidc_role_body(
+    catalog: dict, client_id: str, emails: list[str], token_policies: list[str]
+) -> dict:
+    oidc = catalog["auth"]["oidc"]
+    return {
+        "user_claim": "email",
+        "allowed_redirect_uris": oidc["redirect_uris"],
+        "oidc_scopes": "openid,email,profile",
+        "bound_audiences": client_id,
+        "bound_claims": {
+            "email": emails,
+            "hd": oidc.get("hosted_domains") or [],
+        },
+        "claim_mappings": {"email": "email", "name": "name"},
+        "token_policies": token_policies,
+        "token_ttl": "8h",
+        "role_type": "oidc",
+    }
+
+
 def remount(bao: Bao, src: str, dst: str) -> None:
     print(f"Remounting {src} -> {dst}")
     resp = bao.request("POST", "sys/remount", {"from": src, "to": dst})
@@ -278,6 +315,8 @@ def validate_catalog(catalog: dict) -> None:
         memberships = user.get("memberships") or []
         if not memberships:
             raise SystemExit(f"catalog users.{uname}: at least one membership is required")
+        if user.get("openbao_admin") not in (None, True, False):
+            raise SystemExit(f"catalog users.{uname}: openbao_admin must be a boolean")
         for m in memberships:
             gid = m.get("group")
             role = m.get("role")
@@ -293,7 +332,6 @@ def validate_catalog(catalog: dict) -> None:
                     f"catalog users.{uname}: service(s) {extra} not in group {gid} "
                     f"(allowed: {sorted(allowed) or 'none'})"
                 )
-
 
 def role_identity_members(
     catalog: dict, ids: dict[str, str], gid: str, role_name: str, service: str | None
@@ -525,10 +563,9 @@ def ensure_mounts(bao: Bao, catalog: dict) -> None:
 
 
 def configure_oidc(bao: Bao, catalog: dict, client_id: str, client_secret: str) -> str:
-    oidc = catalog["auth"]["oidc"]
     mount = oidc_mount(catalog)
     display = oidc_display_name(catalog)
-    emails = sorted({u["email"] for u in (catalog.get("users") or {}).values() if u.get("email")})
+    emails = catalog_emails(catalog)
     if not emails:
         raise SystemExit("catalog users: at least one email is required for the OIDC allowlist")
     print(f"OIDC allowlist: {len(emails)} email(s) (UI tab {mount}/)")
@@ -545,21 +582,16 @@ def configure_oidc(bao: Bao, catalog: dict, client_id: str, client_secret: str) 
     bao.request(
         "POST",
         f"auth/{mount}/role/google",
-        {
-            "user_claim": "email",
-            "allowed_redirect_uris": oidc["redirect_uris"],
-            "oidc_scopes": "openid,email,profile",
-            "bound_audiences": client_id,
-            "bound_claims": {
-                "email": emails,
-                "hd": oidc.get("hosted_domains") or [],
-            },
-            "claim_mappings": {"email": "email", "name": "name"},
-            "token_policies": [],
-            "token_ttl": "8h",
-            "role_type": "oidc",
-        },
+        oidc_role_body(catalog, client_id, emails, []),
     )
+    admin_emails = openbao_admin_emails(catalog)
+    if admin_emails:
+        print(f"OIDC role {ADMIN_OIDC_ROLE}: {len(admin_emails)} admin email(s)")
+        bao.request(
+            "POST",
+            f"auth/{mount}/role/{ADMIN_OIDC_ROLE}",
+            oidc_role_body(catalog, client_id, admin_emails, [ADMIN_POLICY_NAME]),
+        )
     # Without listing_visibility=unauth the UI login page only shows Token.
     # The tab label is the mount path (spaces are not allowed).
     bao.request(
@@ -585,6 +617,15 @@ def configure_oidc(bao: Bao, catalog: dict, client_id: str, client_secret: str) 
 
 
 def write_policies(bao: Bao, catalog: dict) -> None:
+    if openbao_admin_emails(catalog):
+        if not ADMIN_POLICY_PATH.is_file():
+            raise SystemExit(f"missing {ADMIN_POLICY_PATH}")
+        print(f"Policy {ADMIN_POLICY_NAME}")
+        bao.request(
+            "PUT",
+            f"sys/policies/acl/{ADMIN_POLICY_NAME}",
+            {"policy": ADMIN_POLICY_PATH.read_text()},
+        )
     for gid, group in (catalog.get("groups") or {}).items():
         for role_name in (group.get("roles") or {}):
             for svc, services in role_service_combos(group):

@@ -64,6 +64,9 @@ groups:
 users:
   amnon:
     email: amnon@ebi.ac.uk
+    # Default OIDC login (UI / bao login) stays FG operator. OpenBao admin is
+    # OIDC role "admin": bao login -method=oidc -path=embl-ebi role=admin
+    openbao_admin: true
     memberships:
       - { group: fg, role: operator }
   cernst:

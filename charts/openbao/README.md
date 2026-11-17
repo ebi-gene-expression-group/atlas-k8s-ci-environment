@@ -17,7 +17,7 @@ are disabled: team-admin cannot create cluster-scoped webhooks or ClusterRoles.
 
 - UI / API: [https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk](https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk)
 - Health: [https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health](https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk/v1/sys/health)
-- Human login: **EMBL-EBI Login** (Google OIDC, catalog email allowlist). Root token is for `task deploy-openbao` / `task openbao-apply-acl` only. The UI tab is the mount path `embl-ebi` (spaces are not allowed).
+- Human login: **EMBL-EBI Login** (Google OIDC, catalog email allowlist). The UI and default `bao login` use OIDC role `google` (catalog KV grants only). Users with `openbao_admin: true` can also `bao login -method=oidc -path=embl-ebi role=admin` for identity/policies/AppRole (policy `openbao-admin`). Root token is for `task deploy-openbao` / `task openbao-apply-acl` only. The UI tab is the mount path `embl-ebi` (spaces are not allowed).
 
 TLS is terminated in front of the cluster. Ingress stays HTTP.
 
@@ -31,8 +31,10 @@ On an interactive shell that allows opening a browser, use:
   export BAO_ADDR='https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk'  
   # This is required until the TLS signature is properly configured on the EBI Traffic Manager
   export BAO_SKIP_VERIFY=true
-  # this will open a browser with the Google login page
+  # this will open a browser with the Google login page (limited: catalog KV grants)
   bao login -method=oidc -path=embl-ebi
+  # OpenBao admin (identity, policies, AppRole) — only users with openbao_admin: true
+  bao login -method=oidc -path=embl-ebi role=admin
   # This gets a secret
   bao kv get -mount=kv -format yaml -field password annotare/public/app/jdbc-readonly
   ```
