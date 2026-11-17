@@ -43,6 +43,15 @@ In a non-interactive shell, e.g. SLURM job:
 
 1. admin will create a role with the requirement access policy and relevant ttl values
 
+Catalog AppRoles (preferred): add an `approles:` entry in `acl/catalog.fg.yaml` (or another split catalog) and run `task openbao:apply-acl`. Example: `pipeline-fenix-zarr-export-dev` can read `kv/data/fenix/dev/*`. Then mint a secret id (not stored in git):
+
+```bash
+bao read auth/approle/role/pipeline-fenix-zarr-export-dev/role-id
+bao write -f -field=secret_id auth/approle/role/pipeline-fenix-zarr-export-dev/secret-id
+```
+
+Ad-hoc AppRole (not in the catalog):
+
 ```bash
 bao write auth/approle/role/fg-cli-dev \
     token_policies=group-fg-role-developer-annotare
@@ -79,6 +88,84 @@ bao write -f -field=secret_id auth/approle/role/fg-cli-dev/secret-id
 bao kv get kv/annotare/test/app/jdbc
 ```
 
+### Jenkins (Fenix pipelines)
+
+Jenkins jobs should log in with AppRole and read KV at run time, not store S3 keys
+in Jenkins. Store **role_id** / **secret_id** as a **Username with password**
+credential in the folder that owns the job:
+
+- ID: `pipeline-fenix-zarr-export-<ENV>` (e.g. `pipeline-fenix-zarr-export-dev`). Do not prefix with `openbao-`.
+- Username: OpenBao `role_id`
+- Password: OpenBao `secret_id` (mint once; do not remint every build)
+
+`<ENV>` is the job build parameter. Dev AppRole `pipeline-fenix-zarr-export-dev`
+can read `kv/data/fenix/dev/*`. Staging needs a matching AppRole
+(`pipeline-fenix-zarr-export-staging`) before `ENV=staging` jobs can use this.
+
+See [FG-642](https://embl.atlassian.net/browse/FG-642).
+
+```groovy
+def credId = "pipeline-fenix-zarr-export-${params.ENV}"
+
+withCredentials([usernamePassword(
+    credentialsId: credId,
+    usernameVariable: 'BAO_ROLE_ID',
+    passwordVariable: 'BAO_SECRET_ID'
+)]) {
+    sh """
+      export BAO_ADDR=https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk
+      export BAO_SKIP_VERIFY=true
+      export BAO_TOKEN=\$(bao write -field=token auth/approle/login \\
+        role_id="\$BAO_ROLE_ID" secret_id="\$BAO_SECRET_ID")
+      bao kv get -mount=kv -format yaml \\
+        fenix/${params.ENV}/ebi-storage/fenix-data-${params.ENV}/ReadOnly
+    """
+}
+```
+
+Notes:
+
+- `credentialsId` is Groovy (`${params.ENV}` expands before `sh`).
+- Inside the Groovy GString (`"""`), escape shell dollars as `\$` so Jenkins does not interpolate `BAO_ROLE_ID`.
+- The agent image needs the `bao` CLI. `BAO_SKIP_VERIFY=true` until Traffic Manager TLS is correct.
+- Use `.../ReadWrite` instead of `.../ReadOnly` if the job must write to the bucket.
+
+### GitLab CI (Fenix pipelines)
+
+Same AppRole as Jenkins: store **role_id** / **secret_id** as CI/CD variables, not S3 keys.
+
+Group variables — [ebi-gene-expression](https://gitlab.ebi.ac.uk/groups/ebi-gene-expression/-/settings/ci_cd),
+**Settings → CI/CD → Variables**, all environments:
+
+- `BAO_ADDR` — `https://openbao.hh-webadmin-35.wp-k8s.ebi.ac.uk`
+- `BAO_SKIP_VERIFY` — `true` until Traffic Manager TLS is correct
+
+Per environment (project or group), masked:
+
+- `BAO_ROLE_ID` — OpenBao `role_id`. Environment scope `dev`.
+- `BAO_SECRET_ID` — OpenBao `secret_id` (mint once; hidden if the UI offers it). Environment scope `dev`.
+
+Repeat the AppRole pair with environment scope `staging` when AppRole
+`pipeline-fenix-zarr-export-staging` exists. The job must set `environment: name:`
+to that env (or `$ENV`) so GitLab injects the matching pair.
+Protect the AppRole variables if the job only runs on protected branches.
+
+```yaml
+fenix-zarr-export:
+  environment:
+    name: $ENV
+  script:
+    - |
+      export BAO_TOKEN=$(bao write -field=token auth/approle/login \
+        role_id="$BAO_ROLE_ID" secret_id="$BAO_SECRET_ID")
+      bao kv get -mount=kv -format yaml \
+        fenix/${ENV}/ebi-storage/fenix-data-${ENV}/ReadOnly
+```
+
+Notes:
+
+- Pass `ENV` as a pipeline variable (`dev` today). The runner image needs the `bao` CLI.
+- Use `.../ReadWrite` instead of `.../ReadOnly` if the job must write to the bucket.
 
 ## App version & Helm Chart
 

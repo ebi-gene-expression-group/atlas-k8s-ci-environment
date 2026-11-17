@@ -212,3 +212,13 @@ secret_sets:
         fields: [username, password]
         defaults:
           username: jmiguel@ebi.ac.uk
+
+# Machine AppRoles (CI/pipelines). secret_id is not in git; generate after apply:
+#   bao write -f -field=secret_id auth/approle/role/pipeline-fenix-zarr-export-dev/secret-id
+approles:
+  - name: pipeline-fenix-zarr-export-dev
+    description: Fenix zarr export pipeline — read fenix/dev KV
+    token_ttl: 1h
+    token_max_ttl: 4h
+    grants:
+      - { service: fenix, environments: [dev], access: [read] }

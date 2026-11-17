@@ -332,6 +332,19 @@ def validate_catalog(catalog: dict) -> None:
                     f"catalog users.{uname}: service(s) {extra} not in group {gid} "
                     f"(allowed: {sorted(allowed) or 'none'})"
                 )
+    for role in catalog.get("approles") or []:
+        name = role.get("name")
+        if not name:
+            raise SystemExit("catalog approles: each entry needs a name")
+        grants = role.get("grants") or []
+        if not grants:
+            raise SystemExit(f"catalog approles.{name}: at least one grant is required")
+        for grant in grants:
+            if not grant.get("service"):
+                raise SystemExit(f"catalog approles.{name}: grant is missing service")
+            if not grant.get("environments"):
+                raise SystemExit(f"catalog approles.{name}: grant is missing environments")
+
 
 def role_identity_members(
     catalog: dict, ids: dict[str, str], gid: str, role_name: str, service: str | None
@@ -430,6 +443,63 @@ def policy_hcl(group_id: str, group: dict, catalog: dict | None = None) -> str:
         caps = ", ".join(f'"{c}"' for c in sorted(paths[path]))
         blocks.append(f'path "{path}" {{\n  capabilities = [{caps}]\n}}')
     return "\n\n".join(blocks) + "\n"
+
+
+def approle_policy_name(name: str) -> str:
+    return f"approle-{name}"
+
+
+def approle_policy_hcl(role: dict) -> str:
+    paths: dict[str, set[str]] = {}
+
+    def add(path: str, caps: list[str]) -> None:
+        paths.setdefault(path, set()).update(caps)
+
+    add("kv/metadata", ["list"])
+    for grant in role.get("grants") or []:
+        svc = str(grant["service"])
+        access = grant.get("access") or ["read"]
+        caps = access_caps(access)
+        meta_caps = ["read", "list"] + (
+            ["create", "update", "delete"] if "write" in access else []
+        )
+        add(f"kv/metadata/{svc}", ["list"])
+        for env in grant.get("environments") or []:
+            add(f"kv/metadata/{svc}/{env}", ["list"])
+            add(f"kv/metadata/{svc}/{env}/*", meta_caps)
+            add(f"kv/data/{svc}/{env}/*", caps)
+    blocks = [f"# approle {role['name']}"]
+    for path in sorted(paths):
+        cap_s = ", ".join(f'"{c}"' for c in sorted(paths[path]))
+        blocks.append(f'path "{path}" {{\n  capabilities = [{cap_s}]\n}}')
+    return "\n\n".join(blocks) + "\n"
+
+
+def write_approles(bao: Bao, catalog: dict) -> None:
+    roles = catalog.get("approles") or []
+    if not roles:
+        return
+    for role in roles:
+        name = role["name"]
+        policy = approle_policy_name(name)
+        print(f"Policy {policy}")
+        bao.request("PUT", f"sys/policies/acl/{policy}", {"policy": approle_policy_hcl(role)})
+        print(f"AppRole {name}")
+        bao.request(
+            "POST",
+            f"auth/approle/role/{name}",
+            {
+                "token_policies": [policy],
+                "token_ttl": str(role.get("token_ttl") or "1h"),
+                "token_max_ttl": str(role.get("token_max_ttl") or "4h"),
+                "bind_secret_id": True,
+            },
+        )
+        role_id = (bao.request("GET", f"auth/approle/role/{name}/role-id").get("data") or {}).get(
+            "role_id"
+        )
+        print(f"  role_id {role_id}")
+        print(f"  mint secret_id: bao write -f -field=secret_id auth/approle/role/{name}/secret-id")
 
 
 def lookup_values(values: dict | None, item: dict):
@@ -545,6 +615,10 @@ def ensure_mounts(bao: Bao, catalog: dict) -> None:
     mount = oidc_mount(catalog)
     display = oidc_display_name(catalog)
     auths = _data(bao.request("GET", "sys/auth"))
+    if catalog.get("approles") and "approle/" not in auths:
+        print("Enabling approle auth at approle/")
+        bao.request("POST", "sys/auth/approle", {"type": "approle"})
+        auths = _data(bao.request("GET", "sys/auth"))
     wanted = f"{mount}/"
     if wanted not in auths:
         if "oidc/" in auths:
@@ -828,6 +902,7 @@ def main() -> None:
     ensure_mounts(bao, catalog)
     accessor = configure_oidc(bao, catalog, client_id, client_secret)
     write_policies(bao, catalog)
+    write_approles(bao, catalog)
     sync_identity(bao, catalog, accessor)
     seed_kv(bao, catalog, values)
     print(f"ACL apply complete. UI login: {oidc_display_name(catalog)}")
