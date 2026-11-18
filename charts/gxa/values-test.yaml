@@ -9,6 +9,10 @@ tomcat:
 
 loggingLevel: INFO
 
+resources:
+  requests:
+    memory: "3Gi"
+
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvm-078.ebi.ac.uk:5432/gxpatlastst"
   user: atlasprd3

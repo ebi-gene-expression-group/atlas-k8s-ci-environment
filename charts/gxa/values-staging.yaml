@@ -8,6 +8,10 @@ tomcat:
 
 loggingLevel: DEBUG
 
+resources:
+  requests:
+    memory: "3Gi"
+
 jdbc:
   # Shared with ci (populate source): pgsql-hlvm-147
   url: "jdbc:postgresql://pgsql-hlvm-147.ebi.ac.uk:5432/gxpatlaspro"

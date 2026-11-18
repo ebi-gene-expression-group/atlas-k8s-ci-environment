@@ -8,6 +8,10 @@ tomcat:
 
 loggingLevel: INFO
 
+resources:
+  requests:
+    memory: "3Gi"
+
 jdbc:
   url: "jdbc:postgresql://pgsql-dlvmpub2-023.ebi.ac.uk:5432/gxpatlaspub"
   user: atlasprd3
