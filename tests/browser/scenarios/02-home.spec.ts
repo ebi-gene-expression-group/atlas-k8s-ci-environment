@@ -10,15 +10,15 @@ test('Home page renders the search form.', async ({ page, gxa }) => {
 
 test('10. Check/Select Featured Experiments (GTEx, EDTL, PCAWG).', async ({ page, gxa }) => {
   await gxa.open(page, '/home');
-  const featured = page.locator('#featured');
-  await featured.waitFor({ state: 'visible', timeout: 30_000 });
   await gxa.dismissBanner(page);
+  const featured = page.locator('#featured');
   for (const fragment of ['E-GTEX-8', '/edtl/experiments', 'E-MTAB-5200', 'E-MTAB-5423']) {
-    expect(await featured.locator(`a[href*='${fragment}']`).count(), fragment).toBeGreaterThan(0);
+    await expect(featured.locator(`a[href*='${fragment}']`).first(), fragment).toBeVisible({ timeout: 60_000 });
   }
   for (const accession of ['E-MTAB-5200', 'E-MTAB-5423']) {
     await gxa.open(page, `/experiments/${accession}/Results`);
     await gxa.expectExperiment(page, accession);
+    await gxa.expectHeatmap(page);
   }
 });
 

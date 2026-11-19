@@ -23,11 +23,23 @@ async function exampleLabels(page: Page, inputId: string): Promise<string[]> {
 async function searchExample(page: Page, gxa: Gxa, inputId: string, example: string): Promise<void> {
   await gxa.open(page, '/home');
   const link = column(page, inputId).getByRole('link', { name: example, exact: true });
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 120_000 }),
-    link.click(),
-  ]);
+  await link.click({ noWaitAfter: true });
+  await page.waitForURL(/\/(search|genes|genesets)\b/, { timeout: 120_000 });
   await gxa.expectSearchResults(page, example);
+}
+
+async function searchGeneFromHome(page: Page, gxa: Gxa, gene: string, species: string): Promise<void> {
+  await gxa.open(page, '/home');
+  await gxa.dismissBanner(page);
+  const editor = page.locator('#home-search-gene-query-input + ul.json-tag-editor');
+  await editor.click();
+  const input = editor.locator('input');
+  await input.fill(gene);
+  await input.press('Enter');
+  await expect(editor.locator('.json-tag-editor-tag', { hasText: gene })).toBeVisible();
+  await page.locator('#species').selectOption({ label: species });
+  await page.locator('#home-search-atlas-search-button').click({ noWaitAfter: true });
+  await page.waitForURL(/\/(search|genes|genesets)\b/, { timeout: 120_000 });
 }
 
 function searchPath(options: { gene?: string; condition?: string; species?: string }): string {
@@ -61,7 +73,7 @@ for (const example of CONDITION_EXAMPLES) {
 }
 
 test('2. Specific gene with species set to Homo sapiens: gene information tab.', async ({ page, gxa }) => {
-  await gxa.open(page, searchPath({ gene: SPECIFIC_GENE, species: HOMO_SAPIENS }));
+  await searchGeneFromHome(page, gxa, SPECIFIC_GENE, HOMO_SAPIENS);
   await gxa.expectSearchResults(page, SPECIFIC_GENE);
   await expect(page.locator("a[href='#information']")).toBeVisible({ timeout: 60_000 });
 });
@@ -127,9 +139,7 @@ test('9. Click one experiment link in the baseline heatmap.', async ({ page, gxa
   const href = (await link.getAttribute('href')) ?? '';
   const match = href.match(/(E-[A-Z0-9-]+)/);
   expect(match, href).toBeTruthy();
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 90_000 }),
-    link.click(),
-  ]);
+  await link.click({ noWaitAfter: true });
+  await page.waitForURL(/\/experiments\//, { timeout: 120_000 });
   await gxa.expectExperiment(page, match![1]);
 });

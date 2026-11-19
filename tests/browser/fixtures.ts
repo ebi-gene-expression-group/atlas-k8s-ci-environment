@@ -39,14 +39,56 @@ export class Gxa {
 
   async open(page: Page, path: string): Promise<Response> {
     const url = `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
-    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    const response = await page.goto(url, { waitUntil: 'commit', timeout: 120_000 });
     expect(response, `no response for ${url}`).toBeTruthy();
     expect(response!.ok(), `${url} returned HTTP ${response!.status()}`).toBeTruthy();
+    await this.settled(page);
     await expect(page.locator('h4', { hasText: 'Error:' })).toHaveCount(0);
     return response!;
   }
 
+  /** Document parsed, then same-origin fetch/XHR and loading images have gone quiet. */
+  async settled(page: Page): Promise<void> {
+    await page.waitForLoadState('domcontentloaded', { timeout: 120_000 });
+    await page.evaluate(() => {
+      const state = window as unknown as {
+        __gxaInflight?: number;
+        __gxaSettleStart?: number;
+        __gxaSawLoad?: boolean;
+        __gxaQuietSince?: number;
+      };
+      state.__gxaSettleStart = Date.now();
+      state.__gxaSawLoad = (state.__gxaInflight ?? 0) > 0;
+      state.__gxaQuietSince = 0;
+    });
+    await page.waitForFunction(
+      () => {
+        const state = window as unknown as {
+          __gxaInflight?: number;
+          __gxaSettleStart: number;
+          __gxaSawLoad?: boolean;
+          __gxaQuietSince?: number;
+        };
+        const now = Date.now();
+        const pending = state.__gxaInflight ?? 0;
+        const loading = document.querySelectorAll('img[src*="loading.gif"]').length;
+        if (pending > 0 || loading > 0) {
+          state.__gxaSawLoad = true;
+          state.__gxaQuietSince = 0;
+          return false;
+        }
+        if (!state.__gxaQuietSince) state.__gxaQuietSince = now;
+        const quiet = now - state.__gxaQuietSince > 800;
+        const grace = now - state.__gxaSettleStart > 5_000;
+        return quiet && (state.__gxaSawLoad || grace);
+      },
+      undefined,
+      { timeout: 120_000, polling: 200 },
+    );
+  }
+
   async expectExperiment(page: Page, accession: string): Promise<void> {
+    await this.settled(page);
     expect(page.url(), `${accession} missing from ${page.url()}`).toContain(accession);
     await page.locator('#experimentDescription').waitFor({ state: 'visible' });
     await page.locator('#experiment-page').waitFor({ state: 'attached' });
@@ -54,6 +96,7 @@ export class Gxa {
   }
 
   async expectSearchResults(page: Page, example: string): Promise<void> {
+    await this.settled(page);
     await expect(page).toHaveTitle(/Search results/);
     await expect(page.locator('h4', { hasText: 'Error:' })).toHaveCount(0);
     await expect(page.getByText('Sorry, we could not find results matching your search criteria')).toHaveCount(0);
@@ -85,6 +128,7 @@ export class Gxa {
   }
 
   async expectHeatmap(page: Page): Promise<void> {
+    await this.settled(page);
     await page.locator('#experiment-page .gxaHeatmapContainer .highcharts-container').first().waitFor({
       state: 'visible',
       timeout: 90_000,
@@ -165,10 +209,52 @@ export class Gxa {
 type Fixtures = { gxa: Gxa };
 
 export const test = base.extend<Fixtures>({
-  gxa: async ({}, use) => {
+  gxa: async ({ page }, use) => {
     const baseUrl = process.env.GXA_SYSTEM_BASE?.replace(/\/$/, '');
-    test.skip(!baseUrl, 'Set GXA_SYSTEM_BASE or run task test:browser ENV=staging');
-    await use(new Gxa(baseUrl!));
+    if (!baseUrl) {
+      throw new Error('GXA_SYSTEM_BASE is not set. Set it in .env or the environment.');
+    }
+    await page.addInitScript(() => {
+      const state = window as unknown as { __gxaInflight: number };
+      state.__gxaInflight = 0;
+      const track = (delta: number) => {
+        state.__gxaInflight = Math.max(0, state.__gxaInflight + delta);
+      };
+      const sameOrigin = (raw: string) => {
+        try {
+          return new URL(raw, location.href).origin === location.origin;
+        } catch {
+          return false;
+        }
+      };
+      const origFetch = window.fetch.bind(window);
+      window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+        const count = sameOrigin(raw);
+        if (count) track(1);
+        try {
+          return await origFetch(input, init);
+        } finally {
+          if (count) track(-1);
+        }
+      };
+      const origOpen = XMLHttpRequest.prototype.open;
+      const origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: unknown[]) {
+        (this as XMLHttpRequest & { __gxaUrl?: string }).__gxaUrl = String(url);
+        return origOpen.apply(this, [method, url, ...rest] as unknown as Parameters<typeof origOpen>);
+      };
+      XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+        const raw = (this as XMLHttpRequest & { __gxaUrl?: string }).__gxaUrl ?? '';
+        const count = sameOrigin(raw);
+        if (count) track(1);
+        this.addEventListener('loadend', () => {
+          if (count) track(-1);
+        });
+        return origSend.call(this, body);
+      };
+    });
+    await use(new Gxa(baseUrl));
   },
 });
 
