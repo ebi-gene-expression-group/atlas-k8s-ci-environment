@@ -19,8 +19,14 @@
 # WARM_ACCESSIONS=1 — HTML + JSON resource endpoints per accession (default)
 # WARM_BIOENTITIES=1 — /json/experiments/{accession} -> profiles.rows -> bioentity URLs (default)
 # WARM_SEARCHES=1 — POST /json/baseline_experiments and GET /json/search/differential_results (default)
-# SEARCH_QUERIES_FILE — one query per line (default: scripts/search_terms.csv); # comments and a search_term header are skipped
-# SEARCH_QUERIES — optional comma-separated override; when set, the file is not used
+# SEARCH_QUERIES_FILE — one geneQuery per line (default: scripts/search_terms.csv); # comments and a header are skipped
+# SEARCH_QUERIES — optional comma-separated geneQuery override; when set, the file is not used
+# SEARCH_CONDITIONS_FILE — one conditionQuery per line (default: scripts/search_conditions.csv)
+# SEARCH_CONDITIONS — optional comma-separated conditionQuery override; when set, the file is not used
+#   An empty geneQuery and an empty conditionQuery are always added and sent as []
+# SEARCH_SPECIES — optional comma-separated override; when empty, species come from SPECIES_SUMMARY_URL
+#   An empty species (any) is always added, so each term and condition is also searched with no species filter
+# SPECIES_SUMMARY_URL — catalogue of species (iconSrc) used when SEARCH_SPECIES is empty
 # Colors: auto when stdout is a TTY; NO_COLOR=1 disables, FORCE_COLOR=1 enables when piped
 # LOG_FILE: defaults to scripts/gxa-hit-YYYYMMDD-HHMMSS.tsv next to this script
 #
@@ -52,11 +58,14 @@ USER_START_INTERVAL_SECONDS="${USER_START_INTERVAL_SECONDS:-0.5}"  # delay betwe
 WARM_ACCESSIONS="${WARM_ACCESSIONS:-1}"  # 1 = HTML + JSON resource endpoints per accession
 WARM_BIOENTITIES="${WARM_BIOENTITIES:-0}"  # 1 = experiment JSON + /json/bioentity-information/{id}
 WARM_SEARCHES="${WARM_SEARCHES:-1}"  # 1 = baseline + differential search pages (not per accession)
-SEARCH_QUERIES="${SEARCH_QUERIES:-}"  # comma-separated override; empty = load SEARCH_QUERIES_FILE
+SEARCH_QUERIES="${SEARCH_QUERIES:-}"  # comma-separated geneQuery override; empty = load SEARCH_QUERIES_FILE
 SEARCH_QUERIES_FILE="${SEARCH_QUERIES_FILE:-${SCRIPT_DIR}/search_terms.csv}"
-SEARCH_SPECIES="${SEARCH_SPECIES:-homo sapiens,mus musculus}"
+SEARCH_CONDITIONS="${SEARCH_CONDITIONS:-}"  # comma-separated conditionQuery override; empty = load SEARCH_CONDITIONS_FILE
+SEARCH_CONDITIONS_FILE="${SEARCH_CONDITIONS_FILE:-${SCRIPT_DIR}/search_conditions.csv}"
+SEARCH_SPECIES="${SEARCH_SPECIES:-}"  # comma-separated override; empty = load SPECIES_SUMMARY_URL
+SPECIES_SUMMARY_URL="${SPECIES_SUMMARY_URL:-https://wwwdev.ebi.ac.uk/gxa/json/species-summary}"
 SORT_OUTPUT="${SORT_OUTPUT:-1}"
-PROGRESS="${PROGRESS:-1}"  # 1 = accession + request counts on stderr
+PROGRESS="${PROGRESS:-1}"  # 1 = live counts for the active phase (experiments, bioentities, or searches)
 PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-0.5}"  # seconds between live progress updates
 CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-10}"
 MAX_TIME="${MAX_TIME:-120}"
@@ -145,7 +154,8 @@ print_slowest_line() {
 
 emit_summary() {
   local total ok fail slowest run_elapsed aggregate_rps total_bytes aggregate_bps
-  local aggregate_bps_display total_bytes_display avg_latency summary_file
+  local aggregate_bps_display total_bytes_display avg_latency summary_file status_counts
+  local code count status_color
 
   total=$(wc -l <"$log_file" | tr -d ' ')
   ok=$(awk -F'\t' '$2 >= 200 && $2 < 400 { c++ } END { print c + 0 }' "$log_file")
@@ -158,11 +168,18 @@ emit_summary() {
   aggregate_bps_display=$(format_bytes_rate "$aggregate_bps")
   total_bytes_display=$(format_bytes_total "$total_bytes")
   avg_latency=$(awk -F'\t' '{ sum += $1; n++ } END { if (n > 0) printf "%.3f", sum / n; else print "0.000" }' "$log_file")
+  status_counts=$(awk -F'\t' '{ c[$2]++ } END { for (s in c) printf "%s\t%s\n", s, c[s] }' "$log_file" | sort -n)
   summary_file="${LOG_FILE%.*}.summary"
 
   {
     echo "=== summary ==="
     echo "requests:     ${total} (${ok} ok, ${fail} failed)"
+    echo "status:"
+    if [[ -n "$status_counts" ]]; then
+      while IFS=$'\t' read -r code count; do
+        printf '  %-6s %s\n' "$code" "$count"
+      done <<<"$status_counts"
+    fi
     echo "wall time:    ${run_elapsed}s"
     echo "tps:          ${aggregate_rps} req/s"
     echo "throughput:   ${aggregate_bps_display} (${total_bytes_display} total)"
@@ -180,6 +197,22 @@ emit_summary() {
     {
       printf '%b\n' "${C_BOLD}=== summary ===${C_RESET}"
       printf 'requests:     %s (%s ok, %b)\n' "$total" "${C_GREEN}${ok}${C_RESET}" "$fail_part"
+      printf '%bstatus:%b\n' "$C_DIM" "$C_RESET"
+      if [[ -n "$status_counts" ]]; then
+        while IFS=$'\t' read -r code count; do
+          status_color="$C_GREEN"
+          if [[ ! "$code" =~ ^[0-9]+$ ]] || [[ "$code" -eq 0 ]]; then
+            status_color="$C_RED"
+          elif (( code >= 500 )); then
+            status_color="$C_RED"
+          elif (( code >= 400 )); then
+            status_color="$C_YELLOW"
+          elif (( code >= 300 )); then
+            status_color="$C_CYAN"
+          fi
+          printf '  %b%-6s%b %s\n' "$status_color" "$code" "$C_RESET" "$count"
+        done <<<"$status_counts"
+      fi
       printf 'wall time:    %ss\n' "$run_elapsed"
       printf 'tps:          %b%s req/s%b\n' "$C_CYAN" "$aggregate_rps" "$C_RESET"
       printf 'throughput:   %b%s%b (%s total)\n' "$C_CYAN" "$aggregate_bps_display" "$C_RESET" "$total_bytes_display"
@@ -198,17 +231,67 @@ emit_summary() {
 # Four endpoints per experiment (override with space-separated lists if needed).
 read -r -a HTML_ENDPOINTS <<< "${HTML_ENDPOINTS:-Results Plots Downloads}"
 read -r -a JSON_ENDPOINTS <<< "${JSON_ENDPOINTS:-resources/DATA resources/PLOTS}"
-search_queries=()
-if [[ -n "$SEARCH_QUERIES" ]]; then
-  IFS=',' read -r -a search_queries <<< "$SEARCH_QUERIES"
-elif [[ -f "$SEARCH_QUERIES_FILE" ]]; then
+# One term per line. Blank lines, # comments, and a header (search_term or condition) are skipped.
+load_search_terms() {
+  local file="$1"
+  local line
+  [[ -f "$file" ]] || return 0
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%$'\r'}"
-    [[ -z "$line" || "$line" == \#* || "$line" == "search_term" ]] && continue
-    search_queries+=("$line")
-  done < "$SEARCH_QUERIES_FILE"
+    [[ -z "$line" || "$line" == \#* || "$line" == "search_term" || "$line" == "condition" ]] && continue
+    printf '%s\n' "$line"
+  done < "$file"
+}
+
+search_queries=()
+search_conditions=()
+if [[ -n "$SEARCH_QUERIES" ]]; then
+  IFS=',' read -r -a search_queries <<< "$SEARCH_QUERIES"
+else
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "$line" ]] && search_queries+=("$line")
+  done < <(load_search_terms "$SEARCH_QUERIES_FILE")
 fi
-IFS=',' read -r -a search_species <<< "$SEARCH_SPECIES"
+if [[ -n "$SEARCH_CONDITIONS" ]]; then
+  IFS=',' read -r -a search_conditions <<< "$SEARCH_CONDITIONS"
+else
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "$line" ]] && search_conditions+=("$line")
+  done < <(load_search_terms "$SEARCH_CONDITIONS_FILE")
+fi
+# Empty gene and condition are extra product slots, sent as [] by warm_searches.
+if [[ "$WARM_SEARCHES" == "1" && ${#search_queries[@]} -gt 0 ]]; then
+  search_queries+=("")
+fi
+if [[ "$WARM_SEARCHES" == "1" && ${#search_conditions[@]} -gt 0 ]]; then
+  search_conditions+=("")
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "${C_RED}ERROR: jq is required${C_RESET}" >&2
+  exit 1
+fi
+
+search_species=()
+if [[ -n "$SEARCH_SPECIES" ]]; then
+  IFS=',' read -r -a search_species <<< "$SEARCH_SPECIES"
+elif [[ "$WARM_SEARCHES" == "1" ]]; then
+  echo "${C_DIM}Loading species from:${C_RESET} $SPECIES_SUMMARY_URL" >&2
+  if ! species_json=$(curl -fsSL \
+    --connect-timeout "$CONNECT_TIMEOUT" \
+    --max-time "$MAX_TIME" \
+    "$SPECIES_SUMMARY_URL"); then
+    echo "${C_RED}ERROR: failed to load species from $SPECIES_SUMMARY_URL${C_RESET}" >&2
+    exit 1
+  fi
+  while IFS= read -r species || [[ -n "$species" ]]; do
+    [[ -n "$species" ]] && search_species+=("$species")
+  done < <(jq -r '.speciesSummary[].cards[].iconSrc | select(length > 0)' <<<"$species_json")
+fi
+# Empty species is the "any" filter: one extra pass per gene and condition.
+if [[ "$WARM_SEARCHES" == "1" ]]; then
+  search_species+=("")
+fi
 
 CURL_WRITE_OUT='%{time_total}\t%{http_code}\t%{size_download}\t%{method}\t%{url_effective}\n'
 
@@ -226,18 +309,40 @@ echo "${C_DIM}WARM_ACCESSIONS:${C_RESET} $WARM_ACCESSIONS" >&2
 echo "${C_DIM}WARM_BIOENTITIES:${C_RESET} $WARM_BIOENTITIES" >&2
 echo "${C_DIM}WARM_SEARCHES:${C_RESET} $WARM_SEARCHES" >&2
 echo "${C_DIM}SEARCH_QUERIES_FILE:${C_RESET} $SEARCH_QUERIES_FILE" >&2
-echo "${C_DIM}SEARCH_QUERIES:${C_RESET} ${search_queries[*]}" >&2
-echo "${C_DIM}SEARCH_SPECIES:${C_RESET} ${search_species[*]}" >&2
+echo "${C_DIM}SEARCH_CONDITIONS_FILE:${C_RESET} $SEARCH_CONDITIONS_FILE" >&2
+queries_display=""
+conditions_display=""
+if ((${#search_queries[@]} > 0)); then
+  query_parts=()
+  for query in "${search_queries[@]}"; do
+    query_parts+=("${query:-any}")
+  done
+  queries_display="${query_parts[*]}"
+fi
+if ((${#search_conditions[@]} > 0)); then
+  condition_parts=()
+  for condition in "${search_conditions[@]}"; do
+    condition_parts+=("${condition:-any}")
+  done
+  conditions_display="${condition_parts[*]}"
+fi
+echo "${C_DIM}SEARCH_QUERIES (${#search_queries[@]}):${C_RESET} ${queries_display}" >&2
+echo "${C_DIM}SEARCH_CONDITIONS (${#search_conditions[@]}):${C_RESET} ${conditions_display}" >&2
+echo "${C_DIM}SPECIES_SUMMARY_URL:${C_RESET} $SPECIES_SUMMARY_URL" >&2
+species_display=""
+if ((${#search_species[@]} > 0)); then
+  species_parts=()
+  for species in "${search_species[@]}"; do
+    species_parts+=("${species:-any}")
+  done
+  species_display="${species_parts[*]}"
+fi
+echo "${C_DIM}SEARCH_SPECIES (${#search_species[@]}):${C_RESET} ${species_display}" >&2
 echo "${C_DIM}PROGRESS:${C_RESET} $PROGRESS" >&2
 echo "${C_DIM}HTML endpoints:${C_RESET} ${HTML_ENDPOINTS[*]}" >&2
 echo "${C_DIM}JSON endpoints:${C_RESET} ${JSON_ENDPOINTS[*]}" >&2
 echo "${C_DIM}LOG_FILE:${C_RESET} $LOG_FILE" >&2
 echo "${C_DIM}summary:${C_RESET} ${LOG_FILE%.*}.summary" >&2
-
-if ! command -v jq >/dev/null 2>&1; then
-  echo "${C_RED}ERROR: jq is required${C_RESET}" >&2
-  exit 1
-fi
 
 HEALTH_URL="${BASE_URL}/json/health"
 echo "${C_DIM}Checking health:${C_RESET} $HEALTH_URL" >&2
@@ -258,8 +363,13 @@ if [[ "$WARM_ACCESSIONS" != "1" && "$WARM_BIOENTITIES" != "1" && "$WARM_SEARCHES
   exit 1
 fi
 
-if [[ "$WARM_SEARCHES" == "1" && ${#search_queries[@]} -eq 0 ]]; then
-  echo "${C_RED}ERROR: no search queries (set SEARCH_QUERIES or SEARCH_QUERIES_FILE)${C_RESET}" >&2
+if [[ "$WARM_SEARCHES" == "1" && ( ${#search_queries[@]} -eq 0 || ${#search_conditions[@]} -eq 0 ) ]]; then
+  echo "${C_RED}ERROR: search warmups need both gene terms and conditions (SEARCH_QUERIES_FILE and SEARCH_CONDITIONS_FILE)${C_RESET}" >&2
+  exit 1
+fi
+
+if [[ "$WARM_SEARCHES" == "1" && ${#search_species[@]} -eq 0 ]]; then
+  echo "${C_RED}ERROR: no search species (set SEARCH_SPECIES or SPECIES_SUMMARY_URL)${C_RESET}" >&2
   exit 1
 fi
 
@@ -318,20 +428,34 @@ progress_watch_flag="${log_file}.watch"
 accession_queue="${log_file}.queue"
 work_lock="${log_file}.work.lock"
 
+# Unit separator, not tab: bash read treats tab as whitespace and drops the empty
+# accession field, which shifts the total into the label and leaves the denominator 0.
+PROGRESS_SEP=$'\x1f'
+
 write_progress_state() {
   local tmp
   tmp="$(mktemp "${progress_state_file}.tmp.XXXXXX")"
-  printf '%s\t%s\n' "$acc_index" "$current_accession" >"$tmp"
+  printf '%s%s%s%s%s%s%s\n' \
+    "$acc_index" "$PROGRESS_SEP" \
+    "$current_accession" "$PROGRESS_SEP" \
+    "$progress_label" "$PROGRESS_SEP" \
+    "$progress_total" >"$tmp"
   mv "$tmp" "$progress_state_file"
 }
 
 read_progress_state() {
   acc_index=0
   current_accession=""
+  progress_label="${progress_label:-experiments}"
+  progress_total="${progress_total:-0}"
   if [[ -f "$progress_state_file" ]]; then
-    IFS=$'\t' read -r acc_index current_accession <"$progress_state_file" || true
+    IFS="$PROGRESS_SEP" read -r acc_index current_accession progress_label progress_total <"$progress_state_file" || true
     acc_index="${acc_index:-0}"
+    progress_label="${progress_label:-experiments}"
+    progress_total="${progress_total:-0}"
   fi
+  [[ "$acc_index" =~ ^[0-9]+$ ]] || acc_index=0
+  [[ "$progress_total" =~ ^[0-9]+$ ]] || progress_total=0
 }
 
 INTERRUPTED=0
@@ -482,12 +606,14 @@ user_worker() {
   user_has_requested=0
   while accession="$(claim_accession)"; do
     [[ "$INTERRUPTED" == "1" ]] && break
-    if [[ "$USER_PHASE" == "both" ]]; then
-      warm_accession_pages "$accession"
-      warm_bioentity_accession "$accession"
-    else
-      warm_bioentity_accession "$accession"
-    fi
+    case "$USER_PHASE" in
+      bioentities)
+        warm_bioentity_accession "$accession"
+        ;;
+      *)
+        warm_accession_pages "$accession"
+        ;;
+    esac
   done
   return 0
 }
@@ -496,6 +622,11 @@ run_user_workers() {
   local i pid started=0
   local -a pids=()
   USER_PHASE="$1"
+  case "$USER_PHASE" in
+    bioentities) progress_label="bioentities" ;;
+    *) progress_label="experiments" ;;
+  esac
+  progress_total=${#accessions[@]}
   acc_index=0
   current_accession=""
   write_progress_state
@@ -515,7 +646,7 @@ run_user_workers() {
 }
 
 warm_accessions() {
-  run_user_workers both
+  run_user_workers experiments
 }
 
 warm_bioentities() {
@@ -523,27 +654,55 @@ warm_bioentities() {
 }
 
 # Search pages are global (one pass per run), not tied to an accession or bioentity.
+# gene_query and condition_query are raw terms; an empty term is sent as [].
 warm_searches() {
-  local gene_query="${1:-REG1B}"
-  local species_query="${2:-homo sapiens}"
-
-  local differential_url
-  differential_url="${BASE_URL}/json/search/differential_results?geneQuery=%255B%257B%2522value%2522%253A%2522${gene_query}%2522%257D%255D&conditionQuery=%255B%255D"
+  local gene_query="${1:-}"
+  local species_query="${2:-}"
+  local condition_query="${3:-}"
+  local search_term_category="${4:-symbol}"
+  
+  if [[ -n "$gene_query" ]]; then
+    gene_query="[{\"value\":\"${gene_query}\",\"category\":\"${search_term_category}\"}]"
+  else
+    gene_query="[]"
+  fi
+  if [[ -n "$condition_query" ]]; then
+    condition_query="[{\"value\":\"${condition_query}\"}]"
+  else
+    condition_query="[]"
+  fi
 
   curl -sS -L -o /dev/null \
     --connect-timeout "$CONNECT_TIMEOUT" \
     --max-time "$MAX_TIME" \
     -w "$CURL_WRITE_OUT" \
-    --data-urlencode "geneQuery=[{\"value\":\"${gene_query}\"}]" \
-    --data-urlencode 'conditionQuery=[]' \
+    --data-urlencode "geneQuery=${gene_query}" \
+    --data-urlencode "conditionQuery=${condition_query}" \
     --data-urlencode "species=${species_query}" \
     --data-urlencode 'source=ORGANISM_PART' \
     "${BASE_URL}/json/baseline_experiments" >>"$log_file" 2>/dev/null || true
 
   interruptible_sleep "$REQUEST_INTERVAL_SECONDS"
 
-  hit_url "$differential_url"
+  curl -sS -L --get -o /dev/null \
+    --connect-timeout "$CONNECT_TIMEOUT" \
+    --max-time "$MAX_TIME" \
+    -w "$CURL_WRITE_OUT" \
+    --data-urlencode "geneQuery=${gene_query}" \
+    --data-urlencode "conditionQuery=${condition_query}" \
+    --data-urlencode "species=${species_query}" \
+    "${BASE_URL}/json/search/differential_results" >>"$log_file" 2>/dev/null || true
 
+  interruptible_sleep "$REQUEST_INTERVAL_SECONDS"
+
+  curl -sS -L --get -o /dev/null \
+    --connect-timeout "$CONNECT_TIMEOUT" \
+    --max-time "$MAX_TIME" \
+    -w "$CURL_WRITE_OUT" \
+    --data-urlencode "geneQuery=${gene_query}" \
+    --data-urlencode "conditionQuery=${condition_query}" \
+    --data-urlencode "species=${species_query}" \
+    "${BASE_URL}/json/search/differential_facets" >>"$log_file" 2>/dev/null || true
 }
 
 cleanup_work_files() {
@@ -555,6 +714,7 @@ report_progress() {
   local current="$1"
   local total="$2"
   local accession="$3"
+  local label="${progress_label:-experiments}"
   [[ "$PROGRESS" == "1" ]] || return 0
   local logged elapsed req_per_sec
   logged=$(wc -l <"$log_file" | tr -d ' ')
@@ -563,24 +723,24 @@ report_progress() {
     if (t > 0) printf "%.1f", n / t
     else print "0.0"
   }')
-  mean_latency=$(awk '{sum+=$1} END {if(NR>0) print sum/NR}' $log_file)
+  mean_latency=$(awk '{sum+=$1} END {if(NR>0) printf "%.2f", sum/NR; else print "0.00"}' "$log_file")
   if [[ -t 2 && "$USE_COLOR" == "1" ]]; then
-    printf '\r%bexperiments: %4d/%d%b  %brequests: %7s%b  %b%2.2f req/s%b  latency %b%2.2f s/req%b %s%b\033[K' \
-      "$C_CYAN" "$current" "$total" "$C_RESET" \
+    printf '\r%b%-12s %4d/%d%b  %brequests: %7s%b  %b%2.2f req/s%b  latency %b%2.2f s/req%b %s%b\033[K' \
+      "$C_CYAN" "${label}:" "$current" "$total" "$C_RESET" \
       "$C_DIM" "$logged" "$C_RESET" \
       "$C_CYAN" "$req_per_sec" "$C_RESET" \
       "$C_DIM" "$mean_latency" "$C_RESET" \
       "$accession" >&2
   else
-    printf 'experiments: %4d/%d  requests: %7s  %2.2f req/s  %2.2f s/req %s\n' \
-      "$current" "$total" "$logged" "$req_per_sec" "$mean_latency" "$accession" >&2
+    printf '%-12s %4d/%d  requests: %7s  %2.2f req/s  %2.2f s/req %s\n' \
+      "${label}:" "$current" "$total" "$logged" "$req_per_sec" "$mean_latency" "$accession" >&2
   fi
 }
 
 progress_watcher() {
   while [[ -f "$progress_watch_flag" && "$INTERRUPTED" != "1" ]]; do
     read_progress_state
-    report_progress "$acc_index" "$total_accessions" "$current_accession"
+    report_progress "$acc_index" "$progress_total" "$current_accession"
     sleep "$PROGRESS_INTERVAL" &
     wait $! 2>/dev/null || true
   done
@@ -588,7 +748,7 @@ progress_watcher() {
 
 start_progress_watcher() {
   [[ "$PROGRESS" == "1" ]] || return 0
-  : >"$progress_state_file"
+  write_progress_state
   touch "$progress_watch_flag"
   progress_watcher &
   progress_watch_pid=$!
@@ -604,9 +764,18 @@ stop_progress_watcher() {
 }
 
 run_start=$(now_s)
-total_accessions=${#accessions[@]}
 acc_index=0
 current_accession=""
+if [[ "$WARM_ACCESSIONS" == "1" ]]; then
+  progress_label="experiments"
+  progress_total=${#accessions[@]}
+elif [[ "$WARM_BIOENTITIES" == "1" ]]; then
+  progress_label="bioentities"
+  progress_total=${#accessions[@]}
+else
+  progress_label="searches"
+  progress_total=$(( ${#search_queries[@]} * ${#search_species[@]} * ${#search_conditions[@]} ))
+fi
 
 write_progress_state
 start_progress_watcher
@@ -618,10 +787,24 @@ if [[ "$WARM_BIOENTITIES" == "1" ]]; then
   warm_bioentities
 fi
 if [[ "$WARM_SEARCHES" == "1" ]]; then
+  search_index=0
+  progress_label="searches"
+  progress_total=$(( ${#search_queries[@]} * ${#search_species[@]} * ${#search_conditions[@]} ))
+  acc_index=0
+  current_accession=""
+  write_progress_state
   for query in "${search_queries[@]}"; do
     for species in "${search_species[@]}"; do
-      echo "Warming up search for query: $query and species: $species" >&2
-      warm_searches "$query" "$species"
+      for condition in "${search_conditions[@]}"; do
+        search_index=$((search_index + 1))
+        acc_index=$search_index
+        current_accession="${query:-any} / ${condition:-any} (${species:-any})"
+        write_progress_state
+        if [[ "$PROGRESS" != "1" ]]; then
+          echo "Warming up search for gene: ${query:-any}, condition: ${condition:-any}, species: ${species:-any}" >&2
+        fi
+        warm_searches "$query" "$species" "$condition"
+      done
     done
   done
 fi
@@ -629,7 +812,7 @@ fi
 read_progress_state
 cleanup_work_files
 stop_progress_watcher
-report_progress "$acc_index" "$total_accessions" "$current_accession"
+report_progress "$acc_index" "$progress_total" "$current_accession"
 
 if [[ "$PROGRESS" == "1" && -t 2 ]]; then
   echo >&2
