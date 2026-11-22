@@ -23,7 +23,8 @@ solr:
   restartAt: ""
   image:
     tag: 8.7.0
-  javaMem: "-Xms4000m -Xmx10000m"
+  # Heap must fit under the 11Gi limit, with room for metaspace and direct memory.
+  javaMem: "-Xms4000m -Xmx8000m"
   opts: >-
     -Denable.packages=true
     -Dblob.max.size.mb=100
