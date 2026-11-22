@@ -66,9 +66,19 @@ Extra nginx configuration-snippet for ingress cache (health bypass, cache method
 Used with nginx.ingress.kubernetes.io/proxy-cache annotation referencing keys_zone from controller http-snippet.
 */}}
 {{- define "app.ingress.cacheConfigurationSnippet" -}}
-proxy_cache_methods GET HEAD;
+proxy_cache_methods GET HEAD POST;
+proxy_cache_key "$uri$is_args$args$gxa_cache_key_body";
+client_body_in_single_buffer on;
+client_body_buffer_size 1m;
 set $skip_cache 0;
-if ($request_uri ~ "^{{ .Values.ingress.pathPrefix }}/json/(health|build)$") {
+if ($request_uri ~ "^{{ .Values.ingress.pathPrefix }}/json/(health|build)(\?|$)") {
+  set $skip_cache 1;
+}
+if ($request_uri ~ "^{{ .Values.ingress.pathPrefix }}/admin(/|\?|$)") {
+  set $skip_cache 1;
+}
+set $method_and_length "${request_method}${http_content_length}";
+if ($method_and_length ~ "^POST([0-9]{7,})?$") {
   set $skip_cache 1;
 }
 proxy_cache_bypass $skip_cache;
@@ -128,10 +138,16 @@ Paths under {{ contextPath }}/_ops/cache/ — Basic auth via /etc/nginx/purge.ht
           auth_basic_user_file /etc/nginx/purge.htpasswd;
           proxy_cache_purge atlas "$1*";
         }
+        location = {{ $ctx }}/_ops/cache/purge-post-bodies {
+          internal;
+          proxy_cache_purge atlas "$gxa_purge_key|*";
+        }
         location ~ ^{{ $ctx }}/_ops/cache/purge(/.*)$ {
           auth_basic "GXA cache purge";
           auth_basic_user_file /etc/nginx/purge.htpasswd;
-          proxy_cache_purge atlas "$1$is_args$args";
+          set $gxa_purge_key "$1$is_args$args";
+          mirror {{ $ctx }}/_ops/cache/purge-post-bodies;
+          proxy_cache_purge atlas "$gxa_purge_key";
         }
 {{- end }}
 

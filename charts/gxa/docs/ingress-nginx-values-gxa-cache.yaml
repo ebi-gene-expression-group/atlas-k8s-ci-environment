@@ -16,3 +16,7 @@ controller:
     annotations-risk-level: Critical
     http-snippet: |
       proxy_cache_path /tmp/gxa-nginx-cache levels=1:2 keys_zone=gxa_cache:10m max_size=1g inactive=60d use_temp_path=off;
+      map $request_method $gxa_cache_key_body {
+        default "";
+        POST    "|$request_body";
+      }

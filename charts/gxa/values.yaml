@@ -141,7 +141,11 @@ nginx:
   proxyConnectTimeout: 10s
   # Max request body size (for Tomcat Manager WAR uploads; default 1m is too small)
   clientMaxBodySize: 140m
-  # Proxy cache settings (when enabled)
+  # Proxy cache settings (when enabled).
+  # GET and HEAD are keyed by the URL, so existing GET entries stay valid.
+  # POST is keyed by the URL plus the body. /gxa/admin is not cached.
+  # POST bodies of 1000000 bytes or more are not cached
+  # (the body must stay in the 1m memory buffer or it is missing from the key).
   cache:
     enabled: true
     zoneSize: 10m
