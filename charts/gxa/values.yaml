@@ -149,7 +149,7 @@ nginx:
   cache:
     enabled: true
     zoneSize: 10m
-    maxSize: 1g
+    maxSize: 1536m  # 1.5 GiB. Nginx rejects a fractional size such as 1.5g.
     inactive: 7d
     valid200: 60d
     purge:
