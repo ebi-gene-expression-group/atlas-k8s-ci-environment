@@ -43,9 +43,11 @@ flowchart LR
 
 ## Proxy configuration
 
-Proxy variables come from the `ebi-proxy` ConfigMap and are injected into the pod
+Proxy variables come from `proxy.*` in values (defaults match the EBI wwwcache)
+and are written to the `ebi-proxy` ConfigMap, then injected into the pod
 as `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, and related variants. `CATALINA_OPTS`
-is also populated to ensure Java-based proxy support.
+is also populated to ensure Java-based proxy support. Override `proxy.httpProxy`,
+`proxy.httpsProxy`, `proxy.host`, `proxy.port`, or `proxy.noProxy` per environment.
 
 ## Images and repositories
 

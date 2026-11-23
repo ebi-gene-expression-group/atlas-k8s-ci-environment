@@ -18,6 +18,13 @@ solr:
   user: admin
   createSecret: true
 
+# HX wwwcache for fg-fallback.
+proxy:
+  httpProxy: "http://hx-wwwcache.ebi.ac.uk:3128"
+  httpsProxy: "http://hx-wwwcache.ebi.ac.uk:3128"
+  host: "hx-wwwcache.ebi.ac.uk"
+  port: "3128"
+
 # see https://embl.service-now.com/esc?id=kb_article&sysparm_article=KB0011170
 nfs:
   server: "hx-isi-srv-vlan157.ebi.ac.uk"

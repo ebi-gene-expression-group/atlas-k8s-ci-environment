@@ -99,6 +99,16 @@ ingress:
 # Override URL prefix for the app when ingress is off but traffic is still under a path.
 publicUrlPrefix: ""
 
+# Outbound HTTP proxy (EBI wwwcache). Written to the ebi-proxy ConfigMap and
+# injected as HTTP_PROXY / HTTPS_PROXY / NO_PROXY, plus Java -Dhttp.proxyHost
+# via CATALINA_OPTS. Override per environment in values-<env>.yaml.
+proxy:
+  httpProxy: "http://hh-wwwcache.ebi.ac.uk:3128"
+  httpsProxy: "http://hh-wwwcache.ebi.ac.uk:3128"
+  host: "hh-wwwcache.ebi.ac.uk"
+  port: "3128"
+  noProxy: "localhost,127.0.0.1,*.cluster.local,*.svc,*.svc.cluster.local"
+
 resources:
   requests:
     memory: "4Gi"
