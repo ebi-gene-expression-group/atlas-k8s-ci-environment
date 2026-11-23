@@ -8,6 +8,19 @@ spec:
     fsGroup: 1000
   containers:
     - name: jnlp
+      env:
+        # Git checkout runs in this container. The git-client plugin sets
+        # http_proxy from the Jenkins controller (hh-wwwcache). http.<url>.proxy
+        # overrides that. Each cluster's gxa-jenkins/ebi-proxy supplies the URL.
+        - name: GIT_CONFIG_COUNT
+          value: "1"
+        - name: GIT_CONFIG_KEY_0
+          value: http.https://github.com/.proxy
+        - name: GIT_CONFIG_VALUE_0
+          valueFrom:
+            configMapKeyRef:
+              name: ebi-proxy
+              key: HTTP_PROXY
       resources:
         requests:
           memory: "512Mi"
